@@ -1,0 +1,77 @@
+from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
+
+
+class Category(models.Model):
+    slug = models.SlugField("نامک", unique=True)
+    title = models.CharField("عنوان", max_length=100, unique=True)
+    emoji = models.CharField("اموجی", max_length=10)
+    sub = models.JSONField("زیردسته‌ها", default=list, blank=True)
+
+    class Meta:
+        verbose_name = "دسته‌بندی"
+        verbose_name_plural = "دسته‌بندی‌ها"
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class Product(models.Model):
+    title = models.CharField("عنوان", max_length=255)
+    title_en = models.CharField("عنوان انگلیسی", max_length=255, blank=True)
+    price = models.PositiveIntegerField("قیمت (تومان)")
+    old_price = models.PositiveIntegerField("قیمت قبل (تومان)", null=True, blank=True)
+    rating = models.FloatField("امتیاز", default=0)
+    rating_count = models.PositiveIntegerField("تعداد امتیاز", default=0)
+    emoji = models.CharField("اموجی", max_length=10)
+    badge = models.CharField("برچسب", max_length=50, blank=True)
+    colors = models.JSONField("رنگ‌ها", null=True, blank=True)  # [{name, hex}]
+    features = models.JSONField("ویژگی‌ها", null=True, blank=True)  # [str]
+    specs = models.JSONField("مشخصات", null=True, blank=True)  # [{label, value}]
+    description = models.TextField("توضیحات", blank=True)
+    warranty = models.CharField("گارانتی", max_length=100, blank=True)
+    stock = models.PositiveIntegerField("موجودی", default=10)
+    created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+
+    category = models.ForeignKey(
+        Category,
+        verbose_name="دسته‌بندی",
+        on_delete=models.PROTECT,
+        related_name="products",
+    )
+
+    class Meta:
+        verbose_name = "محصول"
+        verbose_name_plural = "محصولات"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class Review(models.Model):
+    rating = models.PositiveSmallIntegerField(
+        "امتیاز", validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    text = models.TextField("متن")
+    created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+
+    product = models.ForeignKey(
+        Product, verbose_name="محصول", on_delete=models.CASCADE, related_name="reviews"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="کاربر",
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+
+    class Meta:
+        verbose_name = "دیدگاه"
+        verbose_name_plural = "دیدگاه‌ها"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.product} — {self.rating}★"

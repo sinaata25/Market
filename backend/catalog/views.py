@@ -1,0 +1,179 @@
+import math
+
+from django.db.models import Avg, Count
+from rest_framework import serializers
+from rest_framework.views import APIView
+
+from common.responses import fail, ok
+
+from .dto import category_dto, product_dto
+from .models import Category, Product, Review
+
+SORTS = {
+    "newest": "-created_at",
+    "cheapest": "price",
+    "expensive": "-price",
+    "popular": "-rating_count",
+}
+
+
+class CategoryListView(APIView):
+    """فهرست دسته‌بندی‌ها"""
+
+    def get(self, request):
+        categories = [category_dto(c) for c in Category.objects.all()]
+        return ok({"categories": categories})
+
+
+class ProductListView(APIView):
+    """فهرست محصولات با فیلتر، جستجو، مرتب‌سازی و صفحه‌بندی.
+
+    مثال: /api/products?category=garden-tools&sort=cheapest&page=1
+    """
+
+    def get(self, request):
+        qs = Product.objects.select_related("category")
+
+        category = request.query_params.get("category")
+        if category:
+            qs = qs.filter(category__slug=category)
+
+        search = request.query_params.get("search")
+        if search:
+            qs = qs.filter(title__contains=search)
+
+        if request.query_params.get("discounted") in ("true", "1"):
+            qs = qs.filter(old_price__isnull=False)
+
+        sort = request.query_params.get("sort", "newest")
+        qs = qs.order_by(SORTS.get(sort, "-created_at"))
+
+        try:
+            page = max(1, int(request.query_params.get("page", 1)))
+            per_page = min(50, max(1, int(request.query_params.get("perPage", 20))))
+        except ValueError:
+            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
+
+        total = qs.count()
+        start = (page - 1) * per_page
+        items = [product_dto(p) for p in qs[start : start + per_page]]
+
+        return ok(
+            {
+                "items": items,
+                "total": total,
+                "page": page,
+                "perPage": per_page,
+                "pages": math.ceil(total / per_page),
+            }
+        )
+
+
+class ProductDetailView(APIView):
+    """جزئیات یک محصول به‌همراه محصولات مرتبط"""
+
+    def get(self, request, pk: int):
+        try:
+            product = Product.objects.select_related("category").get(pk=pk)
+        except Product.DoesNotExist:
+            return fail("محصول یافت نشد", 404)
+
+        # اول هم‌دسته‌ها، بعد پرطرفدارهای سایر دسته‌ها تا سقف ۴ مورد
+        same = list(
+            Product.objects.select_related("category")
+            .filter(category=product.category)
+            .exclude(pk=pk)[:4]
+        )
+        if len(same) < 4:
+            others = (
+                Product.objects.select_related("category")
+                .exclude(category=product.category)
+                .exclude(pk=pk)
+                .order_by("-rating_count")[: 4 - len(same)]
+            )
+            same.extend(others)
+
+        return ok(
+            {
+                "product": product_dto(product),
+                "related": [product_dto(p) for p in same],
+            }
+        )
+
+
+def mask_author(user) -> str:
+    """نام کاربر یا شماره‌ی ماسک‌شده"""
+    if user.name:
+        return user.name
+    return f"کاربر {user.phone[:4]}***{user.phone[-2:]}"
+
+
+class ReviewCreateSerializer(serializers.Serializer):
+    rating = serializers.IntegerField(
+        min_value=1,
+        max_value=5,
+        error_messages={
+            "required": "امتیاز الزامی است",
+            "min_value": "امتیاز باید بین ۱ تا ۵ باشد",
+            "max_value": "امتیاز باید بین ۱ تا ۵ باشد",
+        },
+    )
+    text = serializers.CharField(
+        min_length=5,
+        max_length=1000,
+        error_messages={
+            "required": "متن دیدگاه الزامی است",
+            "min_length": "متن دیدگاه حداقل ۵ حرف باشد",
+            "max_length": "متن دیدگاه حداکثر ۱۰۰۰ حرف باشد",
+        },
+    )
+
+
+class ReviewListCreateView(APIView):
+    """فهرست دیدگاه‌های محصول / ثبت دیدگاه (نیازمند ورود)"""
+
+    def get(self, request, pk: int):
+        reviews = Review.objects.filter(product_id=pk).select_related("user")
+        return ok(
+            {
+                "reviews": [
+                    {
+                        "id": r.id,
+                        "rating": r.rating,
+                        "text": r.text,
+                        "createdAt": r.created_at.isoformat(),
+                        "author": mask_author(r.user),
+                    }
+                    for r in reviews
+                ]
+            }
+        )
+
+    def post(self, request, pk: int):
+        if not request.user.is_authenticated:
+            return fail("برای ثبت دیدگاه ابتدا وارد شوید", 401)
+
+        try:
+            product = Product.objects.get(pk=pk)
+        except Product.DoesNotExist:
+            return fail("محصول یافت نشد", 404)
+
+        ser = ReviewCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        review = Review.objects.create(
+            product=product,
+            user=request.user,
+            rating=ser.validated_data["rating"],
+            text=ser.validated_data["text"],
+        )
+
+        # میانگین و تعداد امتیازها دوباره محاسبه شود
+        agg = Review.objects.filter(product=product).aggregate(
+            avg=Avg("rating"), count=Count("id")
+        )
+        product.rating = round(agg["avg"] or 0, 1)
+        product.rating_count = agg["count"]
+        product.save(update_fields=["rating", "rating_count"])
+
+        return ok({"review": {"id": review.id}}, status=201)

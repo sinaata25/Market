@@ -1,0 +1,66 @@
+import "server-only";
+import type { Product as ProductDTO, Category as CategoryDTO } from "@/lib/products";
+
+// لایه‌ی خواندن کاتالوگ سمت سرور Next — از API جنگو fetch می‌کند
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
+
+async function apiGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${BACKEND_URL}${path}`, { cache: "no-store" });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error ?? `خطای API: ${path}`);
+  return json.data as T;
+}
+
+export async function getCategories(): Promise<CategoryDTO[]> {
+  const data = await apiGet<{ categories: CategoryDTO[] }>("/api/categories");
+  return data.categories;
+}
+
+export type ProductListParams = {
+  categorySlug?: string;
+  search?: string;
+  sort?: "newest" | "cheapest" | "expensive" | "popular";
+  page?: number;
+  perPage?: number;
+  onlyDiscounted?: boolean;
+};
+
+export type ProductListResult = {
+  items: ProductDTO[];
+  total: number;
+  page: number;
+  perPage: number;
+  pages: number;
+};
+
+export async function getProducts(
+  params: ProductListParams = {}
+): Promise<ProductListResult> {
+  const qs = new URLSearchParams();
+  if (params.categorySlug) qs.set("category", params.categorySlug);
+  if (params.search) qs.set("search", params.search);
+  if (params.sort) qs.set("sort", params.sort);
+  if (params.page) qs.set("page", String(params.page));
+  if (params.perPage) qs.set("perPage", String(params.perPage));
+  if (params.onlyDiscounted) qs.set("discounted", "true");
+  const query = qs.toString();
+  return apiGet<ProductListResult>(`/api/products${query ? `?${query}` : ""}`);
+}
+
+export async function getProductById(id: number): Promise<ProductDTO | null> {
+  try {
+    const data = await apiGet<{ product: ProductDTO }>(`/api/products/${id}`);
+    return data.product;
+  } catch {
+    return null;
+  }
+}
+
+export async function getRelatedProducts(id: number): Promise<ProductDTO[]> {
+  try {
+    const data = await apiGet<{ related: ProductDTO[] }>(`/api/products/${id}`);
+    return data.related;
+  } catch {
+    return [];
+  }
+}
