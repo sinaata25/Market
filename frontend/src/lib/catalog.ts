@@ -56,6 +56,19 @@ export async function getProductById(id: number): Promise<ProductDTO | null> {
   }
 }
 
+// یافتن محصول با نامک سئو (تنظیم‌شده در پنل سئو)
+export async function getProductBySlug(
+  slug: string
+): Promise<{ product: ProductDTO; related: ProductDTO[] } | null> {
+  try {
+    return await apiGet<{ product: ProductDTO; related: ProductDTO[] }>(
+      `/api/products/slug/${encodeURIComponent(slug)}`
+    );
+  } catch {
+    return null;
+  }
+}
+
 export async function getRelatedProducts(id: number): Promise<ProductDTO[]> {
   try {
     const data = await apiGet<{ related: ProductDTO[] }>(`/api/products/${id}`);

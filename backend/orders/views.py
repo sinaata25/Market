@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.db import transaction
+from django.db.models import F
 from rest_framework import serializers
 from rest_framework.views import APIView
 
+from accounts.models import Address
 from carts.services import get_current_cart
 from catalog.models import Product
 from common.responses import fail, ok
@@ -17,21 +19,29 @@ class OutOfStock(Exception):
 
 
 class CreateOrderSerializer(serializers.Serializer):
+    # در صورت ارسال، اطلاعات از دفترچه آدرس کاربر خوانده می‌شود
+    addressId = serializers.IntegerField(required=False, allow_null=True)
     fullName = serializers.CharField(
         min_length=3,
+        required=False,
         error_messages={
             "required": "نام تحویل‌گیرنده الزامی است",
             "min_length": "نام تحویل‌گیرنده حداقل ۳ حرف باشد",
         },
     )
     province = serializers.CharField(
-        min_length=2, error_messages={"required": "استان الزامی است"}
+        min_length=2,
+        required=False,
+        error_messages={"required": "استان الزامی است"},
     )
     city = serializers.CharField(
-        min_length=2, error_messages={"required": "شهر الزامی است"}
+        min_length=2,
+        required=False,
+        error_messages={"required": "شهر الزامی است"},
     )
     address = serializers.CharField(
         min_length=10,
+        required=False,
         error_messages={
             "required": "آدرس الزامی است",
             "min_length": "آدرس کامل‌تری وارد کنید",
@@ -39,22 +49,51 @@ class CreateOrderSerializer(serializers.Serializer):
     )
     postalCode = serializers.CharField(required=False, allow_blank=True)
 
+    def validate(self, data):
+        # اگر آدرس ذخیره‌شده انتخاب نشده، فیلدهای آدرس الزامی‌اند
+        if not data.get("addressId"):
+            missing = [
+                label
+                for field, label in (
+                    ("fullName", "نام تحویل‌گیرنده"),
+                    ("province", "استان"),
+                    ("city", "شهر"),
+                    ("address", "آدرس"),
+                )
+                if not data.get(field)
+            ]
+            if missing:
+                raise serializers.ValidationError(f"{missing[0]} الزامی است")
+        return data
+
 
 def order_dto(order: Order) -> dict:
     return {
         "id": order.id,
         "code": order.code,
         "status": order.status,
+        "statusLabel": order.get_status_display(),
         "createdAt": order.created_at.isoformat(),
         "fullName": order.full_name,
+        "phone": order.phone,
         "province": order.province,
         "city": order.city,
+        "address": order.address,
+        "postalCode": order.postal_code,
         "itemsPrice": order.items_price,
         "discount": order.discount,
         "shippingPrice": order.shipping_price,
         "totalPrice": order.total_price,
+        "canCancel": order.status == Order.Status.PENDING,
         "items": [
-            {"id": i.id, "title": i.title, "price": i.price, "qty": i.qty}
+            {
+                "id": i.id,
+                "title": i.title,
+                "price": i.price,
+                "oldPrice": i.old_price,
+                "qty": i.qty,
+                "productId": i.product_id,
+            }
             for i in order.items.all()
         ],
     }
@@ -76,6 +115,22 @@ class OrderListCreateView(APIView):
         ser = CreateOrderSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         info = ser.validated_data
+
+        # آدرس ذخیره‌شده کاربر جایگزین فیلدهای دستی می‌شود
+        if info.get("addressId"):
+            addr = Address.objects.filter(
+                pk=info["addressId"], user=request.user
+            ).first()
+            if addr is None:
+                return fail("آدرس انتخاب‌شده یافت نشد", 404)
+            info = {
+                **info,
+                "fullName": addr.full_name,
+                "province": addr.province,
+                "city": addr.city,
+                "address": addr.address,
+                "postalCode": addr.postal_code,
+            }
 
         cart = get_current_cart(request)
         if cart is None or not cart.items.exists():
@@ -146,3 +201,43 @@ class OrderListCreateView(APIView):
             {"order": {"code": order.code, "totalPrice": order.total_price}},
             status=201,
         )
+
+
+class OrderDetailView(APIView):
+    """جزئیات یک سفارش کاربر + لغو سفارش در انتظار پرداخت"""
+
+    def get(self, request, pk: int):
+        if not request.user.is_authenticated:
+            return fail("ابتدا وارد شوید", 401)
+        order = (
+            Order.objects.filter(pk=pk, user=request.user)
+            .prefetch_related("items")
+            .first()
+        )
+        if order is None:
+            return fail("سفارش یافت نشد", 404)
+        return ok({"order": order_dto(order)})
+
+    def post(self, request, pk: int):
+        """لغو سفارش — موجودی کالاها برگردانده می‌شود"""
+        if not request.user.is_authenticated:
+            return fail("ابتدا وارد شوید", 401)
+        order = (
+            Order.objects.filter(pk=pk, user=request.user)
+            .prefetch_related("items")
+            .first()
+        )
+        if order is None:
+            return fail("سفارش یافت نشد", 404)
+        if order.status != Order.Status.PENDING:
+            return fail("فقط سفارش در انتظار پرداخت قابل لغو است", 409)
+
+        with transaction.atomic():
+            for item in order.items.all():
+                Product.objects.filter(pk=item.product_id).update(
+                    stock=F("stock") + item.qty
+                )
+            order.status = Order.Status.CANCELED
+            order.save(update_fields=["status"])
+
+        return ok({"order": order_dto(order)})

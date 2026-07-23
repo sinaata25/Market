@@ -12,6 +12,7 @@ type CartItem = {
     id: number;
     title: string;
     emoji: string;
+    image?: string | null;
     price: number;
     oldPrice?: number;
     stock?: number;
@@ -34,6 +35,16 @@ type CheckoutInfo = {
   postalCode: string;
 };
 
+type SavedAddress = {
+  id: number;
+  title: string;
+  fullName: string;
+  province: string;
+  city: string;
+  address: string;
+  isDefault: boolean;
+};
+
 export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +57,8 @@ export default function CartPage() {
     address: "",
     postalCode: "",
   });
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [orderCode, setOrderCode] = useState<string | null>(null);
@@ -62,6 +75,18 @@ export default function CartPage() {
 
   useEffect(() => {
     loadCart();
+    // آدرس‌های ذخیره‌شده کاربر (اگر لاگین باشد)
+    api
+      .get<{ addresses: SavedAddress[] }>("/api/auth/addresses")
+      .then((res) => {
+        if (res.ok && res.data) {
+          setAddresses(res.data.addresses);
+          const def =
+            res.data.addresses.find((a) => a.isDefault) ??
+            res.data.addresses[0];
+          if (def) setSelectedAddress(def.id);
+        }
+      });
   }, []);
 
   function notifyHeader() {
@@ -99,9 +124,14 @@ export default function CartPage() {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    // اگر آدرس ذخیره‌شده انتخاب شده، فقط شناسه‌اش ارسال می‌شود
+    const payload =
+      addresses.length > 0 && selectedAddress
+        ? { addressId: selectedAddress }
+        : info;
     const res = await api.post<{ order: { code: string } }>(
       "/api/orders",
-      info
+      payload
     );
     setSubmitting(false);
     if (!res.ok || !res.data) {
@@ -200,9 +230,18 @@ export default function CartPage() {
             >
               <Link
                 href={`/product/${item.product.id}`}
-                className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-slate-50 text-4xl"
+                className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 text-4xl"
               >
-                {item.product.emoji}
+                {item.product.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.product.image}
+                    alt={item.product.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  item.product.emoji
+                )}
               </Link>
               <div className="min-w-0 flex-1">
                 <Link
@@ -303,52 +342,98 @@ export default function CartPage() {
               </button>
             ) : (
               <form onSubmit={submitOrder} className="mt-4 space-y-3">
-                <input
-                  required
-                  placeholder="نام و نام خانوادگی تحویل‌گیرنده"
-                  value={info.fullName}
-                  onChange={(e) =>
-                    setInfo({ ...info, fullName: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                />
-                <div className="flex gap-2">
-                  <input
-                    required
-                    placeholder="استان"
-                    value={info.province}
-                    onChange={(e) =>
-                      setInfo({ ...info, province: e.target.value })
-                    }
-                    className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                  />
-                  <input
-                    required
-                    placeholder="شهر"
-                    value={info.city}
-                    onChange={(e) => setInfo({ ...info, city: e.target.value })}
-                    className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                  />
-                </div>
-                <textarea
-                  required
-                  placeholder="آدرس کامل پستی"
-                  rows={3}
-                  value={info.address}
-                  onChange={(e) =>
-                    setInfo({ ...info, address: e.target.value })
-                  }
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                />
-                <input
-                  placeholder="کد پستی (اختیاری)"
-                  dir="ltr"
-                  value={info.postalCode}
-                  onChange={(e) =>
-                    setInfo({ ...info, postalCode: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-sm font-num outline-none focus:border-brand-400 focus:bg-white"
-                />
+                {addresses.length > 0 ? (
+                  /* انتخاب از دفترچه آدرس */
+                  <>
+                    <p className="text-xs font-medium text-slate-600">
+                      آدرس تحویل را انتخاب کنید:
+                    </p>
+                    {addresses.map((a) => (
+                      <label
+                        key={a.id}
+                        className={`flex cursor-pointer gap-2 rounded-xl border p-3 text-xs transition ${
+                          selectedAddress === a.id
+                            ? "border-brand-400 bg-brand-50/50"
+                            : "border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="address"
+                          checked={selectedAddress === a.id}
+                          onChange={() => setSelectedAddress(a.id)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-medium text-slate-700">
+                            {a.title} — {a.fullName}
+                          </span>
+                          <span className="mt-0.5 block leading-5 text-slate-500">
+                            {a.province}، {a.city}، {a.address}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                    <Link
+                      href="/profile/addresses"
+                      className="block text-center text-xs text-brand-600 hover:underline"
+                    >
+                      + افزودن آدرس جدید
+                    </Link>
+                  </>
+                ) : (
+                  /* فرم دستی برای کاربری که آدرس ذخیره‌شده ندارد */
+                  <>
+                    <input
+                      required
+                      placeholder="نام و نام خانوادگی تحویل‌گیرنده"
+                      value={info.fullName}
+                      onChange={(e) =>
+                        setInfo({ ...info, fullName: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        required
+                        placeholder="استان"
+                        value={info.province}
+                        onChange={(e) =>
+                          setInfo({ ...info, province: e.target.value })
+                        }
+                        className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
+                      />
+                      <input
+                        required
+                        placeholder="شهر"
+                        value={info.city}
+                        onChange={(e) =>
+                          setInfo({ ...info, city: e.target.value })
+                        }
+                        className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
+                      />
+                    </div>
+                    <textarea
+                      required
+                      placeholder="آدرس کامل پستی"
+                      rows={3}
+                      value={info.address}
+                      onChange={(e) =>
+                        setInfo({ ...info, address: e.target.value })
+                      }
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
+                    />
+                    <input
+                      placeholder="کد پستی (اختیاری)"
+                      dir="ltr"
+                      value={info.postalCode}
+                      onChange={(e) =>
+                        setInfo({ ...info, postalCode: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-sm font-num outline-none focus:border-brand-400 focus:bg-white"
+                    />
+                  </>
+                )}
 
                 {error && <p className="text-xs text-red-500">{error}</p>}
                 {error.includes("وارد") && (

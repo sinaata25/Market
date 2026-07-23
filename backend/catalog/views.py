@@ -32,7 +32,7 @@ class ProductListView(APIView):
     """
 
     def get(self, request):
-        qs = Product.objects.select_related("category")
+        qs = Product.objects.select_related("category").prefetch_related("images")
 
         category = request.query_params.get("category")
         if category:
@@ -74,19 +74,25 @@ class ProductDetailView(APIView):
 
     def get(self, request, pk: int):
         try:
-            product = Product.objects.select_related("category").get(pk=pk)
+            product = (
+                Product.objects.select_related("category")
+                .prefetch_related("images")
+                .get(pk=pk)
+            )
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
 
         # اول هم‌دسته‌ها، بعد پرطرفدارهای سایر دسته‌ها تا سقف ۴ مورد
         same = list(
             Product.objects.select_related("category")
+            .prefetch_related("images")
             .filter(category=product.category)
             .exclude(pk=pk)[:4]
         )
         if len(same) < 4:
             others = (
                 Product.objects.select_related("category")
+                .prefetch_related("images")
                 .exclude(category=product.category)
                 .exclude(pk=pk)
                 .order_by("-rating_count")[: 4 - len(same)]
@@ -99,6 +105,23 @@ class ProductDetailView(APIView):
                 "related": [product_dto(p) for p in same],
             }
         )
+
+
+class ProductBySlugView(APIView):
+    """یافتن محصول با نامک سئو (تنظیم‌شده در پنل سئو)"""
+
+    def get(self, request, slug: str):
+        from seo.models import PageMeta
+
+        meta = PageMeta.objects.filter(page_type="product", slug=slug).first()
+        if meta is None:
+            return fail("محصول یافت نشد", 404)
+        try:
+            product_id = int(meta.object_key)
+        except ValueError:
+            return fail("محصول یافت نشد", 404)
+        view = ProductDetailView()
+        return view.get(request, pk=product_id)
 
 
 def mask_author(user) -> str:

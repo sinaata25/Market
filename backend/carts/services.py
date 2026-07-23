@@ -79,7 +79,9 @@ def cart_dto(cart: Cart | None) -> dict:
     if cart is not None:
         items = [
             {"id": i.id, "qty": i.qty, "product": product_dto(i.product)}
-            for i in cart.items.select_related("product__category")
+            for i in cart.items.select_related(
+                "product__category"
+            ).prefetch_related("product__images")
         ]
 
     items_price = sum(

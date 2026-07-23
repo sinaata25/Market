@@ -51,6 +51,29 @@ class Product(models.Model):
         return self.title
 
 
+class ProductImage(models.Model):
+    """تصویر محصول — اولین تصویر (کمترین order) تصویر اصلی است"""
+
+    image = models.ImageField("تصویر", upload_to="products/")
+    alt = models.CharField("متن جایگزین", max_length=255, blank=True)
+    order = models.PositiveSmallIntegerField("ترتیب", default=0)
+
+    product = models.ForeignKey(
+        Product,
+        verbose_name="محصول",
+        on_delete=models.CASCADE,
+        related_name="images",
+    )
+
+    class Meta:
+        verbose_name = "تصویر محصول"
+        verbose_name_plural = "تصاویر محصول"
+        ordering = ["order", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.product} — {self.order}"
+
+
 class Review(models.Model):
     rating = models.PositiveSmallIntegerField(
         "امتیاز", validators=[MinValueValidator(1), MaxValueValidator(5)]

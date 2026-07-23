@@ -1,13 +1,47 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProductById, getRelatedProducts } from "@/lib/catalog";
+import {
+  getProductById,
+  getProductBySlug,
+  getRelatedProducts,
+} from "@/lib/catalog";
+import { breadcrumbSchema, fetchSeo, toMetadata } from "@/lib/seo";
+import type { Product } from "@/lib/products";
 import ProductGallery from "@/components/product/ProductGallery";
 import BuyBox from "@/components/product/BuyBox";
 import ProductTabs from "@/components/product/ProductTabs";
 import ProductCard from "@/components/product/ProductCard";
+import FavoriteButton from "@/components/product/FavoriteButton";
+import JsonLd from "@/components/seo/JsonLd";
 
 // موجودی و امتیاز لحظه‌ای از دیتابیس خوانده می‌شود
 export const dynamic = "force-dynamic";
+
+// پارامتر می‌تواند شناسه عددی یا نامک سئو باشد
+async function resolveProduct(
+  idOrSlug: string
+): Promise<{ product: Product; related: Product[] } | null> {
+  const numeric = Number(idOrSlug);
+  if (Number.isInteger(numeric) && numeric > 0) {
+    const product = await getProductById(numeric);
+    if (!product) return null;
+    return { product, related: await getRelatedProducts(numeric) };
+  }
+  return getProductBySlug(idOrSlug);
+}
+
+// متاتگ‌های سئو از پنل سئو خوانده می‌شوند
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const resolved = await resolveProduct(id);
+  if (!resolved) return {};
+  const seo = await fetchSeo("product", String(resolved.product.id));
+  return toMetadata(seo);
+}
 
 export default async function ProductPage({
   params,
@@ -15,23 +49,41 @@ export default async function ProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const productId = Number(id);
-  if (!Number.isInteger(productId)) notFound();
+  const resolved = await resolveProduct(id);
+  if (!resolved) notFound();
 
-  const product = await getProductById(productId);
-  if (!product) notFound();
-
-  const related = await getRelatedProducts(product.id);
+  const { product, related } = resolved;
+  const seo = await fetchSeo("product", String(product.id));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5">
+      {/* اسکیمای JSON-LD (محصول + بردکرامب) از پنل سئو */}
+      {seo?.schema && <JsonLd data={seo.schema} />}
+      {seo?.site.breadcrumbsEnabled && (
+        <JsonLd
+          data={breadcrumbSchema(seo.site, [
+            { name: "خانه", path: "/" },
+            {
+              name: product.category,
+              path: `/category/${product.categorySlug}`,
+            },
+            { name: product.title, path: `/product/${product.id}` },
+          ])}
+        />
+      )}
+
       {/* مسیر راهنما (breadcrumb) */}
       <nav className="mb-4 flex flex-wrap items-center gap-1 text-xs text-slate-400">
         <Link href="/" className="hover:text-brand-600">
           خانه
         </Link>
         <span>/</span>
-        <span className="hover:text-brand-600">{product.category}</span>
+        <Link
+          href={`/category/${product.categorySlug}`}
+          className="hover:text-brand-600"
+        >
+          {product.category}
+        </Link>
         <span>/</span>
         <span className="text-slate-600">{product.title}</span>
       </nav>
@@ -40,14 +92,21 @@ export default async function ProductPage({
       <div className="grid grid-cols-1 gap-6 rounded-2xl border border-slate-100 bg-white p-4 lg:grid-cols-12 lg:p-6">
         {/* گالری */}
         <div className="lg:col-span-4">
-          <ProductGallery emoji={product.emoji} />
+          <ProductGallery
+            emoji={product.emoji}
+            images={product.images}
+            title={product.title}
+          />
         </div>
 
         {/* اطلاعات محصول */}
         <div className="lg:col-span-5">
-          <h1 className="mb-1 text-lg font-bold leading-8 text-slate-800">
-            {product.title}
-          </h1>
+          <div className="mb-1 flex items-start justify-between gap-3">
+            <h1 className="text-lg font-bold leading-8 text-slate-800">
+              {product.title}
+            </h1>
+            <FavoriteButton productId={product.id} />
+          </div>
           {product.titleEn && (
             <p className="mb-3 text-xs text-slate-400" dir="ltr">
               {product.titleEn}
@@ -66,7 +125,10 @@ export default async function ProductPage({
               </span>
             </span>
             <span className="text-slate-300">|</span>
-            <Link href="#" className="text-brand-600">
+            <Link
+              href={`/category/${product.categorySlug}`}
+              className="text-brand-600"
+            >
               {product.category}
             </Link>
           </div>

@@ -9,6 +9,8 @@ export type Product = {
   rating: number;
   ratingCount: number;
   emoji: string;
+  image?: string | null;
+  images?: string[];
   badge?: string;
   colors?: { name: string; hex: string }[];
   features?: string[];

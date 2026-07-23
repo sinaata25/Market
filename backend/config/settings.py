@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     "catalog",
     "carts",
     "orders",
+    "adminapi",
+    "seo",
 ]
 
 MIDDLEWARE = [
@@ -130,6 +132,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# فایل‌های آپلودی (تصاویر محصولات)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ─── تنظیمات فروشگاه ─────────────────────────────────────────
@@ -142,4 +148,7 @@ SHOP = {
     "FREE_SHIPPING_THRESHOLD": 2_000_000,
     # تا اتصال سرویس پیامک، کد OTP در پاسخ API برگردانده می‌شود
     "OTP_EXPOSE_DEV_CODE": DEBUG,
+    # ⚠️ موقتی: ورود بدون کد پیامکی (فقط با شماره موبایل).
+    # بعد از خرید پنل پیامکی، در .env مقدار OTP_BYPASS=false بگذارید.
+    "OTP_BYPASS": os.getenv("OTP_BYPASS", "true").lower() == "true",
 }

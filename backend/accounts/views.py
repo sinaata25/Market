@@ -23,6 +23,8 @@ def user_dto(user) -> dict:
         "id": user.id,
         "phone": user.phone,
         "name": user.name or None,
+        "isStaff": user.is_staff,
+        "isSeoManager": user.is_seo_manager,
         "createdAt": user.date_joined.isoformat(),
     }
 
@@ -45,6 +47,16 @@ class SendOtpView(APIView):
 
         if not is_valid_iran_mobile(phone):
             return fail("شماره موبایل معتبر نیست", 422)
+
+        # ⚠️ موقتی تا خرید پنل پیامکی: ورود مستقیم بدون کد
+        # (با OTP_BYPASS=false در .env غیرفعال می‌شود)
+        if SHOP["OTP_BYPASS"]:
+            user, _created = User.objects.get_or_create(phone=phone)
+            login(
+                request, user, backend="django.contrib.auth.backends.ModelBackend"
+            )
+            merge_guest_cart_into_user(request, user)
+            return ok({"bypass": True, "user": user_dto(user)})
 
         # محدودیت ارسال مجدد
         cooldown_start = timezone.now() - timezone.timedelta(

@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from .models import Category, Product, Review
+from .models import Category, Product, ProductImage, Review
+
+
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 1
 
 
 @admin.register(Category)
@@ -16,6 +21,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ["category"]
     search_fields = ["title", "title_en"]
     list_editable = ["price", "old_price", "stock"]
+    inlines = [ProductImageInline]
 
 
 @admin.register(Review)

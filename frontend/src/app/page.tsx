@@ -1,18 +1,32 @@
 import Link from "next/link";
 import { getCategories, getProducts } from "@/lib/catalog";
+import { fetchSeo, orgSchema, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
+import JsonLd from "@/components/seo/JsonLd";
 
 // داده‌ها از دیتابیس خوانده می‌شوند؛ صفحه داینامیک است
 export const dynamic = "force-dynamic";
 
+// متاتگ‌های سئو از پنل سئو خوانده می‌شوند
+export async function generateMetadata() {
+  const seo = await fetchSeo("static", "/");
+  return toMetadata(seo);
+}
+
 export default async function Home() {
-  const [categories, { items: products }] = await Promise.all([
-    getCategories(),
-    getProducts({ sort: "popular", perPage: 8 }),
-  ]);
+  const [categories, { items: products }, { items: deals }, seo] =
+    await Promise.all([
+      getCategories(),
+      getProducts({ sort: "popular", perPage: 8 }),
+      getProducts({ onlyDiscounted: true, perPage: 6 }),
+      fetchSeo("static", "/"),
+    ]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
+      {/* اسکیمای Organization (قابل کنترل از پنل سئو) */}
+      {seo?.site.orgSchemaEnabled && <JsonLd data={orgSchema(seo.site)} />}
+
       {/* بنر اصلی */}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-brand-700 to-brand-500 px-6 py-12 text-white sm:px-12 sm:py-16">
         <div className="relative z-10 max-w-lg">
@@ -56,12 +70,34 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* محصولات */}
+      {/* شگفت‌انگیزها */}
+      {deals.length > 0 && (
+        <section className="mt-10 overflow-hidden rounded-3xl bg-gradient-to-l from-red-600 to-rose-500 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+              ⚡ پیشنهاد شگفت‌انگیز
+            </h2>
+            <Link
+              href="/incredible"
+              className="rounded-xl bg-white/20 px-4 py-2 text-xs font-medium text-white backdrop-blur transition hover:bg-white/30"
+            >
+              مشاهده همه ←
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {deals.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* پرفروش‌ترین‌ها */}
       <section className="mt-10">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-800">🔥 پرفروش‌ترین‌ها</h2>
           <Link
-            href="/category/garden-tools"
+            href="/best-sellers"
             className="text-sm text-brand-600 transition hover:text-brand-700"
           >
             مشاهده همه ←

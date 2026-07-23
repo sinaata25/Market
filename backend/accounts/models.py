@@ -36,6 +36,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     name = models.CharField("نام", max_length=100, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    # نقش «مدیر سئو»: دسترسی فقط به پنل سئو، بدون سفارش‌ها/کاربران/مالی
+    is_seo_manager = models.BooleanField("مدیر سئو", default=False)
     date_joined = models.DateTimeField("تاریخ عضویت", default=timezone.now)
 
     objects = UserManager()
@@ -49,6 +51,65 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self) -> str:
         return self.name or self.phone
+
+
+class Address(models.Model):
+    """دفترچه آدرس کاربر"""
+
+    user = models.ForeignKey(
+        "accounts.User",
+        verbose_name="کاربر",
+        on_delete=models.CASCADE,
+        related_name="addresses",
+    )
+    title = models.CharField("عنوان", max_length=50, default="خانه")
+    full_name = models.CharField("نام تحویل‌گیرنده", max_length=100)
+    phone = models.CharField("شماره تماس", max_length=11)
+    province = models.CharField("استان", max_length=50)
+    city = models.CharField("شهر", max_length=50)
+    address = models.TextField("آدرس")
+    postal_code = models.CharField("کد پستی", max_length=10, blank=True)
+    is_default = models.BooleanField("آدرس پیش‌فرض", default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "آدرس"
+        verbose_name_plural = "آدرس‌ها"
+        ordering = ["-is_default", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.title} — {self.city}"
+
+
+class Favorite(models.Model):
+    """علاقه‌مندی‌های کاربر"""
+
+    user = models.ForeignKey(
+        "accounts.User",
+        verbose_name="کاربر",
+        on_delete=models.CASCADE,
+        related_name="favorites",
+    )
+    product = models.ForeignKey(
+        "catalog.Product",
+        verbose_name="محصول",
+        on_delete=models.CASCADE,
+        related_name="favorited_by",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "علاقه‌مندی"
+        verbose_name_plural = "علاقه‌مندی‌ها"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "product"], name="unique_user_favorite"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} ❤ {self.product}"
 
 
 class Otp(models.Model):

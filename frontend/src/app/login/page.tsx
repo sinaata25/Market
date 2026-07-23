@@ -30,15 +30,24 @@ export default function LoginPage() {
   async function sendOtp(): Promise<boolean> {
     setLoading(true);
     setError("");
-    const res = await api.post<{ ttl?: number; devCode?: string }>(
-      "/api/auth/otp/send",
-      { phone }
-    );
-    setLoading(false);
+    const res = await api.post<{
+      ttl?: number;
+      devCode?: string;
+      bypass?: boolean;
+    }>("/api/auth/otp/send", { phone });
     if (!res.ok) {
+      setLoading(false);
       setError(res.error ?? "خطا در ارسال کد");
       return false;
     }
+    // ⚠️ موقتی تا اتصال پنل پیامکی: سرور بدون کد وارد کرده است
+    if (res.data?.bypass) {
+      window.dispatchEvent(new CustomEvent("cart:updated"));
+      router.push("/");
+      router.refresh();
+      return false; // به مرحله‌ی کد نرود
+    }
+    setLoading(false);
     setSeconds(res.data?.ttl ?? 120);
     // تا زمان اتصال سرویس پیامک، کد برای تست نمایش داده می‌شود
     setDevCode(res.data?.devCode ?? null);

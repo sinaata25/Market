@@ -20,7 +20,11 @@ def category_dto(category: Category) -> dict:
 
 def product_dto(product: Product) -> dict:
     category = product.category
+    # آدرس‌های نسبی /media/… — فرانت آن‌ها را به جنگو پروکسی می‌کند
+    images = [img.image.url for img in product.images.all()]
     return {
+        "image": images[0] if images else None,
+        "images": images,
         "id": product.id,
         "title": product.title,
         "titleEn": product.title_en or None,

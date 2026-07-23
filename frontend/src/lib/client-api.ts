@@ -44,9 +44,32 @@ async function request<T>(
   }
 }
 
+// آپلود فایل (multipart) — Content-Type را مرورگر خودش می‌گذارد
+async function upload<T>(path: string, form: FormData): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "X-CSRFToken": getCsrfToken() },
+      body: form,
+    });
+    const json = await res.json();
+    return {
+      ok: Boolean(json.ok),
+      data: json.data as T,
+      error: json.error as string | undefined,
+      status: res.status,
+    };
+  } catch {
+    return { ok: false, error: "خطا در ارتباط با سرور", status: 0 };
+  }
+}
+
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
-  delete: <T>(path: string) => request<T>("DELETE", path),
+  delete: <T>(path: string, body?: unknown) =>
+    request<T>("DELETE", path, body),
+  upload,
 };

@@ -12,8 +12,18 @@ export default function ProductCard({ product }: { product: Product }) {
       className="group flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-3 transition hover:border-brand-200 hover:shadow-md"
     >
       {/* تصویر */}
-      <div className="relative mb-3 grid aspect-square place-items-center rounded-xl bg-slate-50 text-6xl">
-        {product.emoji}
+      <div className="relative mb-3 grid aspect-square place-items-center overflow-hidden rounded-xl bg-slate-50 text-6xl">
+        {product.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.image}
+            alt={product.title}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          product.emoji
+        )}
         {product.badge && (
           <span className="absolute right-2 top-2 rounded-lg bg-brand-600 px-2 py-1 text-[11px] font-bold text-white">
             {product.badge}

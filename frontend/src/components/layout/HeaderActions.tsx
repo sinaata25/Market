@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client-api";
 
-type Me = { id: number; phone: string; name: string | null } | null;
+type Me = {
+  id: number;
+  phone: string;
+  name: string | null;
+  isStaff?: boolean;
+} | null;
 
 export default function HeaderActions() {
   const router = useRouter();
@@ -64,17 +69,42 @@ export default function HeaderActions() {
           </button>
           {menuOpen && (
             <div className="absolute left-0 top-full z-50 pt-2">
-              <div className="w-44 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
-                <Link
-                  href="/orders"
-                  className="block px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  📦 سفارش‌های من
-                </Link>
+              <div className="w-48 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+                {[
+                  { href: "/profile", icon: "👤", label: "پروفایل من" },
+                  { href: "/profile/orders", icon: "📦", label: "سفارش‌های من" },
+                  {
+                    href: "/profile/addresses",
+                    icon: "📍",
+                    label: "آدرس‌های من",
+                  },
+                  {
+                    href: "/profile/favorites",
+                    icon: "❤️",
+                    label: "علاقه‌مندی‌ها",
+                  },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="block px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {item.icon} {item.label}
+                  </Link>
+                ))}
+                {user.isStaff && (
+                  <Link
+                    href="/admin"
+                    className="block border-t border-slate-100 px-4 py-2.5 text-sm text-violet-600 transition hover:bg-violet-50"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    🎛️ پنل مدیریت
+                  </Link>
+                )}
                 <button
                   onClick={logout}
-                  className="block w-full px-4 py-2.5 text-right text-sm text-red-500 transition hover:bg-red-50"
+                  className="block w-full border-t border-slate-100 px-4 py-2.5 text-right text-sm text-red-500 transition hover:bg-red-50"
                 >
                   ⏻ خروج از حساب
                 </button>

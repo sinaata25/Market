@@ -1,7 +1,19 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Otp, User
+from .models import Address, Favorite, Otp, User
+
+
+@admin.register(Address)
+class AddressAdmin(admin.ModelAdmin):
+    list_display = ["title", "user", "full_name", "city", "is_default"]
+    list_filter = ["is_default", "province"]
+    search_fields = ["full_name", "phone", "city"]
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ["user", "product", "created_at"]
 
 
 @admin.register(User)

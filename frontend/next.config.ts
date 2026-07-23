@@ -17,6 +17,20 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${BACKEND_URL}/api/:path*`,
       },
+      // تصاویر محصولات هم از جنگو سرو می‌شوند
+      {
+        source: "/media/:path*",
+        destination: `${BACKEND_URL}/media/:path*`,
+      },
+      // فایل‌های سئو از جنگو (قابل مدیریت از پنل سئو)
+      {
+        source: "/robots.txt",
+        destination: `${BACKEND_URL}/robots.txt`,
+      },
+      {
+        source: "/sitemap.xml",
+        destination: `${BACKEND_URL}/sitemap.xml`,
+      },
     ];
   },
 };
