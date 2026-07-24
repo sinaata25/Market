@@ -10,3 +10,4 @@ backend/staticfiles/
 # ─── عمومی ───
 .DS_Store
 Thumbs.db
+node_modules

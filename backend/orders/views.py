@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import transaction
 from django.db.models import F
@@ -8,6 +10,7 @@ from accounts.models import Address
 from carts.services import get_current_cart
 from catalog.models import Product
 from common.responses import fail, ok
+from common.utils import normalize_phone
 
 from .models import Order, OrderItem
 
@@ -16,6 +19,11 @@ SHOP = settings.SHOP
 
 class OutOfStock(Exception):
     """موجودی کافی نیست — پیام برای کاربر قابل نمایش است"""
+
+
+def new_order_code() -> str:
+    """کد غیرقابل‌حدس؛ یکتایی نهایی با قید دیتابیس تضمین می‌شود."""
+    return f"GS-{secrets.token_hex(6).upper()}"
 
 
 class CreateOrderSerializer(serializers.Serializer):
@@ -48,6 +56,12 @@ class CreateOrderSerializer(serializers.Serializer):
         },
     )
     postalCode = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_postalCode(self, value):
+        value = normalize_phone(value)
+        if value and (not value.isdigit() or len(value) != 10):
+            raise serializers.ValidationError("کد پستی باید ۱۰ رقم باشد")
+        return value
 
     def validate(self, data):
         # اگر آدرس ذخیره‌شده انتخاب نشده، فیلدهای آدرس الزامی‌اند
@@ -167,7 +181,7 @@ class OrderListCreateView(APIView):
                     product.save(update_fields=["stock"])
 
                 order = Order.objects.create(
-                    code=f"GS-{10001 + Order.objects.count()}",
+                    code=new_order_code(),
                     user=request.user,
                     full_name=info["fullName"],
                     phone=request.user.phone,
@@ -222,17 +236,17 @@ class OrderDetailView(APIView):
         """لغو سفارش — موجودی کالاها برگردانده می‌شود"""
         if not request.user.is_authenticated:
             return fail("ابتدا وارد شوید", 401)
-        order = (
-            Order.objects.filter(pk=pk, user=request.user)
-            .prefetch_related("items")
-            .first()
-        )
-        if order is None:
-            return fail("سفارش یافت نشد", 404)
-        if order.status != Order.Status.PENDING:
-            return fail("فقط سفارش در انتظار پرداخت قابل لغو است", 409)
-
         with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(pk=pk, user=request.user)
+                .prefetch_related("items")
+                .first()
+            )
+            if order is None:
+                return fail("سفارش یافت نشد", 404)
+            if order.status != Order.Status.PENDING:
+                return fail("فقط سفارش در انتظار پرداخت قابل لغو است", 409)
             for item in order.items.all():
                 Product.objects.filter(pk=item.product_id).update(
                     stock=F("stock") + item.qty

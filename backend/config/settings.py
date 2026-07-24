@@ -5,6 +5,7 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,14 +20,24 @@ SECRET_KEY = os.getenv(
 
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
+
+if not DEBUG and SECRET_KEY == "django-insecure-dev-only-change-me":
+    raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is false")
 
 # فرانت Next.js درخواست‌ها را پروکسی می‌کند؛ این originها برای CSRF مجازند
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:8000,http://127.0.0.1:8000",
+    ).split(",")
+    if origin.strip()
 ]
 
 # ─── اپلیکیشن‌ها ─────────────────────────────────────────────
@@ -40,6 +51,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # شخص ثالث
     "rest_framework",
+    "drf_spectacular",
     # اپ‌های پروژه
     "accounts",
     "catalog",
@@ -106,10 +118,13 @@ SESSION_COOKIE_SAMESITE = "Lax"
 # در حالت توسعه روی http هستیم؛ در استقرار https اجباری می‌شود
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # ─── DRF ─────────────────────────────────────────────────────
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
@@ -121,6 +136,13 @@ REST_FRAMEWORK = {
     ],
     # همه‌ی خطاها با قالب یکسان {ok: false, error: "..."} برگردند
     "EXCEPTION_HANDLER": "common.responses.api_exception_handler",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Green Tools Store API",
+    "DESCRIPTION": "OpenAPI documentation for the store backend.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 # ─── بین‌المللی‌سازی ─────────────────────────────────────────
@@ -150,5 +172,5 @@ SHOP = {
     "OTP_EXPOSE_DEV_CODE": DEBUG,
     # ⚠️ موقتی: ورود بدون کد پیامکی (فقط با شماره موبایل).
     # بعد از خرید پنل پیامکی، در .env مقدار OTP_BYPASS=false بگذارید.
-    "OTP_BYPASS": os.getenv("OTP_BYPASS", "true").lower() == "true",
+    "OTP_BYPASS": os.getenv("OTP_BYPASS", "false").lower() == "true",
 }

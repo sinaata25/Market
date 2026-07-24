@@ -3,8 +3,10 @@
 import math
 from datetime import timedelta
 
+from PIL import Image, UnidentifiedImageError
 from django.contrib.auth import get_user_model
-from django.db.models import Avg, Count, F, IntegerField, Sum
+from django.db import transaction
+from django.db.models import Avg, Count, F, IntegerField, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework import serializers
@@ -19,6 +21,13 @@ from orders.models import Order, OrderItem
 User = get_user_model()
 
 VALID_STATUSES = [s for s, _ in Order.Status.choices]
+
+
+def positive_page(value) -> int | None:
+    try:
+        return max(1, int(value or 1))
+    except (TypeError, ValueError):
+        return None
 
 
 class IsStaff(BasePermission):
@@ -175,11 +184,15 @@ class AdminOrderListView(StaffRequiredMixin, APIView):
 
         search = request.query_params.get("search", "").strip()
         if search:
-            qs = qs.filter(code__icontains=search) | qs.filter(
-                full_name__icontains=search
-            ) | qs.filter(phone__icontains=search)
+            qs = qs.filter(
+                Q(code__icontains=search)
+                | Q(full_name__icontains=search)
+                | Q(phone__icontains=search)
+            )
 
-        page = max(1, int(request.query_params.get("page", 1) or 1))
+        page = positive_page(request.query_params.get("page"))
+        if page is None:
+            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
         per_page = 15
         total = qs.count()
         rows = qs[(page - 1) * per_page : page * per_page]
@@ -196,17 +209,28 @@ class AdminOrderListView(StaffRequiredMixin, APIView):
 
 class AdminOrderDetailView(StaffRequiredMixin, APIView):
     def patch(self, request, pk: int):
-        try:
-            order = Order.objects.get(pk=pk)
-        except Order.DoesNotExist:
-            return fail("سفارش یافت نشد", 404)
-
         status = request.data.get("status")
         if status not in VALID_STATUSES:
             return fail("وضعیت نامعتبر است", 422)
 
-        order.status = status
-        order.save(update_fields=["status"])
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .prefetch_related("items")
+                .filter(pk=pk)
+                .first()
+            )
+            if order is None:
+                return fail("سفارش یافت نشد", 404)
+            if order.status == Order.Status.CANCELED and status != order.status:
+                return fail("سفارش لغوشده قابل بازگشایی نیست", 409)
+            if status == Order.Status.CANCELED and order.status != status:
+                for item in order.items.all():
+                    Product.objects.filter(pk=item.product_id).update(
+                        stock=F("stock") + item.qty
+                    )
+            order.status = status
+            order.save(update_fields=["status"])
         return ok({"order": order_row(order)})
 
 
@@ -272,7 +296,9 @@ class AdminProductListView(StaffRequiredMixin, APIView):
         if search:
             qs = qs.filter(title__icontains=search)
 
-        page = max(1, int(request.query_params.get("page", 1) or 1))
+        page = positive_page(request.query_params.get("page"))
+        if page is None:
+            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
         per_page = 15
         total = qs.count()
         rows = qs[(page - 1) * per_page : page * per_page]
@@ -345,6 +371,12 @@ class AdminProductImageView(StaffRequiredMixin, APIView):
             return fail("فایل تصویر ارسال نشده است", 422)
         if file.size > 5 * 1024 * 1024:
             return fail("حجم تصویر حداکثر ۵ مگابایت باشد", 422)
+        try:
+            image = Image.open(file)
+            image.verify()
+            file.seek(0)
+        except (UnidentifiedImageError, OSError):
+            return fail("فایل ارسال‌شده تصویر معتبر نیست", 422)
         order = (product.images.count() or 0)
         ProductImage.objects.create(
             product=product, image=file, alt=product.title, order=order
@@ -372,11 +404,13 @@ class AdminUserListView(StaffRequiredMixin, APIView):
         )
         search = request.query_params.get("search", "").strip()
         if search:
-            qs = qs.filter(phone__icontains=search) | qs.filter(
-                name__icontains=search
+            qs = qs.filter(
+                Q(phone__icontains=search) | Q(name__icontains=search)
             )
 
-        page = max(1, int(request.query_params.get("page", 1) or 1))
+        page = positive_page(request.query_params.get("page"))
+        if page is None:
+            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
         per_page = 15
         total = qs.count()
         rows = qs[(page - 1) * per_page : page * per_page]
@@ -418,7 +452,9 @@ class AdminReviewListView(StaffRequiredMixin, APIView):
     def get(self, request):
         qs = Review.objects.select_related("user", "product").order_by("-created_at")
 
-        page = max(1, int(request.query_params.get("page", 1) or 1))
+        page = positive_page(request.query_params.get("page"))
+        if page is None:
+            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
         per_page = 15
         total = qs.count()
         rows = qs[(page - 1) * per_page : page * per_page]
