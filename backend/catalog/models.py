@@ -95,6 +95,11 @@ class Review(models.Model):
         verbose_name = "دیدگاه"
         verbose_name_plural = "دیدگاه‌ها"
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "product"], name="unique_user_product_review"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.product} — {self.rating}★"

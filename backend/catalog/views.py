@@ -184,6 +184,9 @@ class ReviewListCreateView(APIView):
         ser = ReviewCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
 
+        if Review.objects.filter(product=product, user=request.user).exists():
+            return fail("شما قبلاً برای این محصول دیدگاه ثبت کرده‌اید", 409)
+
         review = Review.objects.create(
             product=product,
             user=request.user,

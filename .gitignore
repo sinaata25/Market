@@ -52,6 +52,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+node_modules
+.next/
+
 #############################
 # IDEs
 #############################
@@ -66,9 +69,12 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
+
 #############################
 # Misc
 #############################
 
 *.swp
 *.swo
+=======
+

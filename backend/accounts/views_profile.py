@@ -1,6 +1,6 @@
 """پروفایل کاربر: اطلاعات شخصی، آدرس‌ها، علاقه‌مندی‌ها، خلاصه فعالیت"""
 
-from django.db.models import Sum
+from django.db.models import Avg, Count, Sum
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -271,5 +271,13 @@ class MyReviewsView(AuthRequired, APIView):
         review = Review.objects.filter(pk=review_id, user=request.user).first()
         if review is None:
             return fail("دیدگاه یافت نشد", 404)
+        product_id = review.product_id
         review.delete()
+        aggregate = Review.objects.filter(product_id=product_id).aggregate(
+            avg=Avg("rating"), count=Count("id")
+        )
+        Product.objects.filter(pk=product_id).update(
+            rating=round(aggregate["avg"] or 0, 1),
+            rating_count=aggregate["count"],
+        )
         return ok({"deleted": True})

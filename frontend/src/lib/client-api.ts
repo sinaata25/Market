@@ -32,7 +32,14 @@ async function request<T>(
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
+    if (!json || typeof json !== "object") {
+      return {
+        ok: false,
+        error: "پاسخ نامعتبر از سرور",
+        status: res.status,
+      };
+    }
     return {
       ok: Boolean(json.ok),
       data: json.data as T,
@@ -52,7 +59,14 @@ async function upload<T>(path: string, form: FormData): Promise<ApiResult<T>> {
       headers: { "X-CSRFToken": getCsrfToken() },
       body: form,
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
+    if (!json || typeof json !== "object") {
+      return {
+        ok: false,
+        error: "پاسخ نامعتبر از سرور",
+        status: res.status,
+      };
+    }
     return {
       ok: Boolean(json.ok),
       data: json.data as T,

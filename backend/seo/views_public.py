@@ -2,6 +2,7 @@
 
 import json
 
+from django.db.models import F
 from django.http import HttpResponse
 from rest_framework.views import APIView
 
@@ -87,7 +88,7 @@ class ResolveRedirectView(APIView):
         ).first()
         if redirect is None:
             return ok({"redirect": None})
-        Redirect.objects.filter(pk=redirect.pk).update(hits=redirect.hits + 1)
+        Redirect.objects.filter(pk=redirect.pk).update(hits=F("hits") + 1)
         return ok(
             {
                 "redirect": {

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Product } from "@/lib/products";
+import { api } from "@/lib/client-api";
 
 const tabs = [
   { key: "specs", label: "مشخصات" },
@@ -11,8 +12,58 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number]["key"];
 
+type Review = {
+  id: number;
+  rating: number;
+  text: string;
+  createdAt: string;
+  author: string;
+};
+
 export default function ProductTabs({ product }: { product: Product }) {
   const [active, setActive] = useState<TabKey>("specs");
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (active !== "reviews") return;
+    api
+      .get<{ reviews: Review[] }>(`/api/products/${product.id}/reviews`)
+      .then((res) => {
+        if (res.ok && res.data) setReviews(res.data.reviews);
+        else setReviewMessage(res.error ?? "خطا در دریافت دیدگاه‌ها");
+      })
+      .finally(() => setReviewsLoading(false));
+  }, [active, product.id]);
+
+  async function submitReview(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setReviewMessage("");
+    const res = await api.post<{ review: { id: number } }>(
+      `/api/products/${product.id}/reviews`,
+      { rating: reviewRating, text: reviewText }
+    );
+    setSubmitting(false);
+    if (!res.ok) {
+      setReviewMessage(
+        res.status === 401
+          ? "برای ثبت دیدگاه ابتدا وارد حساب خود شوید"
+          : (res.error ?? "خطا در ثبت دیدگاه")
+      );
+      return;
+    }
+    setReviewText("");
+    setReviewMessage("دیدگاه شما ثبت شد.");
+    const refreshed = await api.get<{ reviews: Review[] }>(
+      `/api/products/${product.id}/reviews`
+    );
+    if (refreshed.ok && refreshed.data) setReviews(refreshed.data.reviews);
+  }
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-white">
@@ -21,7 +72,10 @@ export default function ProductTabs({ product }: { product: Product }) {
         {tabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setActive(t.key)}
+            onClick={() => {
+              if (t.key === "reviews") setReviewsLoading(true);
+              setActive(t.key);
+            }}
             className={`relative px-4 py-3 text-sm font-medium transition ${
               active === t.key
                 ? "text-brand-700"
@@ -76,19 +130,78 @@ export default function ProductTabs({ product }: { product: Product }) {
               </p>
             </div>
 
-            {/* نمونه دیدگاه */}
-            <div className="rounded-xl border border-slate-100 p-4">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700">
-                  کاربر دیجی‌سبز
-                </span>
-                <span className="text-amber-400 text-xs">★★★★★</span>
-              </div>
-              <p className="text-sm leading-7 text-slate-500">
-                کیفیت ساخت عالی بود و خیلی سریع به دستم رسید. کاملاً راضی هستم و
-                پیشنهاد می‌کنم.
+            <form
+              onSubmit={submitReview}
+              className="space-y-3 rounded-xl border border-slate-100 p-4"
+            >
+              <h3 className="text-sm font-bold text-slate-700">ثبت دیدگاه</h3>
+              <label className="block text-xs text-slate-500">
+                امتیاز
+                <select
+                  value={reviewRating}
+                  onChange={(e) => setReviewRating(Number(e.target.value))}
+                  className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-2"
+                >
+                  {[5, 4, 3, 2, 1].map((rating) => (
+                    <option key={rating} value={rating}>
+                      {rating.toLocaleString("fa-IR")} ستاره
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <textarea
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                minLength={5}
+                maxLength={1000}
+                required
+                placeholder="تجربه خود از این محصول را بنویسید"
+                className="min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-brand-400"
+              />
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+              >
+                {submitting ? "در حال ثبت..." : "ثبت دیدگاه"}
+              </button>
+              {reviewMessage && (
+                <p className="text-xs text-slate-500">{reviewMessage}</p>
+              )}
+            </form>
+
+            {reviewsLoading ? (
+              <p className="text-sm text-slate-400">در حال دریافت دیدگاه‌ها...</p>
+            ) : reviews.length === 0 ? (
+              <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                هنوز دیدگاهی برای این محصول ثبت نشده است.
               </p>
-            </div>
+            ) : (
+              reviews.map((review) => (
+                <article
+                  key={review.id}
+                  className="rounded-xl border border-slate-100 p-4"
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-sm font-medium text-slate-700">
+                      {review.author}
+                    </span>
+                    <span
+                      className="text-xs text-amber-400"
+                      aria-label={`${review.rating} از ۵ ستاره`}
+                    >
+                      {"★".repeat(review.rating)}
+                      <span className="text-slate-200">
+                        {"★".repeat(5 - review.rating)}
+                      </span>
+                    </span>
+                  </div>
+                  <p className="text-sm leading-7 text-slate-500">
+                    {review.text}
+                  </p>
+                </article>
+              ))
+            )}
           </div>
         )}
       </div>

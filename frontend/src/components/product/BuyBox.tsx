@@ -84,8 +84,12 @@ export default function BuyBox({ product }: { product: Product }) {
         <span className="text-xs text-slate-500">تعداد</span>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setQty((q) => q + 1)}
-            className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-brand-600 hover:bg-slate-200"
+            onClick={() =>
+              setQty((q) => Math.min(product.stock ?? 99, q + 1))
+            }
+            disabled={qty >= (product.stock ?? 99)}
+            aria-label="افزایش تعداد"
+            className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-brand-600 hover:bg-slate-200 disabled:opacity-40"
           >
             +
           </button>
@@ -94,7 +98,9 @@ export default function BuyBox({ product }: { product: Product }) {
           </span>
           <button
             onClick={() => setQty((q) => Math.max(1, q - 1))}
-            className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200"
+            disabled={qty <= 1}
+            aria-label="کاهش تعداد"
+            className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 disabled:opacity-40"
           >
             −
           </button>
