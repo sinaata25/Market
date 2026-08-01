@@ -1,7 +1,10 @@
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+
+from common.utils import is_valid_iran_mobile, normalize_phone, validate_iran_mobile
 
 
 class UserManager(BaseUserManager):
@@ -9,9 +12,29 @@ class UserManager(BaseUserManager):
 
     use_in_migrations = True
 
+    @staticmethod
+    def _normalize_phone_kwargs(kwargs: dict) -> dict:
+        if "phone" in kwargs:
+            kwargs = {**kwargs, "phone": normalize_phone(str(kwargs["phone"]))}
+        return kwargs
+
+    def get_or_create(self, defaults=None, **kwargs):
+        return super().get_or_create(
+            defaults=defaults,
+            **self._normalize_phone_kwargs(kwargs),
+        )
+
+    def update_or_create(self, defaults=None, create_defaults=None, **kwargs):
+        return super().update_or_create(
+            defaults=defaults,
+            create_defaults=create_defaults,
+            **self._normalize_phone_kwargs(kwargs),
+        )
+
     def create_user(self, phone: str, password: str | None = None, **extra):
-        if not phone:
-            raise ValueError("شماره موبایل الزامی است")
+        phone = normalize_phone(phone)
+        if not is_valid_iran_mobile(phone):
+            raise ValueError("شماره موبایل معتبر الزامی است")
         user = self.model(phone=phone, **extra)
         if password:
             user.set_password(password)
@@ -32,7 +55,12 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     """کاربر فروشگاه — شناسه‌ی ورود: شماره موبایل"""
 
-    phone = models.CharField("شماره موبایل", max_length=11, unique=True)
+    phone = models.CharField(
+        "شماره موبایل",
+        max_length=11,
+        unique=True,
+        validators=[validate_iran_mobile],
+    )
     name = models.CharField("نام", max_length=100, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -48,6 +76,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = "کاربر"
         verbose_name_plural = "کاربران"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(phone__regex=r"^09[0-9]{9}$"),
+                name="accounts_user_phone_canonical",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        self.phone = normalize_phone(self.phone)
+        if not is_valid_iran_mobile(self.phone):
+            raise ValidationError({"phone": "شماره موبایل معتبر نیست"})
+        return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.name or self.phone
@@ -113,23 +153,58 @@ class Favorite(models.Model):
 
 
 class Otp(models.Model):
-    """کد یکبارمصرف ورود"""
+    """چالش یکبارمصرف ورود؛ برای هر شماره فقط یک رکورد وجود دارد."""
 
-    phone = models.CharField("شماره موبایل", max_length=11, db_index=True)
-    code = models.CharField("کد", max_length=5)
+    phone = models.CharField(
+        "شماره موبایل",
+        max_length=11,
+        unique=True,
+        validators=[validate_iran_mobile],
+    )
+    code_hash = models.CharField("هش کد", max_length=128, editable=False)
     expires_at = models.DateTimeField("انقضا")
-    attempts = models.PositiveSmallIntegerField("تعداد تلاش", default=0)
+    attempts = models.PositiveSmallIntegerField("تلاش‌های ناموفق", default=0)
+    failure_window_started_at = models.DateTimeField(null=True, blank=True)
+    locked_until = models.DateTimeField(null=True, blank=True)
     used = models.BooleanField("مصرف‌شده", default=False)
-    created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+    sent_at = models.DateTimeField("زمان ارسال", null=True, blank=True)
+    resend_blocked_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    provider_message_id = models.CharField(
+        "شناسه پیام IPPanel", max_length=64, blank=True, editable=False
+    )
+    delivery_status = models.CharField(max_length=16, blank=True, editable=False)
+    # The pending hash is written before the network request. This makes a code
+    # verifiable even if IPPanel accepted it but the response/final DB write failed.
+    pending_code_hash = models.CharField(max_length=128, blank=True, editable=False)
+    pending_expires_at = models.DateTimeField(null=True, blank=True, editable=False)
+    send_token = models.UUIDField(null=True, blank=True, editable=False)
+    send_started_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         verbose_name = "کد یکبارمصرف"
         verbose_name_plural = "کدهای یکبارمصرف"
-        ordering = ["-created_at"]
+        ordering = ["-sent_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(phone__regex=r"^09[0-9]{9}$"),
+                name="accounts_otp_phone_canonical",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        self.phone = normalize_phone(self.phone)
+        if not is_valid_iran_mobile(self.phone):
+            raise ValidationError({"phone": "شماره موبایل معتبر نیست"})
+        return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return f"{self.phone} — {self.code}"
+        state = "مصرف‌شده" if self.used else "فعال"
+        return f"{self.phone} — {state}"
 
     @property
     def is_expired(self) -> bool:
-        return self.expires_at < timezone.now()
+        return self.expires_at <= timezone.now()

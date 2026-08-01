@@ -35,8 +35,13 @@ npm run dev
 
 سایت: http://localhost:3000
 
+## ورود با OTP و IPPanel
+
+سیستم OTP به API الگوی IPPanel متصل است. راهنمای ساخت الگو، تنظیم `.env`،
+مهاجرت دیتابیس، معماری و چک‌لیست استقرار در [docs/otp-login.md](docs/otp-login.md) آمده است.
+
 ## نکته‌ها
 
-- کد OTP ورود تا اتصال سرویس پیامک، در حالت DEBUG داخل پاسخ API و صفحه لاگین نمایش داده می‌شود.
-- دیتابیس توسعه SQLite است (`backend/db.sqlite3`)؛ برای استقرار `DATABASES` را به PostgreSQL تغییر دهید.
-- قرارداد پاسخ همه‌ی APIها: `{ok: true, data}` یا `{ok: false, error}`.
+- در توسعه، `OTP_SMS_BACKEND=console` کد را فقط در لاگ جنگو می‌نویسد؛ کد هیچ‌گاه در API برنمی‌گردد.
+- دیتابیس توسعه SQLite است (`backend/db.sqlite3`)؛ استقرار با `DEBUG=false` فقط با `DATABASE_URL` از نوع PostgreSQL بالا می‌آید.
+- قرارداد پاسخ همه‌ی APIها: `{ok: true, data}` یا `{ok: false, error, errorCode?, data?}`.
