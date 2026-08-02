@@ -1,13 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { categories } from "@/lib/products";
+import { api } from "@/lib/client-api";
+import {
+  categories as categoryFallback,
+  type Category,
+} from "@/lib/products";
 
 export default function CategoryMenu() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [categories, setCategories] = useState<Category[]>(categoryFallback);
   const active = categories[activeIndex];
+
+  useEffect(() => {
+    let ignore = false;
+    api.get<{ categories: Category[] }>("/api/categories").then((res) => {
+      if (!ignore && res.ok && res.data) {
+        setCategories(res.data.categories);
+        setActiveIndex(0);
+      }
+    });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   return (
     <div
@@ -31,7 +49,7 @@ export default function CategoryMenu() {
       </button>
 
       {/* پنل کشویی (مگامنو) */}
-      {open && (
+      {open && active && (
         <div className="absolute right-0 top-full z-50 pt-2">
           <div className="flex w-[640px] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
             {/* ستون دسته‌های اصلی */}
@@ -48,7 +66,14 @@ export default function CategoryMenu() {
                     }`}
                   >
                     <span className="flex items-center gap-2">
-                      <span className="text-base">{c.emoji}</span>
+                      {c.icon && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={c.icon}
+                          alt=""
+                          className="h-4 w-4 shrink-0 object-contain"
+                        />
+                      )}
                       {c.title}
                     </span>
                     <span className="text-xs text-slate-300">‹</span>
@@ -63,7 +88,14 @@ export default function CategoryMenu() {
                 href={`/category/${active.slug}`}
                 className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-800 hover:text-brand-700"
               >
-                <span className="text-lg">{active.emoji}</span>
+                {active.icon && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={active.icon}
+                    alt=""
+                    className="h-5 w-5 shrink-0 object-contain"
+                  />
+                )}
                 {active.title}
                 <span className="text-xs text-brand-600">(مشاهده همه)</span>
               </Link>

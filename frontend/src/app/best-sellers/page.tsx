@@ -73,7 +73,7 @@ export default async function BestSellersPage({
       <div className="mb-6 flex flex-wrap gap-2">
         <Link
           href={url()}
-          className={`rounded-full border px-4 py-1.5 text-xs transition ${
+          className={`inline-flex items-center rounded-full border px-4 py-1.5 text-xs transition ${
             !activeCategory
               ? "border-brand-500 bg-brand-600 font-medium text-white"
               : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
@@ -85,13 +85,21 @@ export default async function BestSellersPage({
           <Link
             key={c.slug}
             href={url(c.slug)}
-            className={`rounded-full border px-4 py-1.5 text-xs transition ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs transition ${
               activeCategory === c.slug
                 ? "border-brand-500 bg-brand-600 font-medium text-white"
                 : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
             }`}
           >
-            {c.emoji} {c.title}
+            {c.icon && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={c.icon}
+                alt=""
+                className="h-4 w-4 shrink-0 object-contain"
+              />
+            )}
+            {c.title}
           </Link>
         ))}
       </div>

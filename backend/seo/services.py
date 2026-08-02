@@ -33,7 +33,7 @@ def all_pages() -> list[dict]:
             {
                 "pageType": "category",
                 "objectKey": c.slug,
-                "title": f"{c.emoji} {c.title}",
+                "title": c.title,
                 "path": f"/category/{c.slug}",
             }
         )

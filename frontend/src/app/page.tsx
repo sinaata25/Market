@@ -57,11 +57,18 @@ export default async function Home() {
             <Link
               key={c.slug}
               href={`/category/${c.slug}`}
-              className="flex flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-brand-200 hover:shadow-sm"
+              className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-brand-200 hover:shadow-sm"
             >
-              <span className="grid h-14 w-14 place-items-center rounded-full bg-brand-50 text-2xl">
-                {c.emoji}
-              </span>
+              {c.icon && (
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-brand-50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={c.icon}
+                    alt=""
+                    className="h-9 w-9 object-contain"
+                  />
+                </span>
+              )}
               <span className="text-center text-xs text-slate-600">
                 {c.title}
               </span>

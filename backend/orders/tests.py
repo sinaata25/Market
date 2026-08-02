@@ -10,9 +10,7 @@ from .models import Order, OrderItem
 class OrderCancellationTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(phone="09121234567")
-        category = Category.objects.create(
-            slug="tools", title="ابزار", emoji="🌿"
-        )
+        category = Category.objects.create(slug="tools", title="ابزار")
         self.product = Product.objects.create(
             title="بیل", category=category, price=100_000, stock=3
         )

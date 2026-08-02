@@ -276,7 +276,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-# فایل‌های آپلودی (تصاویر محصولات)
+# فایل‌های آپلودی (تصاویر محصولات و آیکن‌های دسته‌بندی)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

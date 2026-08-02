@@ -245,7 +245,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 <option value="">انتخاب کنید...</option>
                 {categories.map((c) => (
                   <option key={c.slug} value={c.slug}>
-                    {c.emoji} {c.title}
+                    {c.title}
                   </option>
                 ))}
               </select>

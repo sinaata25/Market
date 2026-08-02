@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${BACKEND_URL}/api/:path*`,
       },
-      // تصاویر محصولات هم از جنگو سرو می‌شوند
+      // فایل‌های رسانه‌ای محصولات و دسته‌بندی‌ها هم از جنگو سرو می‌شوند
       {
         source: "/media/:path*",
         destination: `${BACKEND_URL}/media/:path*`,

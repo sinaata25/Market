@@ -2,11 +2,19 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from .validators import validate_category_icon
+
 
 class Category(models.Model):
     slug = models.SlugField("نامک", unique=True)
     title = models.CharField("عنوان", max_length=100, unique=True)
-    emoji = models.CharField("اموجی", max_length=10)
+    icon = models.FileField(
+        "آیکن",
+        upload_to="categories/icons/",
+        blank=True,
+        validators=[validate_category_icon],
+        help_text="فایل PNG یا SVG ایمن، حداکثر ۵ مگابایت",
+    )
     sub = models.JSONField("زیردسته‌ها", default=list, blank=True)
 
     class Meta:

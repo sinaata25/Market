@@ -29,9 +29,7 @@ PRODUCT_RESPONSE_KEYS = {
 
 class ProductApiContractTests(TestCase):
     def setUp(self):
-        category = Category.objects.create(
-            slug="tools", title="ابزار", emoji="🌿"
-        )
+        category = Category.objects.create(slug="tools", title="ابزار")
         self.product = Product.objects.create(
             title="بیل", category=category, price=100_000
         )
@@ -62,9 +60,7 @@ class ProductApiContractTests(TestCase):
 class ReviewContractTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(phone="09121234567")
-        category = Category.objects.create(
-            slug="tools", title="ابزار", emoji="🌿"
-        )
+        category = Category.objects.create(slug="tools", title="ابزار")
         self.product = Product.objects.create(
             title="بیل", category=category, price=100_000
         )

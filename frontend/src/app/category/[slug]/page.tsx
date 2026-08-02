@@ -104,9 +104,16 @@ export default async function CategoryPage({
       {/* هدر دسته */}
       <section className="mb-6 overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-l from-brand-50 to-white">
         <div className="flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-center">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white text-4xl shadow-sm ring-1 ring-brand-100">
-            {category.emoji}
-          </span>
+          {category.icon && (
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white shadow-sm ring-1 ring-brand-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={category.icon}
+                alt=""
+                className="h-10 w-10 object-contain"
+              />
+            </span>
+          )}
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-slate-800">
               {category.title}
@@ -291,11 +298,18 @@ export default async function CategoryPage({
               <Link
                 key={c.slug}
                 href={`/category/${c.slug}`}
-                className="flex flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white p-3 transition hover:border-brand-200 hover:shadow-sm"
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white p-3 transition hover:border-brand-200 hover:shadow-sm"
               >
-                <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-50 text-xl">
-                  {c.emoji}
-                </span>
+                {c.icon && (
+                  <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={c.icon}
+                      alt=""
+                      className="h-7 w-7 object-contain"
+                    />
+                  </span>
+                )}
                 <span className="text-center text-[11px] leading-4 text-slate-600">
                   {c.title}
                 </span>

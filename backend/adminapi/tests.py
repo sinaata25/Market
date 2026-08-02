@@ -34,9 +34,7 @@ class AdminApiContractTests(TestCase):
         )
         self.client = APIClient()
         self.client.force_authenticate(admin)
-        self.category = Category.objects.create(
-            slug="tools", title="ابزار", emoji="🌿"
-        )
+        self.category = Category.objects.create(slug="tools", title="ابزار")
 
     def product_payload(self, **overrides):
         payload = {

@@ -13,7 +13,7 @@ def category_dto(category: Category) -> dict:
     return {
         "slug": category.slug,
         "title": category.title,
-        "emoji": category.emoji,
+        "icon": category.icon.url if category.icon else None,
         "sub": category.sub or [],
     }
 

@@ -22,57 +22,58 @@ export type Product = {
 export type Category = {
   slug: string;
   title: string;
-  emoji: string;
+  icon: string | null;
   sub: string[];
 };
 
+// ناوبری تا زمان دریافت داده‌ی زنده از API با این فهرست بدون آیکن قابل استفاده می‌ماند.
 export const categories: Category[] = [
   {
     slug: "garden-tools",
     title: "ابزار باغبانی",
-    emoji: "🌿",
+    icon: null,
     sub: ["بیل و کلنگ", "قیچی باغبانی", "شن‌کش", "اره شاخه‌زنی", "ماله و کج‌بیل"],
   },
   {
     slug: "sprayers",
     title: "سمپاش‌ها",
-    emoji: "💧",
+    icon: null,
     sub: ["سمپاش پشتی", "سمپاش شارژی", "سمپاش موتوری", "سمپاش دستی", "نازل و لوازم جانبی"],
   },
   {
     slug: "power-tools",
     title: "ابزار موتوری",
-    emoji: "🪚",
+    icon: null,
     sub: ["اره موتوری", "علف‌زن", "موتور برق", "دروگر", "تیلر و کولتیواتور"],
   },
   {
     slug: "irrigation",
     title: "آبیاری",
-    emoji: "🚿",
+    icon: null,
     sub: ["شیلنگ آبیاری", "آبیاری قطره‌ای", "پمپ آب", "اتصالات", "تایمر آبیاری"],
   },
   {
     slug: "seeds",
     title: "بذر و نهال",
-    emoji: "🌱",
+    icon: null,
     sub: ["بذر سبزیجات", "بذر صیفی", "نهال میوه", "پیاز گل", "خاک و بستر کشت"],
   },
   {
     slug: "machinery",
     title: "ماشین‌آلات",
-    emoji: "🚜",
+    icon: null,
     sub: ["تراکتور", "ادوات خاک‌ورزی", "کمباین", "نشاکار", "یدکی ماشین‌آلات"],
   },
   {
     slug: "safety",
     title: "ایمنی و حفاظت",
-    emoji: "🧤",
+    icon: null,
     sub: ["دستکش کار", "ماسک و فیلتر", "عینک ایمنی", "چکمه و کفش کار", "لباس کار"],
   },
   {
     slug: "fertilizer",
     title: "کود و سم",
-    emoji: "🧪",
+    icon: null,
     sub: ["کود شیمیایی", "کود آلی", "سم دفع آفات", "علف‌کش", "محرک رشد"],
   },
 ];
@@ -180,4 +181,4 @@ export function formatPrice(value: number) {
 }
 
 // توجه: کوئری‌های محصولات از دیتابیس در src/lib/catalog.ts هستند.
-// آرایه‌های بالا فقط به‌عنوان داده‌ی اولیه (seed) دیتابیس استفاده می‌شوند.
+// آرایه‌ی محصولات بالا فقط به‌عنوان داده‌ی اولیه (seed) دیتابیس استفاده می‌شود.

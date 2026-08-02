@@ -1,6 +1,7 @@
 import math
 
 from django.db.models import Avg, Count
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
@@ -17,9 +18,29 @@ SORTS = {
 }
 
 
+class CategoryResponseSerializer(serializers.Serializer):
+    slug = serializers.CharField()
+    title = serializers.CharField()
+    icon = serializers.CharField(
+        allow_null=True,
+        help_text="Relative media URL for a validated PNG or SVG icon, or null.",
+    )
+    sub = serializers.ListField(child=serializers.CharField())
+
+
+class CategoryListDataSerializer(serializers.Serializer):
+    categories = CategoryResponseSerializer(many=True)
+
+
+class CategoryListEnvelopeSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    data = CategoryListDataSerializer()
+
+
 class CategoryListView(APIView):
     """فهرست دسته‌بندی‌ها"""
 
+    @extend_schema(responses={200: CategoryListEnvelopeSerializer})
     def get(self, request):
         categories = [category_dto(c) for c in Category.objects.all()]
         return ok({"categories": categories})
