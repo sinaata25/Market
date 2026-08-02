@@ -72,7 +72,7 @@ Use at least these production values:
 
 ```dotenv
 SECRET_KEY=<stable-random-secret-shared-by-all-replicas>
-DEBUG=false
+DJANGO_DEBUG=false
 ALLOWED_HOSTS=shop.example.com
 CSRF_TRUSTED_ORIGINS=https://shop.example.com
 DATABASE_URL=postgresql://market:<password>@postgres.internal:5432/market?sslmode=require
@@ -108,7 +108,7 @@ timeouts are finite, capped, and must total less than the resend cooldown. Use
 the TLS options required by your database host; `sslmode=require` is shown for a
 remote PostgreSQL service.
 
-Redis cannot be disabled when `DEBUG=false`. Use a dedicated, monitored Redis
+Redis cannot be disabled when `DJANGO_DEBUG=false`. Use a dedicated, monitored Redis
 database with `maxmemory-policy noeviction`; an eviction policy could discard a
 live rate-limit bucket and restart its allowance. When Redis rejects writes or
 is unavailable, OTP endpoints fail closed before IPPanel is called.
@@ -127,7 +127,7 @@ sanitized real-client chain is therefore part of a production deployment.
 For local development only:
 
 ```dotenv
-DEBUG=true
+DJANGO_DEBUG=true
 OTP_SMS_BACKEND=console
 TRUSTED_PROXY_COUNT=0
 ```
@@ -158,7 +158,7 @@ roll-forward deployment:
 The schema migration can be reversed, but deleted plaintext values and duplicate
 OTP rows cannot be recovered. Production requires PostgreSQL; SQLite remains a
 development database and does not provide PostgreSQL's row-lock semantics. The
-settings module refuses to start with SQLite when `DEBUG=false`.
+settings module refuses to start with SQLite when `DJANGO_DEBUG=false`.
 
 ## 5. Exact request and state flow
 
@@ -261,7 +261,7 @@ The test suite mocks IPPanel and never sends paid/network SMS:
 
 ```bash
 cd backend
-env DEBUG=true OTP_SMS_BACKEND=console ./.venv/bin/python manage.py test
+env DJANGO_DEBUG=true OTP_SMS_BACKEND=console ./.venv/bin/python manage.py test
 ./.venv/bin/python manage.py makemigrations --check --dry-run
 ```
 

@@ -70,7 +70,12 @@ SECRET_KEY = os.getenv(
     "django-insecure-dev-only-change-me",
 )
 
-DEBUG = env_bool("DEBUG", True)
+if os.getenv("DJANGO_DEBUG") is not None:
+    DEBUG = env_bool("DJANGO_DEBUG")
+else:
+    # Backward-compatible fallback. Prefer the namespaced setting because
+    # generic DEBUG is commonly injected by shells, IDEs, and process managers.
+    DEBUG = env_bool("DEBUG", True)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -324,7 +329,9 @@ OTP_SMS_BACKEND = os.getenv("OTP_SMS_BACKEND", _default_otp_backend).strip().low
 if OTP_SMS_BACKEND not in {"console", "ippanel"}:
     raise ImproperlyConfigured("OTP_SMS_BACKEND must be 'console' or 'ippanel'")
 if not DEBUG and OTP_SMS_BACKEND == "console":
-    raise ImproperlyConfigured("OTP_SMS_BACKEND=console is only allowed when DEBUG=true")
+    raise ImproperlyConfigured(
+        "OTP_SMS_BACKEND=console is only allowed when DJANGO_DEBUG=true"
+    )
 
 IPPANEL = {
     "BASE_URL": os.getenv("IPPANEL_BASE_URL", "https://edge.ippanel.com/v1").rstrip(

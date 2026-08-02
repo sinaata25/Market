@@ -43,5 +43,5 @@ npm run dev
 ## نکته‌ها
 
 - در توسعه، `OTP_SMS_BACKEND=console` کد را فقط در لاگ جنگو می‌نویسد؛ کد هیچ‌گاه در API برنمی‌گردد.
-- دیتابیس توسعه SQLite است (`backend/db.sqlite3`)؛ استقرار با `DEBUG=false` فقط با `DATABASE_URL` از نوع PostgreSQL بالا می‌آید.
+- دیتابیس توسعه SQLite است (`backend/db.sqlite3`)؛ استقرار با `DJANGO_DEBUG=false` فقط با `DATABASE_URL` از نوع PostgreSQL بالا می‌آید.
 - قرارداد پاسخ همه‌ی APIها: `{ok: true, data}` یا `{ok: false, error, errorCode?, data?}`.
