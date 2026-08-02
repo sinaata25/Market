@@ -12,7 +12,6 @@ type FormState = {
   price: string;
   oldPrice: string;
   stock: string;
-  emoji: string;
   badge: string;
   description: string;
   warranty: string;
@@ -25,7 +24,6 @@ const EMPTY: FormState = {
   price: "",
   oldPrice: "",
   stock: "10",
-  emoji: "🌿",
   badge: "",
   description: "",
   warranty: "",
@@ -77,7 +75,6 @@ export default function ProductForm({ productId }: { productId?: number }) {
               price: String(p.price),
               oldPrice: p.oldPrice ? String(p.oldPrice) : "",
               stock: String(p.stock ?? 0),
-              emoji: p.emoji,
               badge: p.badge ?? "",
               description: p.description ?? "",
               warranty: p.warranty ?? "",
@@ -101,7 +98,6 @@ export default function ProductForm({ productId }: { productId?: number }) {
       price: Number(form.price) || 0,
       oldPrice: form.oldPrice ? Number(form.oldPrice) : null,
       stock: Number(form.stock) || 0,
-      emoji: form.emoji.trim() || "🌿",
       badge: form.badge.trim(),
       description: form.description.trim(),
       warranty: form.warranty.trim(),
@@ -282,30 +278,18 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                  موجودی *
-                </label>
-                <input
-                  required
-                  type="number"
-                  min={0}
-                  value={form.stock}
-                  onChange={(e) => set("stock", e.target.value)}
-                  className={`${inputCls()} font-num`}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                  اموجی
-                </label>
-                <input
-                  value={form.emoji}
-                  onChange={(e) => set("emoji", e.target.value)}
-                  className={`${inputCls()} text-center`}
-                />
-              </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                موجودی *
+              </label>
+              <input
+                required
+                type="number"
+                min={0}
+                value={form.stock}
+                onChange={(e) => set("stock", e.target.value)}
+                className={`${inputCls()} font-num`}
+              />
             </div>
           </div>
 

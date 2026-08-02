@@ -12,7 +12,6 @@ type Review = {
   createdAt: string;
   productId: number;
   productTitle: string;
-  productEmoji: string;
 };
 
 export default function MyReviews() {
@@ -77,9 +76,6 @@ export default function MyReviews() {
               className="rounded-2xl border border-slate-100 bg-white p-5"
             >
               <div className="mb-3 flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-50 text-xl">
-                  {r.productEmoji}
-                </span>
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/product/${r.productId}`}

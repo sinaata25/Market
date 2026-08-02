@@ -11,7 +11,6 @@ type CartItem = {
   product: {
     id: number;
     title: string;
-    emoji: string;
     image?: string | null;
     price: number;
     oldPrice?: number;
@@ -228,21 +227,19 @@ export default function CartPage() {
               key={item.id}
               className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4"
             >
-              <Link
-                href={`/product/${item.product.id}`}
-                className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 text-4xl"
-              >
-                {item.product.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+              {item.product.image && (
+                <Link
+                  href={`/product/${item.product.id}`}
+                  className="block h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.product.image}
                     alt={item.product.title}
                     className="h-full w-full object-cover"
                   />
-                ) : (
-                  item.product.emoji
-                )}
-              </Link>
+                </Link>
+              )}
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/product/${item.product.id}`}

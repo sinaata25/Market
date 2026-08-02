@@ -54,6 +54,7 @@ export default async function ProductPage({
 
   const { product, related } = resolved;
   const seo = await fetchSeo("product", String(product.id));
+  const hasImages = Boolean(product.images?.length);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5">
@@ -90,17 +91,17 @@ export default async function ProductPage({
 
       {/* بخش اصلی: گالری / اطلاعات / خرید */}
       <div className="grid grid-cols-1 gap-6 rounded-2xl border border-slate-100 bg-white p-4 lg:grid-cols-12 lg:p-6">
-        {/* گالری */}
-        <div className="lg:col-span-4">
-          <ProductGallery
-            emoji={product.emoji}
-            images={product.images}
-            title={product.title}
-          />
-        </div>
+        {hasImages && (
+          <div className="lg:col-span-4">
+            <ProductGallery
+              images={product.images ?? []}
+              title={product.title}
+            />
+          </div>
+        )}
 
         {/* اطلاعات محصول */}
-        <div className="lg:col-span-5">
+        <div className={hasImages ? "lg:col-span-5" : "lg:col-span-8"}>
           <div className="mb-1 flex items-start justify-between gap-3">
             <h1 className="text-lg font-bold leading-8 text-slate-800">
               {product.title}
@@ -172,7 +173,7 @@ export default async function ProductPage({
         </div>
 
         {/* جعبه خرید */}
-        <div className="lg:col-span-3">
+        <div className={hasImages ? "lg:col-span-3" : "lg:col-span-4"}>
           <BuyBox product={product} />
         </div>
       </div>

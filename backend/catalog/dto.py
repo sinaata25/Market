@@ -34,7 +34,6 @@ def product_dto(product: Product) -> dict:
         "oldPrice": product.old_price,
         "rating": product.rating,
         "ratingCount": product.rating_count,
-        "emoji": product.emoji,
         "badge": product.badge or None,
         "colors": product.colors,
         "features": product.features or DEFAULT_FEATURES,

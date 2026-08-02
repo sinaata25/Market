@@ -100,18 +100,16 @@ export default async function IncrediblePage() {
             href={`/product/${best.id}`}
             className="group flex flex-col gap-5 p-5 sm:flex-row sm:items-center"
           >
-            <div className="grid h-40 w-full shrink-0 place-items-center overflow-hidden rounded-2xl bg-slate-50 text-6xl sm:w-40">
-              {best.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
+            {best.image && (
+              <div className="h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-50 sm:w-40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={best.image}
                   alt={best.title}
                   className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                 />
-              ) : (
-                best.emoji
-              )}
-            </div>
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <h3 className="mb-2 text-base font-bold leading-7 text-slate-800 group-hover:text-red-600">
                 {best.title}

@@ -66,7 +66,6 @@ PRODUCTS = [
         "old_price": 5_600_000,
         "rating": 4.6,
         "rating_count": 213,
-        "emoji": "🪚",
         "badge": "پرفروش",
         "colors": [
             {"name": "نارنجی", "hex": "#ea580c"},
@@ -101,7 +100,6 @@ PRODUCTS = [
         "old_price": 2_350_000,
         "rating": 4.4,
         "rating_count": 156,
-        "emoji": "💧",
         "badge": "تخفیف ویژه",
     },
     {
@@ -111,7 +109,6 @@ PRODUCTS = [
         "price": 420_000,
         "rating": 4.8,
         "rating_count": 89,
-        "emoji": "🌿",
     },
     {
         "id": 4,
@@ -121,7 +118,6 @@ PRODUCTS = [
         "old_price": 820_000,
         "rating": 4.3,
         "rating_count": 64,
-        "emoji": "🚿",
     },
     {
         "id": 5,
@@ -130,7 +126,6 @@ PRODUCTS = [
         "price": 350_000,
         "rating": 4.7,
         "rating_count": 142,
-        "emoji": "✂️",
         "badge": "پرفروش",
     },
     {
@@ -141,7 +136,6 @@ PRODUCTS = [
         "old_price": 240_000,
         "rating": 4.5,
         "rating_count": 311,
-        "emoji": "🌱",
     },
     {
         "id": 7,
@@ -150,7 +144,6 @@ PRODUCTS = [
         "price": 95_000,
         "rating": 4.2,
         "rating_count": 47,
-        "emoji": "🧤",
     },
     {
         "id": 8,
@@ -160,7 +153,6 @@ PRODUCTS = [
         "old_price": 175_000,
         "rating": 4.6,
         "rating_count": 98,
-        "emoji": "🧪",
         "badge": "تخفیف ویژه",
     },
 ]
@@ -194,7 +186,6 @@ class Command(BaseCommand):
                     "old_price": data.get("old_price"),
                     "rating": data["rating"],
                     "rating_count": data["rating_count"],
-                    "emoji": data["emoji"],
                     "badge": data.get("badge", ""),
                     "colors": data.get("colors"),
                     "features": data.get("features"),

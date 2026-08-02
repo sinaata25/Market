@@ -14,7 +14,7 @@ class OrderCancellationTests(TestCase):
             slug="tools", title="ابزار", emoji="🌿"
         )
         self.product = Product.objects.create(
-            title="بیل", category=category, price=100_000, emoji="🌿", stock=3
+            title="بیل", category=category, price=100_000, stock=3
         )
         self.order = Order.objects.create(
             code="GS-TEST",

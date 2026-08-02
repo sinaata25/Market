@@ -259,7 +259,6 @@ class MyReviewsView(AuthRequired, APIView):
                         "createdAt": r.created_at.isoformat(),
                         "productId": r.product_id,
                         "productTitle": r.product.title,
-                        "productEmoji": r.product.emoji,
                     }
                     for r in reviews
                 ]

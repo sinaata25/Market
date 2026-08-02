@@ -25,7 +25,6 @@ class Product(models.Model):
     old_price = models.PositiveIntegerField("قیمت قبل (تومان)", null=True, blank=True)
     rating = models.FloatField("امتیاز", default=0)
     rating_count = models.PositiveIntegerField("تعداد امتیاز", default=0)
-    emoji = models.CharField("اموجی", max_length=10)
     badge = models.CharField("برچسب", max_length=50, blank=True)
     colors = models.JSONField("رنگ‌ها", null=True, blank=True)  # [{name, hex}]
     features = models.JSONField("ویژگی‌ها", null=True, blank=True)  # [str]

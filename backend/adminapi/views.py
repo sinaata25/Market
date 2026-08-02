@@ -138,7 +138,7 @@ class StatsView(StaffRequiredMixin, APIView):
         ]
 
         low_stock = [
-            {"id": p.id, "title": p.title, "stock": p.stock, "emoji": p.emoji}
+            {"id": p.id, "title": p.title, "stock": p.stock}
             for p in Product.objects.filter(stock__lte=5).order_by("stock")[:8]
         ]
 
@@ -246,7 +246,6 @@ class ProductWriteSerializer(serializers.Serializer):
     price = serializers.IntegerField(min_value=0)
     oldPrice = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     stock = serializers.IntegerField(min_value=0)
-    emoji = serializers.CharField(max_length=10, required=False, default="🌿")
     badge = serializers.CharField(
         max_length=50, required=False, allow_blank=True, default=""
     )
@@ -277,7 +276,6 @@ def apply_product_data(product: Product, data: dict) -> Product:
     product.price = data["price"]
     product.old_price = data.get("oldPrice")
     product.stock = data["stock"]
-    product.emoji = data.get("emoji", "🌿")
     product.badge = data.get("badge", "")
     product.description = data.get("description", "")
     product.warranty = data.get("warranty", "")

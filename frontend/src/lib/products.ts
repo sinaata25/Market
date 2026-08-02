@@ -8,7 +8,6 @@ export type Product = {
   oldPrice?: number;
   rating: number;
   ratingCount: number;
-  emoji: string;
   image?: string | null;
   images?: string[];
   badge?: string;
@@ -88,7 +87,6 @@ export const products: Product[] = [
     oldPrice: 5600000,
     rating: 4.6,
     ratingCount: 213,
-    emoji: "🪚",
     badge: "پرفروش",
     colors: [
       { name: "نارنجی", hex: "#ea580c" },
@@ -120,7 +118,6 @@ export const products: Product[] = [
     oldPrice: 2350000,
     rating: 4.4,
     ratingCount: 156,
-    emoji: "💧",
     badge: "تخفیف ویژه",
   },
   {
@@ -130,7 +127,6 @@ export const products: Product[] = [
     price: 420000,
     rating: 4.8,
     ratingCount: 89,
-    emoji: "🌿",
   },
   {
     id: 4,
@@ -140,7 +136,6 @@ export const products: Product[] = [
     oldPrice: 820000,
     rating: 4.3,
     ratingCount: 64,
-    emoji: "🚿",
   },
   {
     id: 5,
@@ -149,7 +144,6 @@ export const products: Product[] = [
     price: 350000,
     rating: 4.7,
     ratingCount: 142,
-    emoji: "✂️",
     badge: "پرفروش",
   },
   {
@@ -160,7 +154,6 @@ export const products: Product[] = [
     oldPrice: 240000,
     rating: 4.5,
     ratingCount: 311,
-    emoji: "🌱",
   },
   {
     id: 7,
@@ -169,7 +162,6 @@ export const products: Product[] = [
     price: 95000,
     rating: 4.2,
     ratingCount: 47,
-    emoji: "🧤",
   },
   {
     id: 8,
@@ -179,7 +171,6 @@ export const products: Product[] = [
     oldPrice: 175000,
     rating: 4.6,
     ratingCount: 98,
-    emoji: "🧪",
     badge: "تخفیف ویژه",
   },
 ];

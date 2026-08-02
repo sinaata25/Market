@@ -26,7 +26,7 @@ type Stats = {
   salesByDay: { date: string; total: number; count: number }[];
   statusBreakdown: Record<string, number>;
   topProducts: { product_id: number; title: string; qty: number; revenue: number }[];
-  lowStock: { id: number; title: string; stock: number; emoji: string }[];
+  lowStock: { id: number; title: string; stock: number }[];
   recentOrders: {
     id: number;
     code: string;
@@ -230,7 +230,6 @@ export default function AdminDashboard() {
               <ul className="space-y-2.5">
                 {stats.lowStock.map((p) => (
                   <li key={p.id} className="flex items-center gap-2 text-xs">
-                    <span>{p.emoji}</span>
                     <Link
                       href={`/admin/products/${p.id}`}
                       className="flex-1 truncate text-slate-600 hover:text-brand-700"

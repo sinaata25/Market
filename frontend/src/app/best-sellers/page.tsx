@@ -126,18 +126,16 @@ export default async function BestSellersPage({
                   <span className="absolute left-3 top-3 text-2xl">
                     {MEDALS[i]}
                   </span>
-                  <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 text-3xl">
-                    {p.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                  {p.image && (
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={p.image}
                         alt={p.title}
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
-                    ) : (
-                      p.emoji
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <h3 className="mb-2 line-clamp-2 text-xs leading-5 text-slate-700 group-hover:text-brand-700">
                       {p.title}
