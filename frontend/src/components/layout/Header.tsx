@@ -15,7 +15,7 @@ export default function Header() {
             </span>
             <div className="leading-tight">
               <span className="block text-lg font-bold text-brand-700">
-                ابزار سبز
+                گروه صنعتی توانا
               </span>
               <span className="block text-[11px] text-slate-400">
                 ابزارآلات کشاورزی
@@ -27,7 +27,7 @@ export default function Header() {
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="جستجو در ابزار سبز..."
+              placeholder="جستجو در گروه صنعتی توانا..."
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-11 pl-4 text-sm outline-none transition focus:border-brand-400 focus:bg-white"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">

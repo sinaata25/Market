@@ -85,7 +85,7 @@ export default function ProfileLayout({
                 👤
               </span>
               <p className="text-sm font-bold text-slate-800">
-                {me.name ?? "کاربر ابزار سبز"}
+                {me.name ?? "کاربر توانا"}
               </p>
               <p className="mt-1 text-xs text-slate-400 font-num" dir="ltr">
                 {me.phone}

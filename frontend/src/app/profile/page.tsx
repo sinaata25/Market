@@ -64,7 +64,7 @@ export default function ProfileHome() {
           سلام {user.name ?? "دوست عزیز"} 👋
         </h1>
         <p className="mt-1 text-xs text-brand-50 font-num">
-          عضو ابزار سبز از {faDate(user.dateJoined)}
+          عضو گروه صنعتی توانا از {faDate(user.dateJoined)}
         </p>
       </section>
 

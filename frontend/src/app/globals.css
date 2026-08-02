@@ -3,7 +3,6 @@
 :root {
   --background: #f8fafc;
   --foreground: #1e293b;
-  --font-vazirmatn: Vazirmatn, Tahoma, Arial, sans-serif;
 }
 
 @theme inline {

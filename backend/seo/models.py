@@ -14,7 +14,9 @@ Sitemap: {site_url}/sitemap.xml
 class SeoSettings(models.Model):
     """تنظیمات سراسری سئو — تک‌ردیفی (singleton)"""
 
-    site_name = models.CharField("نام سایت", max_length=100, default="ابزار سبز")
+    site_name = models.CharField(
+        "نام سایت", max_length=100, default="گروه صنعتی توانا"
+    )
     site_url = models.CharField(
         "آدرس سایت", max_length=200, default="http://localhost:3000"
     )

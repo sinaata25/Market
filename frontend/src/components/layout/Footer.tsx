@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const columns = [
   {
-    title: "با ابزار سبز",
+    title: "گروه صنعتی توانا",
     links: ["درباره ما", "تماس با ما", "فرصت‌های شغلی", "وبلاگ کشاورزی"],
   },
   {
@@ -41,7 +41,9 @@ export default function Footer() {
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-lg">
                 🌾
               </span>
-              <span className="text-lg font-bold text-brand-700">ابزار سبز</span>
+              <span className="text-lg font-bold text-brand-700">
+                گروه صنعتی توانا
+              </span>
             </div>
             <p className="text-sm leading-7 text-slate-500">
               فروشگاه اینترنتی ابزارآلات و ادوات کشاورزی؛ ارائه‌دهنده انواع ابزار
@@ -65,7 +67,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-slate-100 pt-6 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} فروشگاه ابزار سبز — تمامی حقوق محفوظ است.
+          © {new Date().getFullYear()} گروه صنعتی توانا — تمامی حقوق محفوظ است.
         </div>
       </div>
     </footer>
