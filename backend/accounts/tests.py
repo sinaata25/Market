@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 import requests
 from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.management import call_command
@@ -30,8 +30,9 @@ from common.utils import iran_mobile_to_e164, is_valid_iran_mobile
 
 from .otp import (
     InvalidOtp,
+    OtpAttemptsExhausted,
     OtpRecentlySent,
-    OtpVerificationLocked,
+    _finalize_send,
     _reserve_send,
     issue_otp,
     verify_otp,
@@ -47,12 +48,10 @@ from .throttles import OtpSendIpThrottle
 User = get_user_model()
 
 TEST_SHOP = {
-    "OTP_LENGTH": 6,
+    "OTP_LENGTH": 4,
     "OTP_TTL_SECONDS": 120,
     "OTP_RESEND_COOLDOWN_SECONDS": 60,
     "OTP_MAX_ATTEMPTS": 5,
-    "OTP_FAILURE_WINDOW_SECONDS": 900,
-    "OTP_LOCKOUT_SECONDS": 900,
     "OTP_RETENTION_DAYS": 7,
     "SHIPPING_PRICE": 60_000,
     "FREE_SHIPPING_THRESHOLD": 2_000_000,
@@ -86,7 +85,7 @@ class IPPanelSmsBackendTests(SimpleTestCase):
         post.return_value = accepted_response()
 
         result = IPPanelSmsBackend(IPPANEL_CONFIG).send_otp(
-            "09121234567", "123456"
+            "09121234567", "1234"
         )
 
         self.assertEqual(result.provider_message_id, "1123594208")
@@ -101,7 +100,7 @@ class IPPanelSmsBackendTests(SimpleTestCase):
                 "from_number": "+983000505",
                 "code": "approved-pattern",
                 "recipients": ["+989121234567"],
-                "params": {"code": "123456"},
+                "params": {"code": "1234"},
             },
             allow_redirects=False,
             timeout=(3.0, 10.0),
@@ -117,7 +116,7 @@ class IPPanelSmsBackendTests(SimpleTestCase):
         post.return_value = response
 
         with self.assertRaises(SmsDeliveryError):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "123456")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
 
     @patch("accounts.sms.requests.post")
     def test_server_error_is_delivery_ambiguous(self, post):
@@ -129,7 +128,7 @@ class IPPanelSmsBackendTests(SimpleTestCase):
         post.return_value = response
 
         with self.assertRaises(SmsDeliveryUncertain):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "123456")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
 
     @patch("accounts.sms.requests.post")
     def test_rejects_a_malformed_success_response(self, post):
@@ -138,18 +137,18 @@ class IPPanelSmsBackendTests(SimpleTestCase):
         post.return_value = response
 
         with self.assertRaises(SmsDeliveryUncertain):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "123456")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
 
     @patch("accounts.sms.requests.post", side_effect=requests.Timeout)
     def test_timeout_is_not_retried(self, post):
         with self.assertRaises(SmsDeliveryUncertain):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "123456")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
         self.assertEqual(post.call_count, 1)
 
     @patch("accounts.sms.requests.post", side_effect=requests.ConnectTimeout)
     def test_connect_timeout_is_a_definite_failure(self, post):
         with self.assertRaises(SmsDeliveryError) as caught:
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "123456")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
         self.assertNotIsInstance(caught.exception, SmsDeliveryUncertain)
         self.assertEqual(post.call_count, 1)
 
@@ -203,7 +202,7 @@ class OtpServiceTests(TestCase):
         code = send_sms.call_args.args[1]
         challenge = Otp.objects.get(phone=self.phone)
 
-        self.assertEqual(len(code), 6)
+        self.assertEqual(len(code), 4)
         self.assertTrue(code.isdigit())
         self.assertNotEqual(challenge.code_hash, code)
         self.assertTrue(check_password(code, challenge.code_hash))
@@ -233,6 +232,37 @@ class OtpServiceTests(TestCase):
 
         self.assertEqual(reserve_once.call_count, 2)
 
+    def test_exhausting_a_pending_code_prevents_finalizer_resurrection(self):
+        token = uuid.uuid4()
+        correct_code = "1234"
+        _reserve_send(
+            self.phone,
+            make_password(correct_code),
+            timezone.now(),
+            token,
+        )
+
+        for _ in range(TEST_SHOP["OTP_MAX_ATTEMPTS"] - 1):
+            with self.assertRaises(InvalidOtp):
+                verify_otp(self.phone, "9999")
+        with self.assertRaises(OtpAttemptsExhausted):
+            verify_otp(self.phone, "9999")
+
+        challenge = Otp.objects.get(phone=self.phone)
+        self.assertEqual(challenge.pending_code_hash, "")
+        self.assertEqual(challenge.pending_attempts, 0)
+        self.assertIsNone(challenge.send_token)
+        self.assertGreater(challenge.resend_blocked_until, timezone.now())
+        with self.assertRaises(SmsDeliveryError):
+            _finalize_send(
+                self.phone,
+                token,
+                delivery_status="accepted",
+                provider_message_id="42",
+            )
+        with self.assertRaises(InvalidOtp):
+            verify_otp(self.phone, correct_code)
+
     @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
     def test_cooldown_blocks_a_second_delivery(self, send_sms):
         issue_otp(self.phone)
@@ -252,6 +282,11 @@ class OtpServiceTests(TestCase):
 
         challenge = Otp.objects.get(phone=self.phone)
         old_hash = challenge.code_hash
+        wrong_code = "0000" if old_code != "0000" else "1111"
+        with self.assertRaises(InvalidOtp):
+            verify_otp(self.phone, wrong_code)
+        challenge.refresh_from_db()
+        self.assertEqual(challenge.attempts, 1)
         challenge.sent_at = timezone.now() - timedelta(seconds=61)
         challenge.save(update_fields=["sent_at"])
 
@@ -265,7 +300,9 @@ class OtpServiceTests(TestCase):
         self.assertEqual(challenge.code_hash, old_hash)
         self.assertEqual(challenge.provider_message_id, "old-id")
         self.assertFalse(challenge.used)
+        self.assertEqual(challenge.attempts, 1)
         self.assertEqual(challenge.pending_code_hash, "")
+        self.assertEqual(challenge.pending_attempts, 0)
         self.assertIsNone(challenge.send_token)
         self.assertTrue(check_password(old_code, challenge.code_hash))
 
@@ -298,8 +335,61 @@ class OtpServiceTests(TestCase):
         self.assertEqual(issued.delivery_status, "unknown")
         challenge = Otp.objects.get(phone=self.phone)
         self.assertTrue(check_password(code, challenge.pending_code_hash))
+        self.assertEqual(challenge.pending_attempts, 0)
         self.assertIsNotNone(challenge.send_token)
+        wrong_code = "0000" if code != "0000" else "1111"
+        with self.assertRaises(InvalidOtp):
+            verify_otp(self.phone, wrong_code)
+        challenge.refresh_from_db()
+        self.assertEqual(challenge.pending_attempts, 1)
         self.assertEqual(verify_otp(self.phone, code).phone, self.phone)
+
+    def test_pending_resend_has_attempts_independent_from_the_old_code(self):
+        with patch(
+            "accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("old")
+        ) as first_send:
+            issue_otp(self.phone)
+            old_code = first_send.call_args.args[1]
+
+        old_wrong = "9999" if old_code != "9999" else "8888"
+        for _ in range(TEST_SHOP["OTP_MAX_ATTEMPTS"] - 1):
+            with self.assertRaises(InvalidOtp):
+                verify_otp(self.phone, old_wrong)
+        Otp.objects.filter(phone=self.phone).update(
+            sent_at=timezone.now() - timedelta(seconds=61)
+        )
+
+        new_code = None
+
+        def fail_old_generation_while_new_send_is_pending(phone, code):
+            nonlocal new_code
+            new_code = code
+            wrong_code = next(
+                candidate
+                for candidate in ("0000", "1111", "2222")
+                if candidate not in {old_code, code}
+            )
+            with self.assertRaises(InvalidOtp):
+                verify_otp(phone, wrong_code)
+            challenge = Otp.objects.get(phone=phone)
+            self.assertTrue(challenge.used)
+            self.assertEqual(
+                challenge.attempts, TEST_SHOP["OTP_MAX_ATTEMPTS"]
+            )
+            self.assertEqual(challenge.pending_attempts, 1)
+            return SmsDeliveryResult("new")
+
+        with patch(
+            "accounts.otp.send_otp_sms",
+            side_effect=fail_old_generation_while_new_send_is_pending,
+        ):
+            issue_otp(self.phone)
+
+        challenge = Otp.objects.get(phone=self.phone)
+        self.assertFalse(challenge.used)
+        self.assertEqual(challenge.attempts, 1)
+        self.assertEqual(challenge.pending_attempts, 0)
+        self.assertEqual(verify_otp(self.phone, new_code).phone, self.phone)
 
     def test_a_valid_pending_code_cannot_be_overwritten(self):
         with patch(
@@ -429,30 +519,102 @@ class OtpServiceTests(TestCase):
         self.assertEqual(send_sms.call_count, 1)
 
     @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
-    def test_final_wrong_attempt_locks_immediately(self, send_sms):
+    def test_fifth_wrong_attempt_consumes_only_the_current_code(self, send_sms):
         issue_otp(self.phone)
         correct_code = send_sms.call_args.args[1]
-        wrong_code = "999999" if correct_code != "999999" else "888888"
+        wrong_code = "9999" if correct_code != "9999" else "8888"
 
         for _ in range(TEST_SHOP["OTP_MAX_ATTEMPTS"] - 1):
             with self.assertRaises(InvalidOtp):
                 verify_otp(self.phone, wrong_code)
-        with self.assertRaises(OtpVerificationLocked):
+        with self.assertRaises(OtpAttemptsExhausted):
             verify_otp(self.phone, wrong_code)
 
         challenge = Otp.objects.get(phone=self.phone)
         self.assertEqual(challenge.attempts, TEST_SHOP["OTP_MAX_ATTEMPTS"])
         self.assertTrue(challenge.used)
-        with self.assertRaises(OtpVerificationLocked):
+        with self.assertRaises(InvalidOtp):
             verify_otp(self.phone, correct_code)
 
-    def test_resend_does_not_reset_failed_attempts(self):
+    @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
+    def test_four_wrong_attempts_still_allow_the_correct_code(self, send_sms):
+        issue_otp(self.phone)
+        correct_code = send_sms.call_args.args[1]
+        wrong_code = "9999" if correct_code != "9999" else "8888"
+
+        for _ in range(TEST_SHOP["OTP_MAX_ATTEMPTS"] - 1):
+            with self.assertRaises(InvalidOtp):
+                verify_otp(self.phone, wrong_code)
+
+        self.assertEqual(verify_otp(self.phone, correct_code).phone, self.phone)
+
+    def test_exhausted_code_can_be_replaced_after_normal_send_cooldown(self):
+        with patch(
+            "accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("first")
+        ) as first_send:
+            issue_otp(self.phone)
+            first_code = first_send.call_args.args[1]
+
+        wrong_code = "9999" if first_code != "9999" else "8888"
+        for _ in range(TEST_SHOP["OTP_MAX_ATTEMPTS"] - 1):
+            with self.assertRaises(InvalidOtp):
+                verify_otp(self.phone, wrong_code)
+        with self.assertRaises(OtpAttemptsExhausted) as exhausted:
+            verify_otp(self.phone, wrong_code)
+        self.assertGreater(exhausted.exception.retry_after, 0)
+
+        with self.assertRaises(OtpRecentlySent):
+            issue_otp(self.phone)
+
+        Otp.objects.filter(phone=self.phone).update(
+            sent_at=timezone.now() - timedelta(seconds=61)
+        )
+        with patch(
+            "accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("second")
+        ) as second_send:
+            issue_otp(self.phone)
+            second_code = second_send.call_args.args[1]
+
+        challenge = Otp.objects.get(phone=self.phone)
+        self.assertFalse(challenge.used)
+        self.assertEqual(challenge.attempts, 0)
+        self.assertEqual(verify_otp(self.phone, second_code).phone, self.phone)
+
+    def test_exhausted_code_can_be_replaced_immediately_after_cooldown(self):
+        with patch(
+            "accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("first")
+        ) as first_send:
+            issue_otp(self.phone)
+            first_code = first_send.call_args.args[1]
+
+        Otp.objects.filter(phone=self.phone).update(
+            sent_at=timezone.now() - timedelta(seconds=61)
+        )
+        wrong_code = "9999" if first_code != "9999" else "8888"
+        for _ in range(TEST_SHOP["OTP_MAX_ATTEMPTS"] - 1):
+            with self.assertRaises(InvalidOtp):
+                verify_otp(self.phone, wrong_code)
+        with self.assertRaises(OtpAttemptsExhausted) as exhausted:
+            verify_otp(self.phone, wrong_code)
+        self.assertEqual(exhausted.exception.retry_after, 0)
+
+        with patch(
+            "accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("second")
+        ) as second_send:
+            issue_otp(self.phone)
+            second_code = second_send.call_args.args[1]
+
+        self.assertEqual(verify_otp(self.phone, second_code).phone, self.phone)
+
+    def test_successful_resend_resets_failed_attempts(self):
         with patch(
             "accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("first")
         ):
             issue_otp(self.phone)
         with self.assertRaises(InvalidOtp):
-            verify_otp(self.phone, "000000")
+            verify_otp(self.phone, "0000")
+
+        self.assertEqual(Otp.objects.get(phone=self.phone).attempts, 1)
 
         Otp.objects.filter(phone=self.phone).update(
             sent_at=timezone.now() - timedelta(seconds=61)
@@ -462,7 +624,7 @@ class OtpServiceTests(TestCase):
         ):
             issue_otp(self.phone)
 
-        self.assertEqual(Otp.objects.get(phone=self.phone).attempts, 1)
+        self.assertEqual(Otp.objects.get(phone=self.phone).attempts, 0)
 
     @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
     def test_expired_code_is_rejected_and_consumed(self, send_sms):
@@ -615,7 +777,7 @@ class OtpApiTests(TestCase):
         self.assertIsNone(response.data["data"]["user"])
         self.assertEqual(
             response.data["data"]["otpConfig"],
-            {"codeLength": 6, "expiresIn": 120, "resendAfter": 60},
+            {"codeLength": 4, "expiresIn": 120, "resendAfter": 60},
         )
 
     @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
@@ -634,7 +796,7 @@ class OtpApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["ok"])
-        self.assertEqual(response.data["data"]["codeLength"], 6)
+        self.assertEqual(response.data["data"]["codeLength"], 4)
         self.assertEqual(response.data["data"]["deliveryStatus"], "accepted")
         self.assertNotIn("code", response.data["data"])
         self.assertNotIn("devCode", response.data["data"])
@@ -657,7 +819,7 @@ class OtpApiTests(TestCase):
         self.assertIn("Retry-After", second.headers)
         self.assertEqual(second.data["errorCode"], "otp_cooldown")
         self.assertTrue(second.data["data"]["activeChallenge"])
-        self.assertEqual(second.data["data"]["codeLength"], 6)
+        self.assertEqual(second.data["data"]["codeLength"], 4)
         self.assertGreater(second.data["data"]["expiresIn"], 0)
         self.assertEqual(send_sms.call_count, 1)
 
@@ -788,7 +950,7 @@ class OtpApiTests(TestCase):
         self.assertEqual(me.data["data"]["user"]["phone"], self.phone)
         self.assertEqual(
             me.data["data"]["otpConfig"],
-            {"codeLength": 6, "expiresIn": 120, "resendAfter": 60},
+            {"codeLength": 4, "expiresIn": 120, "resendAfter": 60},
         )
         self.assertIn("sessionid", self.client.cookies)
         self.assertEqual(self.client.session["auth_method"], "otp")
@@ -841,13 +1003,13 @@ class OtpApiTests(TestCase):
         self.assertTrue(Otp.objects.get(phone=self.phone).used)
 
     @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
-    def test_final_wrong_verification_is_rate_limited_with_retry_after(self, send_sms):
+    def test_fifth_wrong_verification_requires_a_new_code(self, send_sms):
         headers = self.csrf_headers()
         self.client.post(
             "/api/auth/otp/send", {"phone": self.phone}, format="json", **headers
         )
         correct_code = send_sms.call_args.args[1]
-        wrong_code = "000000" if correct_code != "000000" else "111111"
+        wrong_code = "0000" if correct_code != "0000" else "1111"
 
         responses = [
             self.client.post(
@@ -859,9 +1021,14 @@ class OtpApiTests(TestCase):
             for _ in range(TEST_SHOP["OTP_MAX_ATTEMPTS"])
         ]
 
-        self.assertEqual(responses[-1].status_code, 429)
-        self.assertEqual(responses[-1].data["errorCode"], "otp_locked")
-        self.assertIn("Retry-After", responses[-1].headers)
+        self.assertEqual(responses[-1].status_code, 400)
+        self.assertEqual(
+            responses[-1].data["errorCode"], "otp_attempts_exhausted"
+        )
+        self.assertTrue(responses[-1].data["data"]["requiresNewCode"])
+        self.assertGreater(responses[-1].data["data"]["resendAfter"], 0)
+        self.assertNotIn("Retry-After", responses[-1].headers)
+        self.assertTrue(Otp.objects.get(phone=self.phone).used)
 
     @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
     def test_inactive_user_cannot_log_in(self, send_sms):

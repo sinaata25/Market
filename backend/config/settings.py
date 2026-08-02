@@ -285,7 +285,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ─── تنظیمات فروشگاه ─────────────────────────────────────────
 
 SHOP = {
-    "OTP_LENGTH": env_int("OTP_LENGTH", 6, minimum=6, maximum=10),
+    "OTP_LENGTH": env_int("OTP_LENGTH", 4, minimum=4, maximum=10),
     "OTP_TTL_SECONDS": env_int(
         "OTP_TTL_SECONDS", 120, minimum=60, maximum=600
     ),
@@ -294,12 +294,6 @@ SHOP = {
     ),
     "OTP_MAX_ATTEMPTS": env_int(
         "OTP_MAX_ATTEMPTS", 5, minimum=3, maximum=10
-    ),
-    "OTP_FAILURE_WINDOW_SECONDS": env_int(
-        "OTP_FAILURE_WINDOW_SECONDS", 900, minimum=300, maximum=86_400
-    ),
-    "OTP_LOCKOUT_SECONDS": env_int(
-        "OTP_LOCKOUT_SECONDS", 900, minimum=60, maximum=86_400
     ),
     "OTP_RETENTION_DAYS": env_int(
         "OTP_RETENTION_DAYS", 7, minimum=1, maximum=30
@@ -313,15 +307,6 @@ if SHOP["OTP_TTL_SECONDS"] < SHOP["OTP_RESEND_COOLDOWN_SECONDS"]:
         "OTP_TTL_SECONDS must be greater than or equal to "
         "OTP_RESEND_COOLDOWN_SECONDS"
     )
-if SHOP["OTP_LOCKOUT_SECONDS"] < SHOP["OTP_TTL_SECONDS"]:
-    raise ImproperlyConfigured(
-        "OTP_LOCKOUT_SECONDS must be greater than or equal to OTP_TTL_SECONDS"
-    )
-if SHOP["OTP_FAILURE_WINDOW_SECONDS"] < SHOP["OTP_TTL_SECONDS"]:
-    raise ImproperlyConfigured(
-        "OTP_FAILURE_WINDOW_SECONDS must be greater than or equal to OTP_TTL_SECONDS"
-    )
-
 # ارسال OTP: در توسعه console و در استقرار ippanel.
 # هیچ مسیر bypass یا بازگرداندن کد در API وجود ندارد.
 _default_otp_backend = "console" if DEBUG else "ippanel"
@@ -340,7 +325,7 @@ IPPANEL = {
     "API_KEY": os.getenv("IPPANEL_API_KEY", "").strip(),
     "FROM_NUMBER": os.getenv("IPPANEL_FROM_NUMBER", "").strip(),
     "PATTERN_CODE": os.getenv("IPPANEL_PATTERN_CODE", "").strip(),
-    "OTP_PARAMETER": os.getenv("IPPANEL_OTP_PARAMETER", "code").strip(),
+    "OTP_PARAMETER": os.getenv("IPPANEL_OTP_PARAMETER", "otp_code").strip(),
     "CONNECT_TIMEOUT": env_float(
         "IPPANEL_CONNECT_TIMEOUT", 3.0, maximum=10.0
     ),

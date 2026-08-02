@@ -55,7 +55,6 @@ class OtpAdmin(admin.ModelAdmin):
         "resend_blocked_until",
         "send_started_at",
         "pending_expires_at",
-        "locked_until",
-        "failure_window_started_at",
+        "pending_attempts",
         "send_token",
     ]

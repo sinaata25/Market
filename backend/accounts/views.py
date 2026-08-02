@@ -24,8 +24,8 @@ from common.utils import (
 from .otp import (
     InactiveOtpUser,
     InvalidOtp,
+    OtpAttemptsExhausted,
     OtpRecentlySent,
-    OtpVerificationLocked,
     issue_otp,
     verify_otp,
 )
@@ -226,13 +226,6 @@ class SendOtpView(OtpThrottleMessageMixin, APIView):
                 },
                 headers={"Retry-After": str(exc.retry_after)},
             )
-        except OtpVerificationLocked as exc:
-            return fail(
-                "تلاش‌های ناموفق بیش از حد مجاز است؛ کمی بعد دوباره تلاش کنید",
-                429,
-                error_code="otp_locked",
-                headers={"Retry-After": str(exc.retry_after)},
-            )
         except SmsDeliveryError:
             return fail(
                 "ارسال پیامک موقتاً ممکن نیست؛ لطفاً کمی بعد دوباره تلاش کنید",
@@ -283,12 +276,18 @@ class VerifyOtpView(OtpThrottleMessageMixin, APIView):
                 400,
                 error_code="otp_invalid",
             )
-        except OtpVerificationLocked as exc:
+        except OtpAttemptsExhausted as exc:
             return fail(
-                "تعداد تلاش‌های ناموفق بیش از حد مجاز است؛ کمی بعد تلاش کنید",
-                429,
-                error_code="otp_locked",
-                headers={"Retry-After": str(exc.retry_after)},
+                (
+                    f"این کد پس از {settings.SHOP['OTP_MAX_ATTEMPTS']} تلاش "
+                    "ناموفق باطل شد؛ کد جدید درخواست کنید"
+                ),
+                400,
+                error_code="otp_attempts_exhausted",
+                data={
+                    "requiresNewCode": True,
+                    "resendAfter": exc.retry_after,
+                },
             )
         except InactiveOtpUser:
             return fail("این حساب غیرفعال است", 403, error_code="account_inactive")

@@ -35,10 +35,12 @@ class OtpRecentlySent(Exception):
         super().__init__(f"retry after {retry_after} seconds")
 
 
-class OtpVerificationLocked(Exception):
+class OtpAttemptsExhausted(Exception):
+    """Every current code was consumed after too many wrong attempts."""
+
     def __init__(self, retry_after: int):
         self.retry_after = retry_after
-        super().__init__(f"verification locked for {retry_after} seconds")
+        super().__init__("the current OTP must be replaced")
 
 
 class InvalidOtp(Exception):
@@ -64,6 +66,18 @@ def _generate_code(length: int) -> str:
 
 def _seconds_until(deadline, now) -> int:
     return max(1, math.ceil((deadline - now).total_seconds()))
+
+
+def _remaining_resend_cooldown(challenge: Otp, now, cooldown: int) -> int:
+    deadlines = []
+    if challenge.resend_blocked_until:
+        deadlines.append(challenge.resend_blocked_until)
+    if challenge.sent_at:
+        deadlines.append(
+            challenge.sent_at + timezone.timedelta(seconds=cooldown)
+        )
+    future_deadlines = [deadline for deadline in deadlines if deadline > now]
+    return _seconds_until(max(future_deadlines), now) if future_deadlines else 0
 
 
 def _with_sqlite_lock_retry(operation):
@@ -105,7 +119,6 @@ def _reserve_send_once(phone: str, code_hash: str, now, token: uuid.UUID) -> Non
     # the normal resend cooldown to avoid duplicate paid SMS messages.
     claimed = (
         Otp.objects.filter(phone=phone)
-        .filter(Q(locked_until__isnull=True) | Q(locked_until__lte=now))
         .filter(
             Q(resend_blocked_until__isnull=True)
             | Q(resend_blocked_until__lte=now)
@@ -116,6 +129,7 @@ def _reserve_send_once(phone: str, code_hash: str, now, token: uuid.UUID) -> Non
             pending_code_hash=code_hash,
             pending_expires_at=now
             + timezone.timedelta(seconds=otp_settings["OTP_TTL_SECONDS"]),
+            pending_attempts=0,
             send_token=token,
             send_started_at=now,
             resend_blocked_until=None,
@@ -125,9 +139,6 @@ def _reserve_send_once(phone: str, code_hash: str, now, token: uuid.UUID) -> Non
         return
 
     challenge = Otp.objects.get(phone=phone)
-    if challenge.locked_until and challenge.locked_until > now:
-        raise OtpVerificationLocked(_seconds_until(challenge.locked_until, now))
-
     cooldown_deadlines = []
     if challenge.resend_blocked_until:
         cooldown_deadlines.append(challenge.resend_blocked_until)
@@ -203,12 +214,14 @@ def _release_send(phone: str, token: uuid.UUID) -> None:
                 return
             challenge.pending_code_hash = ""
             challenge.pending_expires_at = None
+            challenge.pending_attempts = 0
             challenge.send_token = None
             challenge.send_started_at = None
             challenge.save(
                 update_fields=[
                     "pending_code_hash",
                     "pending_expires_at",
+                    "pending_attempts",
                     "send_token",
                     "send_started_at",
                 ]
@@ -239,12 +252,14 @@ def _finalize_send(
         return Otp.objects.filter(phone=phone, send_token=token).update(
             code_hash=F("pending_code_hash"),
             expires_at=F("pending_expires_at"),
+            attempts=F("pending_attempts"),
             used=False,
             sent_at=F("send_started_at"),
             provider_message_id=provider_message_id,
             delivery_status=delivery_status,
             pending_code_hash="",
             pending_expires_at=None,
+            pending_attempts=0,
             send_token=None,
             send_started_at=None,
         )
@@ -315,6 +330,7 @@ def issue_otp(phone: str) -> OtpIssueResult:
 def _clear_pending(challenge: Otp) -> None:
     challenge.pending_code_hash = ""
     challenge.pending_expires_at = None
+    challenge.pending_attempts = 0
     challenge.send_token = None
     challenge.send_started_at = None
 
@@ -324,10 +340,8 @@ def verify_otp(phone: str, code: str):
 
     otp_settings = settings.SHOP
     max_attempts = otp_settings["OTP_MAX_ATTEMPTS"]
-    failure_window = otp_settings["OTP_FAILURE_WINDOW_SECONDS"]
-    lockout = otp_settings["OTP_LOCKOUT_SECONDS"]
     outcome = "invalid"
-    retry_after = None
+    retry_after = 0
     user = None
 
     with transaction.atomic():
@@ -338,150 +352,166 @@ def verify_otp(phone: str, code: str):
         else:
             update_fields = set()
 
-            if challenge.locked_until and challenge.locked_until > now:
-                retry_after = _seconds_until(challenge.locked_until, now)
-                outcome = "locked"
-            else:
-                # A lock/failure window expires with time, never because a new
-                # OTP was generated. This preserves attempts across resends.
-                if challenge.locked_until is not None:
-                    challenge.locked_until = None
-                    challenge.attempts = 0
-                    challenge.failure_window_started_at = None
-                    update_fields.update(
-                        {"locked_until", "attempts", "failure_window_started_at"}
-                    )
-                elif (
-                    challenge.failure_window_started_at
-                    and (now - challenge.failure_window_started_at).total_seconds()
-                    >= failure_window
+            active_valid = bool(
+                challenge.code_hash
+                and not challenge.used
+                and challenge.expires_at > now
+            )
+            pending_valid = bool(
+                challenge.pending_code_hash
+                and challenge.pending_expires_at
+                and challenge.pending_expires_at > now
+            )
+
+            if not active_valid and not pending_valid:
+                if not challenge.used:
+                    challenge.used = True
+                    update_fields.add("used")
+                if (
+                    challenge.pending_expires_at
+                    and challenge.pending_expires_at <= now
                 ):
-                    challenge.attempts = 0
-                    challenge.failure_window_started_at = None
-                    update_fields.update({"attempts", "failure_window_started_at"})
-
-                active_valid = bool(
-                    challenge.code_hash
-                    and not challenge.used
-                    and challenge.expires_at > now
+                    _clear_pending(challenge)
+                    update_fields.update(
+                        {
+                            "pending_code_hash",
+                            "pending_expires_at",
+                            "pending_attempts",
+                            "send_token",
+                            "send_started_at",
+                        }
+                    )
+                outcome = "invalid"
+            else:
+                matched_pending = pending_valid and check_password(
+                    code, challenge.pending_code_hash
                 )
-                pending_valid = bool(
-                    challenge.pending_code_hash
-                    and challenge.pending_expires_at
-                    and challenge.pending_expires_at > now
+                matched_active = active_valid and check_password(
+                    code, challenge.code_hash
                 )
 
-                if not active_valid and not pending_valid:
-                    if not challenge.used:
+                if not matched_pending and not matched_active:
+                    if active_valid:
+                        challenge.attempts += 1
+                        update_fields.add("attempts")
+                        if challenge.attempts >= max_attempts:
+                            challenge.used = True
+                            update_fields.add("used")
+
+                    if pending_valid:
+                        challenge.pending_attempts += 1
+                        update_fields.add("pending_attempts")
+                        if challenge.pending_attempts >= max_attempts:
+                            # Preserve the provider cooldown before clearing the
+                            # token, so a concurrent finalizer cannot resurrect
+                            # the exhausted pending code or trigger a duplicate SMS.
+                            if challenge.send_started_at:
+                                pending_cooldown = (
+                                    challenge.send_started_at
+                                    + timezone.timedelta(
+                                        seconds=otp_settings[
+                                            "OTP_RESEND_COOLDOWN_SECONDS"
+                                        ]
+                                    )
+                                )
+                                if (
+                                    challenge.resend_blocked_until is None
+                                    or challenge.resend_blocked_until
+                                    < pending_cooldown
+                                ):
+                                    challenge.resend_blocked_until = pending_cooldown
+                                    update_fields.add("resend_blocked_until")
+                            _clear_pending(challenge)
+                            update_fields.update(
+                                {
+                                    "pending_code_hash",
+                                    "pending_expires_at",
+                                    "pending_attempts",
+                                    "send_token",
+                                    "send_started_at",
+                                }
+                            )
+
+                    active_remaining = active_valid and not challenge.used
+                    pending_remaining = bool(challenge.pending_code_hash)
+                    if not active_remaining and not pending_remaining:
                         challenge.used = True
                         update_fields.add("used")
-                    if (
-                        challenge.pending_expires_at
-                        and challenge.pending_expires_at <= now
-                    ):
+                        retry_after = _remaining_resend_cooldown(
+                            challenge,
+                            now,
+                            otp_settings["OTP_RESEND_COOLDOWN_SECONDS"],
+                        )
+                        outcome = "exhausted"
+                    else:
+                        outcome = "invalid"
+                else:
+                    if matched_pending:
+                        challenge.expires_at = challenge.pending_expires_at
+                        challenge.sent_at = challenge.send_started_at or now
+                        # The pending reservation has no committed provider
+                        # metadata. Do not retain an older send's outbox ID
+                        # or accepted status on the newly consumed code.
+                        challenge.delivery_status = "unknown"
+                        challenge.provider_message_id = ""
+                        challenge.code_hash = ""
+                        _clear_pending(challenge)
+                        update_fields.update(
+                            {
+                                "sent_at",
+                                "expires_at",
+                                "delivery_status",
+                                "provider_message_id",
+                                "code_hash",
+                                "pending_code_hash",
+                                "pending_expires_at",
+                                "pending_attempts",
+                                "send_token",
+                                "send_started_at",
+                            }
+                        )
+                    elif challenge.pending_code_hash or challenge.send_token:
+                        # A successful login revokes every outstanding code
+                        # for the phone. A concurrent finalizer then fails its
+                        # token CAS and cannot resurrect a second OTP.
                         _clear_pending(challenge)
                         update_fields.update(
                             {
                                 "pending_code_hash",
                                 "pending_expires_at",
+                                "pending_attempts",
                                 "send_token",
                                 "send_started_at",
                             }
                         )
-                    outcome = "invalid"
-                else:
-                    matched_pending = pending_valid and check_password(
-                        code, challenge.pending_code_hash
+                    # If a reserve UPDATE was waiting on this row lock,
+                    # PostgreSQL rechecks this marker and refuses it. Keep
+                    # sent_at as the real provider request timestamp.
+                    challenge.resend_blocked_until = now + timezone.timedelta(
+                        seconds=otp_settings["OTP_RESEND_COOLDOWN_SECONDS"]
                     )
-                    matched_active = active_valid and check_password(
-                        code, challenge.code_hash
+                    challenge.used = True
+                    challenge.attempts = 0
+                    update_fields.update(
+                        {
+                            "used",
+                            "attempts",
+                            "resend_blocked_until",
+                        }
                     )
 
-                    if not matched_pending and not matched_active:
-                        if challenge.failure_window_started_at is None:
-                            challenge.failure_window_started_at = now
-                            update_fields.add("failure_window_started_at")
-                        challenge.attempts += 1
-                        update_fields.add("attempts")
-                        if challenge.attempts >= max_attempts:
-                            challenge.used = True
-                            challenge.locked_until = now + timezone.timedelta(
-                                seconds=lockout
-                            )
-                            retry_after = lockout
-                            update_fields.update({"used", "locked_until"})
-                            outcome = "locked"
-                        else:
-                            outcome = "invalid"
-                    else:
-                        if matched_pending:
-                            challenge.expires_at = challenge.pending_expires_at
-                            challenge.sent_at = challenge.send_started_at or now
-                            # The pending reservation has no committed provider
-                            # metadata. Do not retain an older send's outbox ID
-                            # or accepted status on the newly consumed code.
-                            challenge.delivery_status = "unknown"
-                            challenge.provider_message_id = ""
-                            challenge.code_hash = ""
-                            _clear_pending(challenge)
-                            update_fields.update(
-                                {
-                                    "sent_at",
-                                    "expires_at",
-                                    "delivery_status",
-                                    "provider_message_id",
-                                    "code_hash",
-                                    "pending_code_hash",
-                                    "pending_expires_at",
-                                    "send_token",
-                                    "send_started_at",
-                                }
-                            )
-                        elif challenge.pending_code_hash or challenge.send_token:
-                            # A successful login revokes every outstanding code
-                            # for the phone. A concurrent finalizer then fails its
-                            # token CAS and cannot resurrect a second OTP.
-                            _clear_pending(challenge)
-                            update_fields.update(
-                                {
-                                    "pending_code_hash",
-                                    "pending_expires_at",
-                                    "send_token",
-                                    "send_started_at",
-                                }
-                            )
-                        # If a reserve UPDATE was waiting on this row lock,
-                        # PostgreSQL rechecks this marker and refuses it. Keep
-                        # sent_at as the real provider request timestamp.
-                        challenge.resend_blocked_until = now + timezone.timedelta(
-                            seconds=otp_settings["OTP_RESEND_COOLDOWN_SECONDS"]
-                        )
-                        challenge.used = True
-                        challenge.attempts = 0
-                        challenge.failure_window_started_at = None
-                        challenge.locked_until = None
-                        update_fields.update(
-                            {
-                                "used",
-                                "attempts",
-                                "failure_window_started_at",
-                                "locked_until",
-                                "resend_blocked_until",
-                            }
-                        )
-
-                        try:
-                            user = User.objects.get(phone=phone)
-                        except User.DoesNotExist:
-                            user = User.objects.create_user(phone=phone)
-                        outcome = "success" if user.is_active else "inactive"
+                    try:
+                        user = User.objects.get(phone=phone)
+                    except User.DoesNotExist:
+                        user = User.objects.create_user(phone=phone)
+                    outcome = "success" if user.is_active else "inactive"
 
             if update_fields:
                 challenge.save(update_fields=sorted(update_fields))
 
     # Raise after the transaction so counters/consumption are never rolled back.
-    if outcome == "locked":
-        raise OtpVerificationLocked(retry_after or 1)
+    if outcome == "exhausted":
+        raise OtpAttemptsExhausted(retry_after)
     if outcome == "inactive":
         raise InactiveOtpUser
     if outcome != "success" or user is None:

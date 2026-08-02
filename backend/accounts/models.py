@@ -163,9 +163,9 @@ class Otp(models.Model):
     )
     code_hash = models.CharField("هش کد", max_length=128, editable=False)
     expires_at = models.DateTimeField("انقضا")
-    attempts = models.PositiveSmallIntegerField("تلاش‌های ناموفق", default=0)
-    failure_window_started_at = models.DateTimeField(null=True, blank=True)
-    locked_until = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(
+        "تلاش‌های ناموفق کد فعلی", default=0
+    )
     used = models.BooleanField("مصرف‌شده", default=False)
     sent_at = models.DateTimeField("زمان ارسال", null=True, blank=True)
     resend_blocked_until = models.DateTimeField(
@@ -181,6 +181,7 @@ class Otp(models.Model):
     # verifiable even if IPPanel accepted it but the response/final DB write failed.
     pending_code_hash = models.CharField(max_length=128, blank=True, editable=False)
     pending_expires_at = models.DateTimeField(null=True, blank=True, editable=False)
+    pending_attempts = models.PositiveSmallIntegerField(default=0, editable=False)
     send_token = models.UUIDField(null=True, blank=True, editable=False)
     send_started_at = models.DateTimeField(null=True, blank=True, editable=False)
 

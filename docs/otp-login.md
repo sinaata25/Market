@@ -20,12 +20,12 @@ Content-Type: application/json
   "from_number": "+983000505",
   "code": "APPROVED_PATTERN_CODE",
   "recipients": ["+989121234567"],
-  "params": {"code": "123456"}
+  "params": {"otp_code": "1234"}
 }
 ```
 
-The top-level `code` is the pattern identifier. `params.code` is the temporary
-login code. The backend confirms acceptance only when the response is HTTP 200,
+The top-level `code` is the pattern identifier. `params.otp_code` is the
+temporary login code. The backend confirms acceptance only when the response is HTTP 200,
 `meta.status` is `true`, and `data.message_outbox_ids` contains an ID.
 
 Official references:
@@ -44,11 +44,11 @@ Create a normal pattern in IPPanel and wait for its status to become `active`.
 For example:
 
 ```text
-کد ورود ابزار سبز: %code%
+کد ورود ابزار سبز: %otp_code%
 این کد را در اختیار دیگران قرار ندهید.
 ```
 
-Define `code` as the variable, copy the returned `pattern_code`, obtain a
+Define `otp_code` as the variable, copy the returned `pattern_code`, obtain a
 non-expiring API key, and select a sender assigned to the account (for example
 `+983000505`). Patterns are never created during a login request.
 
@@ -78,19 +78,17 @@ CSRF_TRUSTED_ORIGINS=https://shop.example.com
 DATABASE_URL=postgresql://market:<password>@postgres.internal:5432/market?sslmode=require
 
 OTP_SMS_BACKEND=ippanel
-OTP_LENGTH=6
+OTP_LENGTH=4
 OTP_TTL_SECONDS=120
 OTP_RESEND_COOLDOWN_SECONDS=60
 OTP_MAX_ATTEMPTS=5
-OTP_FAILURE_WINDOW_SECONDS=900
-OTP_LOCKOUT_SECONDS=900
 OTP_RETENTION_DAYS=7
 
 IPPANEL_BASE_URL=https://edge.ippanel.com/v1
 IPPANEL_API_KEY=<secret-api-key>
 IPPANEL_FROM_NUMBER=+983000505
 IPPANEL_PATTERN_CODE=<active-pattern-code>
-IPPANEL_OTP_PARAMETER=code
+IPPANEL_OTP_PARAMETER=otp_code
 IPPANEL_CONNECT_TIMEOUT=3
 IPPANEL_READ_TIMEOUT=10
 
@@ -146,6 +144,10 @@ Migration `0004_secure_otp_challenge`:
 - adds salted hashes, pending-send state, lockout state, and provider metadata;
 - adds database constraints for canonical `09xxxxxxxxx` identity values.
 
+Migration `0005_remove_otp_failure_window_started_at_and_more` invalidates any
+remaining legacy challenge, removes the old phone-wide lock fields, and adds a
+separate attempt counter for an in-flight replacement code.
+
 Because the old application expects the removed plaintext column, use a
 roll-forward deployment:
 
@@ -167,7 +169,7 @@ settings module refuses to start with SQLite when `DJANGO_DEBUG=false`.
    `X-CSRFToken` and same-origin cookies.
 3. Atomic Redis fixed-window counters limit both client IP and hashed phone.
    A database cooldown independently prevents two paid sends for one phone.
-4. Django generates at least six cryptographically secure digits and computes a
+4. Django generates four cryptographically secure digits and computes a
    salted password hash. The plaintext exists only in process memory.
 5. A short compare-and-set database write reserves a unique send token and its
    pending hash. The transaction ends before any network request.
@@ -183,8 +185,10 @@ settings module refuses to start with SQLite when `DJANGO_DEBUG=false`.
    counts failures and consumes a matching active or pending hash once. Success
    also revokes any concurrent reservation, so its finalizer cannot resurrect a
    second usable code.
-9. Failed attempts survive resends. Five failures within the configured window
-   start a timed lockout; a new code does not reset that counter.
+9. Attempts belong to one code generation. The fifth wrong entry during its
+   two-minute lifetime consumes that code; there is no phone-wide verification
+   lock. A successfully issued replacement starts with zero attempts, while the
+   normal SMS resend cooldown still prevents duplicate paid sends.
 10. Django creates/reuses the canonical phone user, calls `login()` (rotating the
     session key), records `auth_method=otp`, and transactionally merges the guest
     cart. A transient cart merge error cannot undo a successful login.
@@ -207,7 +211,7 @@ A confirmed send returns HTTP 200. An ambiguous provider result returns HTTP
     "sent": true,
     "expiresIn": 120,
     "resendAfter": 60,
-    "codeLength": 6,
+    "codeLength": 4,
     "deliveryStatus": "accepted"
   }
 }
@@ -215,20 +219,22 @@ A confirmed send returns HTTP 200. An ambiguous provider result returns HTTP
 
 The frontend tells the user to enter the code if it arrives after an ambiguous
 send. It supports Persian/Arabic digit input, paste and SMS autofill, responsive
-6–10 digit layouts, expiry/resend/verification timers, and safe `next` redirects.
+4–10 digit layouts, expiry/resend timers, and safe `next` redirects.
 Only non-secret challenge UI state is kept in `sessionStorage`; OTP digits are
 never persisted.
 
 `GET /api/auth/me` includes public UI configuration (`codeLength`, `expiresIn`,
 and `resendAfter`) even before login, so lost-response recovery follows the
 backend's configured values. Error responses use stable codes such as
-`otp_cooldown`, `otp_rate_limited`, `otp_locked`, `otp_invalid`, and
-`otp_delivery_failed`. Only `otp_cooldown` with `activeChallenge: true` tells the
-browser that a verifiable challenge exists; an ordinary throttle never pretends
-that a message was sent.
+`otp_cooldown`, `otp_rate_limited`, `otp_attempts_exhausted`, `otp_invalid`, and
+`otp_delivery_failed`. `otp_attempts_exhausted` tells the browser to disable the
+consumed code and offer a replacement after the ordinary SMS cooldown. Only
+`otp_cooldown` with `activeChallenge: true` tells the browser that a verifiable
+challenge exists; an ordinary throttle never pretends that a message was sent.
 
 Provider details, credentials, hashes, OTP digits, and internal exceptions are
-never exposed. Cooldown/lockout/cache throttles return `Retry-After`.
+never exposed. Cooldown and cache throttles return `Retry-After`; exhausting a
+code is not a timed verification lock and therefore returns no such header.
 
 ## 7. Abuse, storage, and operations
 
@@ -268,13 +274,13 @@ env DJANGO_DEBUG=true OTP_SMS_BACKEND=console ./.venv/bin/python manage.py test
 Coverage includes the exact provider payload/header, strict envelopes, definite
 versus ambiguous failures, hash-only storage, provider I/O outside transactions,
 pending-state recovery, failed-resend preservation, concurrent
-verification/resend revocation, cooldown metadata, rolling attempts, lockout,
+verification/resend revocation, cooldown metadata, per-code attempts, exhaustion,
 expiry, one-time use, Unicode phone rejection, CSRF, atomic throttles, sessions,
 non-fatal cart merge, stale-pending retention, and secret-free API responses.
 
 Before enabling real traffic, send once to a controlled phone and verify:
 
-- the pattern is `active` and `%code%` exactly matches the configured parameter;
+- the pattern is `active` and `%otp_code%` exactly matches the configured parameter;
 - sender and recipient are accepted in E.164 form;
 - IPPanel credit and delivery reports are correct;
 - HTTPS, Secure session/CSRF cookies, and proxy headers work end to end;

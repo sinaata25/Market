@@ -15,17 +15,16 @@ import {
   subscribeAuthChanged,
 } from "@/lib/client-api";
 
-const DEFAULT_OTP_LENGTH = 6;
-const MIN_OTP_LENGTH = 6;
+const DEFAULT_OTP_LENGTH = 4;
+const MIN_OTP_LENGTH = 4;
 const MAX_OTP_LENGTH = 10;
 const FALLBACK_EXPIRES_IN = 120;
 const FALLBACK_RESEND_AFTER = 60;
-const OTP_STORAGE_KEY = "market:otp-ui:v1";
+const OTP_STORAGE_KEY = "market:otp-ui:v2";
 const OTP_STORAGE_MAX_AGE = 24 * 60 * 60 * 1000;
 const DEFINITE_SEND_ERROR_CODES = new Set([
   "otp_delivery_failed",
   "otp_rate_limited",
-  "otp_locked",
   "otp_rate_limit_unavailable",
   "otp_cooldown",
 ]);
@@ -58,6 +57,10 @@ type SendOtpErrorData = {
   resendAfter?: number;
   codeLength?: number;
 };
+type VerifyOtpErrorData = {
+  requiresNewCode?: boolean;
+  resendAfter?: number;
+};
 
 const FALLBACK_OTP_CONFIG: OtpConfig = {
   codeLength: DEFAULT_OTP_LENGTH,
@@ -66,7 +69,7 @@ const FALLBACK_OTP_CONFIG: OtpConfig = {
 };
 
 type StoredOtpUiState = {
-  version: 1;
+  version: 2;
   step: "otp";
   phone: string;
   otpLength: number;
@@ -130,7 +133,7 @@ function storeOtpState(
 ) {
   try {
     const value: StoredOtpUiState = {
-      version: 1,
+      version: 2,
       step: "otp",
       savedAt: Date.now(),
       ...state,
@@ -147,7 +150,7 @@ function readStoredOtpState(): StoredOtpUiState | null {
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<StoredOtpUiState>;
     const valid =
-      value.version === 1 &&
+      value.version === 2 &&
       value.step === "otp" &&
       typeof value.phone === "string" &&
       isValidIranMobile(value.phone) &&
@@ -606,10 +609,13 @@ export default function LoginPage() {
     const requestId = beginRequest();
     if (requestId === null) return;
     setError("");
-    const response = await api.post("/api/auth/otp/verify", {
-      phone: normalizeIranMobile(phone),
-      code: otp.join(""),
-    });
+    const response = await api.post<unknown, VerifyOtpErrorData>(
+      "/api/auth/otp/verify",
+      {
+        phone: normalizeIranMobile(phone),
+        code: otp.join(""),
+      }
+    );
     if (!isCurrentRequest(requestId)) return;
 
     const verificationOutcomeMayBeAmbiguous =
@@ -630,6 +636,36 @@ export default function LoginPage() {
     }
 
     finishRequest(requestId);
+
+    if (
+      !response.ok &&
+      response.status === 400 &&
+      response.errorCode === "otp_attempts_exhausted"
+    ) {
+      const now = Date.now();
+      const serverResendAfter = response.errorData?.resendAfter;
+      const resendAfter =
+        typeof serverResendAfter === "number" &&
+        Number.isFinite(serverResendAfter) &&
+        serverResendAfter > 0
+          ? Math.ceil(serverResendAfter)
+          : 0;
+      const nextResendDeadline = now + resendAfter * 1000;
+
+      setOtp(emptyOtp(otpLength));
+      setExpiryDeadline(now);
+      setExpirySeconds(0);
+      setVerifyDeadline(null);
+      setVerifySeconds(0);
+      setResendDeadline(nextResendDeadline);
+      setResendSeconds(resendAfter);
+      setNotice("");
+      setError(
+        response.error ??
+          "این کد پس از ۵ تلاش ناموفق باطل شد؛ کد جدید درخواست کنید"
+      );
+      return;
+    }
 
     if (!response.ok) {
       const retryAfter =
@@ -816,7 +852,7 @@ export default function LoginPage() {
               </p>
             )}
 
-            <fieldset disabled={loading}>
+            <fieldset disabled={loading || otpExpired}>
               <legend className="sr-only">کد تأیید {otpLength} رقمی</legend>
               <div
                 dir="ltr"
@@ -896,7 +932,7 @@ export default function LoginPage() {
                   onClick={resendOtp}
                   className="text-brand-600 hover:underline disabled:cursor-wait disabled:opacity-60"
                 >
-                  ارسال مجدد کد تأیید
+                  {otpExpired ? "دریافت کد جدید" : "ارسال مجدد کد تأیید"}
                 </button>
               )}
               <span className="sr-only" aria-live="polite">
