@@ -24,7 +24,8 @@ export default function FavoriteButton({ productId }: { productId: number }) {
 
   async function toggle() {
     if (!loggedIn) {
-      router.push("/login");
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?next=${encodeURIComponent(currentPath)}`);
       return;
     }
     setBusy(true);

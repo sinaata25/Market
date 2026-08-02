@@ -438,7 +438,7 @@ export default function CartPage() {
                 {error && <p className="text-xs text-red-500">{error}</p>}
                 {error.includes("وارد") && (
                   <Link
-                    href="/login"
+                    href="/login?next=%2Fcart"
                     className="block text-center text-xs text-brand-600 hover:underline"
                   >
                     ورود به حساب کاربری ←

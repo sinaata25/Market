@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { api } from "@/lib/client-api";
+import {
+  api,
+  notifyAuthChanged,
+  subscribeAuthChanged,
+} from "@/lib/client-api";
 
 type Me = {
   id: number;
   phone: string;
   name: string | null;
   isStaff?: boolean;
+  isSeoManager?: boolean;
 } | null;
 
 const NAV = [
@@ -30,19 +35,34 @@ export default function ProfileLayout({
   const router = useRouter();
   const [me, setMe] = useState<Me>(null);
   const [checked, setChecked] = useState(false);
+  const meRequest = useRef(0);
 
-  useEffect(() => {
+  const refreshMe = useCallback(() => {
+    const requestId = ++meRequest.current;
     api.get<{ user: Me }>("/api/auth/me").then((res) => {
+      if (requestId !== meRequest.current) return;
       if (res.ok) setMe(res.data?.user ?? null);
       setChecked(true);
     });
   }, []);
 
+  useEffect(() => {
+    refreshMe();
+    const onFocus = () => refreshMe();
+    window.addEventListener("focus", onFocus);
+    const unsubscribeAuth = subscribeAuthChanged(refreshMe);
+    return () => {
+      meRequest.current += 1;
+      window.removeEventListener("focus", onFocus);
+      unsubscribeAuth();
+    };
+  }, [refreshMe]);
+
   async function logout() {
-    await api.post("/api/auth/logout");
-    window.dispatchEvent(new CustomEvent("cart:updated"));
-    router.push("/");
-    router.refresh();
+    const response = await api.post("/api/auth/logout");
+    if (!response.ok) return;
+    notifyAuthChanged();
+    router.replace("/");
   }
 
   if (!checked) {
@@ -64,7 +84,7 @@ export default function ProfileLayout({
           برای مشاهده پروفایل ابتدا وارد حساب خود شوید.
         </p>
         <Link
-          href="/login"
+          href={`/login?next=${encodeURIComponent(pathname)}`}
           className="inline-block rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-brand-700"
         >
           ورود | ثبت‌نام
@@ -115,7 +135,7 @@ export default function ProfileLayout({
                 );
               })}
 
-              {me.isStaff && (
+              {(me.isStaff || me.isSeoManager) && (
                 <Link
                   href="/admin"
                   className="mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm text-violet-600 transition hover:bg-violet-50"

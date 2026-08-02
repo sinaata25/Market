@@ -1,55 +1,88 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/client-api";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  api,
+  notifyAuthChanged,
+  subscribeAuthChanged,
+} from "@/lib/client-api";
 
 type Me = {
   id: number;
   phone: string;
   name: string | null;
   isStaff?: boolean;
+  isSeoManager?: boolean;
 } | null;
 
 export default function HeaderActions() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<Me>(null);
   const [count, setCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const userRequest = useRef(0);
+  const cartRequest = useRef(0);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const refreshCart = useCallback(() => {
-    fetch("/api/cart")
+    const requestId = ++cartRequest.current;
+    fetch("/api/cart", { cache: "no-store" })
       .then((r) => r.json())
       .then((json) => {
-        if (json.ok) setCount(json.data.cart.itemsCount);
+        if (requestId === cartRequest.current && json.ok) {
+          setCount(json.data.cart.itemsCount);
+        }
       })
       .catch(() => {
         // بی‌صدا — شمارنده صفر می‌ماند
       });
   }, []);
 
+  const refreshUser = useCallback(() => {
+    const requestId = ++userRequest.current;
+    api.get<{ user: Me }>("/api/auth/me").then((response) => {
+      if (requestId === userRequest.current && response.ok) {
+        setUser(response.data?.user ?? null);
+      }
+    });
+  }, []);
+
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.ok) setUser(json.data.user);
-      })
-      .catch(() => {});
+    refreshUser();
     refreshCart();
 
-    // با افزودن کالا از هر جای سایت، شمارنده به‌روز شود
+    // با تغییر سبد یا session در هر تب، header همگام می‌ماند.
     const onUpdate = () => refreshCart();
+    const onAuthChanged = () => {
+      refreshUser();
+      refreshCart();
+    };
+    const onFocus = () => {
+      refreshUser();
+      refreshCart();
+    };
     window.addEventListener("cart:updated", onUpdate);
-    return () => window.removeEventListener("cart:updated", onUpdate);
-  }, [refreshCart]);
+    window.addEventListener("focus", onFocus);
+    const unsubscribeAuth = subscribeAuthChanged(onAuthChanged);
+    return () => {
+      userRequest.current += 1;
+      cartRequest.current += 1;
+      window.removeEventListener("cart:updated", onUpdate);
+      window.removeEventListener("focus", onFocus);
+      unsubscribeAuth();
+    };
+  }, [refreshCart, refreshUser]);
 
   async function logout() {
-    await api.post("/api/auth/logout");
+    const response = await api.post("/api/auth/logout");
+    if (!response.ok) return;
     setUser(null);
     setMenuOpen(false);
-    router.refresh();
-    refreshCart();
+    notifyAuthChanged();
+    router.replace("/");
   }
 
   return (
@@ -57,10 +90,26 @@ export default function HeaderActions() {
       {user ? (
         <div
           className="relative"
-          onMouseEnter={() => setMenuOpen(true)}
-          onMouseLeave={() => setMenuOpen(false)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setMenuOpen(false);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setMenuOpen(false);
+              menuButtonRef.current?.focus();
+            }
+          }}
         >
-          <button className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-400">
+          <button
+            ref={menuButtonRef}
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls="account-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-400"
+          >
             <span>👤</span>
             <span dir="ltr" className="font-num">
               {user.name ?? user.phone}
@@ -68,7 +117,7 @@ export default function HeaderActions() {
             <span className="text-xs">▾</span>
           </button>
           {menuOpen && (
-            <div className="absolute left-0 top-full z-50 pt-2">
+            <div id="account-menu" className="absolute left-0 top-full z-50 pt-2">
               <div className="w-48 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
                 {[
                   { href: "/profile", icon: "👤", label: "پروفایل من" },
@@ -93,7 +142,7 @@ export default function HeaderActions() {
                     {item.icon} {item.label}
                   </Link>
                 ))}
-                {user.isStaff && (
+                {(user.isStaff || user.isSeoManager) && (
                   <Link
                     href="/admin"
                     className="block border-t border-slate-100 px-4 py-2.5 text-sm text-violet-600 transition hover:bg-violet-50"
@@ -114,7 +163,11 @@ export default function HeaderActions() {
         </div>
       ) : (
         <Link
-          href="/login"
+          href={
+            pathname === "/login"
+              ? "/login"
+              : `/login?next=${encodeURIComponent(pathname)}`
+          }
           className="hidden items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-400 hover:text-brand-700 sm:flex"
         >
           <span>👤</span>

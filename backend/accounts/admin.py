@@ -35,6 +35,26 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Otp)
 class OtpAdmin(admin.ModelAdmin):
-    list_display = ["phone", "code", "used", "attempts", "expires_at", "created_at"]
+    list_display = [
+        "phone",
+        "used",
+        "attempts",
+        "expires_at",
+        "sent_at",
+        "resend_blocked_until",
+        "delivery_status",
+        "provider_message_id",
+    ]
     list_filter = ["used"]
     search_fields = ["phone"]
+    exclude = ["code_hash", "pending_code_hash"]
+    readonly_fields = [
+        "provider_message_id",
+        "delivery_status",
+        "sent_at",
+        "resend_blocked_until",
+        "send_started_at",
+        "pending_expires_at",
+        "pending_attempts",
+        "send_token",
+    ]

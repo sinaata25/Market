@@ -9,8 +9,20 @@ def ok(data, status=http.HTTP_200_OK):
     return Response({"ok": True, "data": data}, status=status)
 
 
-def fail(error: str, status=http.HTTP_400_BAD_REQUEST):
-    return Response({"ok": False, "error": error}, status=status)
+def fail(
+    error: str,
+    status=http.HTTP_400_BAD_REQUEST,
+    *,
+    error_code: str | None = None,
+    data=None,
+    headers=None,
+):
+    payload = {"ok": False, "error": error}
+    if error_code:
+        payload["errorCode"] = error_code
+    if data is not None:
+        payload["data"] = data
+    return Response(payload, status=status, headers=headers)
 
 
 def first_error_message(detail) -> str:
@@ -37,4 +49,13 @@ def api_exception_handler(exc, context):
         # خطای پیش‌بینی‌نشده — جنگو خودش ۵۰۰ لاگ می‌کند
         return None
     message = first_error_message(response.data) or "خطای نامشخص"
-    return Response({"ok": False, "error": message}, status=response.status_code)
+    # هدرهایی مانند Retry-After در خطای throttle نباید حذف شوند.
+    payload = {"ok": False, "error": message}
+    error_code = getattr(exc, "error_code", None)
+    if error_code:
+        payload["errorCode"] = error_code
+    return Response(
+        payload,
+        status=response.status_code,
+        headers=dict(response.headers),
+    )

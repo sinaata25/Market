@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/client-api";
+import { api, notifyAuthChanged } from "@/lib/client-api";
 import { faDate } from "@/components/admin/ui";
 
 type Profile = {
@@ -44,19 +44,24 @@ export default function AccountInfo() {
       { name }
     );
     setSaving(false);
-    if (res.ok) {
+    if (res.ok && res.data) {
+      const savedName = res.data.user.name ?? null;
+      setProfile((current) =>
+        current ? { ...current, name: savedName } : current
+      );
+      setName(savedName ?? "");
       setMessage({ ok: true, text: "اطلاعات ذخیره شد ✅" });
-      router.refresh();
+      notifyAuthChanged();
     } else {
       setMessage({ ok: false, text: res.error ?? "خطا در ذخیره" });
     }
   }
 
   async function logout() {
-    await api.post("/api/auth/logout");
-    window.dispatchEvent(new CustomEvent("cart:updated"));
-    router.push("/");
-    router.refresh();
+    const response = await api.post("/api/auth/logout");
+    if (!response.ok) return;
+    notifyAuthChanged();
+    router.replace("/");
   }
 
   if (!profile) {

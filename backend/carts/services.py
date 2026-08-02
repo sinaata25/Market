@@ -1,5 +1,7 @@
 """منطق سبد خرید: سبد مهمان در سشن، سبد کاربر، و ادغام پس از ورود"""
 
+from django.db import transaction
+
 from catalog.dto import product_dto
 
 from .models import Cart, CartItem
@@ -37,13 +39,17 @@ def get_or_create_cart(request) -> Cart:
     return cart
 
 
+@transaction.atomic
 def merge_guest_cart_into_user(request, user) -> None:
     """پس از ورود، سبد مهمان به حساب کاربر منتقل/ادغام می‌شود"""
     token = request.session.get(SESSION_KEY)
     if not token:
         return
 
-    guest_cart = Cart.objects.filter(token=token).first()
+    # Serialize merges for one account (including two different guest carts),
+    # then lock the cart rows before changing their one-to-one ownership/items.
+    type(user).objects.select_for_update().get(pk=user.pk)
+    guest_cart = Cart.objects.select_for_update().filter(token=token).first()
     if guest_cart is None or guest_cart.user_id == user.id:
         return
     if guest_cart.user_id is not None:
@@ -51,7 +57,7 @@ def merge_guest_cart_into_user(request, user) -> None:
         request.session.pop(SESSION_KEY, None)
         return
 
-    user_cart = Cart.objects.filter(user=user).first()
+    user_cart = Cart.objects.select_for_update().filter(user=user).first()
     if user_cart is None:
         # سبد مهمان به کاربر داده می‌شود
         guest_cart.user = user
@@ -60,8 +66,12 @@ def merge_guest_cart_into_user(request, user) -> None:
         return
 
     # ادغام اقلام سبد مهمان در سبد کاربر
-    for item in guest_cart.items.all():
-        existing = user_cart.items.filter(product_id=item.product_id).first()
+    for item in guest_cart.items.select_for_update().all():
+        existing = (
+            user_cart.items.select_for_update()
+            .filter(product_id=item.product_id)
+            .first()
+        )
         if existing:
             existing.qty += item.qty
             existing.save(update_fields=["qty"])

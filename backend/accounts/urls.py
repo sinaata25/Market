@@ -3,6 +3,7 @@ from django.urls import path
 from . import views, views_profile
 
 urlpatterns = [
+    path("csrf", views.CsrfCookieView.as_view()),
     path("otp/send", views.SendOtpView.as_view()),
     path("otp/verify", views.VerifyOtpView.as_view()),
     path("me", views.MeView.as_view()),
