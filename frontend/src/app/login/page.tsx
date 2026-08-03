@@ -40,9 +40,16 @@ type OtpConfig = {
   expiresIn: number;
   resendAfter: number;
 };
+type AuthUser = {
+  id: number;
+  isStaff: boolean;
+};
 type MeData = {
-  user: { id: number } | null;
+  user: AuthUser | null;
   otpConfig: OtpConfig;
+};
+type VerifyOtpData = {
+  user: AuthUser;
 };
 type SendOtpData = {
   sent: boolean;
@@ -243,9 +250,11 @@ export default function LoginPage() {
       }
       if (response.ok && response.data?.user) {
         clearStoredOtpState();
-        const destination = safeNextPath(
-          new URLSearchParams(window.location.search).get("next")
-        );
+        const destination = response.data.user.isStaff
+          ? "/admin"
+          : safeNextPath(
+              new URLSearchParams(window.location.search).get("next")
+            );
         router.replace(destination);
         return;
       }
@@ -583,12 +592,14 @@ export default function LoginPage() {
     putDigits(0, event.clipboardData.getData("text"));
   }
 
-  function completeLogin() {
+  function completeLogin(user: AuthUser) {
     clearStoredOtpState();
     notifyAuthChanged();
-    const destination = safeNextPath(
-      new URLSearchParams(window.location.search).get("next")
-    );
+    const destination = user.isStaff
+      ? "/admin"
+      : safeNextPath(
+          new URLSearchParams(window.location.search).get("next")
+        );
     router.replace(destination);
   }
 
@@ -609,7 +620,7 @@ export default function LoginPage() {
     const requestId = beginRequest();
     if (requestId === null) return;
     setError("");
-    const response = await api.post<unknown, VerifyOtpErrorData>(
+    const response = await api.post<VerifyOtpData, VerifyOtpErrorData>(
       "/api/auth/otp/verify",
       {
         phone: normalizeIranMobile(phone),
@@ -630,7 +641,7 @@ export default function LoginPage() {
       }
       if (session.ok && session.data?.user) {
         finishRequest(requestId);
-        completeLogin();
+        completeLogin(session.data.user);
         return;
       }
     }
@@ -682,7 +693,9 @@ export default function LoginPage() {
       return;
     }
 
-    completeLogin();
+    if (response.data?.user) {
+      completeLogin(response.data.user);
+    }
   }
 
   async function resendOtp() {
