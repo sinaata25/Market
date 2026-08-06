@@ -40,18 +40,22 @@ type AdminProduct = Product & { imageItems?: ImageItem[] };
 
 export default function ProductForm({ productId }: { productId?: number }) {
   const router = useRouter();
-  const isEdit = productId !== undefined;
+  const editingExistingProduct = productId !== undefined;
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [categories, setCategories] = useState<Category[]>([]);
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [loading, setLoading] = useState(isEdit);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [createdProductId, setCreatedProductId] = useState<number>();
+  const [loading, setLoading] = useState(editingExistingProduct);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
     null
   );
   const fileRef = useRef<HTMLInputElement>(null);
+  const activeProductId = productId ?? createdProductId;
+  const isEdit = activeProductId !== undefined;
 
   function set<K extends keyof FormState>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -62,7 +66,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
     api.get<{ categories: Category[] }>("/api/categories").then((res) => {
       if (res.ok && res.data) setCategories(res.data.categories);
     });
-    if (isEdit) {
+    if (editingExistingProduct) {
       api
         .get<{ product: AdminProduct }>(`/api/admin/products/${productId}`)
         .then((res) => {
@@ -84,7 +88,16 @@ export default function ProductForm({ productId }: { productId?: number }) {
           setLoading(false);
         });
     }
-  }, [isEdit, productId]);
+  }, [editingExistingProduct, productId]);
+
+  async function sendImage(targetProductId: number, file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.upload<{ product: AdminProduct }>(
+      `/api/admin/products/${targetProductId}/image`,
+      fd
+    );
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -105,33 +118,79 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
     const res = isEdit
       ? await api.patch<{ product: Product }>(
-          `/api/admin/products/${productId}`,
+          `/api/admin/products/${activeProductId}`,
           payload
         )
       : await api.post<{ product: Product }>("/api/admin/products", payload);
 
-    setSaving(false);
     if (!res.ok || !res.data) {
+      setSaving(false);
       setMessage({ ok: false, text: res.error ?? "خطا در ذخیره" });
       return;
     }
     if (!isEdit) {
-      // بعد از ساخت، برو به صفحه ویرایش برای آپلود عکس
-      router.push(`/admin/products/${res.data.product.id}`);
+      const newProductId = res.data.product.id;
+      setCreatedProductId(newProductId);
+
+      const failedFiles: File[] = [];
+      let latestImages: ImageItem[] = [];
+      for (const file of pendingImages) {
+        const upload = await sendImage(newProductId, file);
+        if (upload.ok && upload.data) {
+          latestImages = upload.data.product.imageItems ?? latestImages;
+        } else {
+          failedFiles.push(file);
+        }
+      }
+
+      setSaving(false);
+      setImages(latestImages);
+      setPendingImages(failedFiles);
+      if (failedFiles.length > 0) {
+        setMessage({
+          ok: false,
+          text: `محصول ایجاد شد، اما ${failedFiles.length.toLocaleString("fa-IR")} تصویر آپلود نشد. دوباره تلاش کنید.`,
+        });
+        return;
+      }
+      router.push(`/admin/products/${newProductId}`);
       return;
     }
+
+    if (pendingImages.length > 0 && activeProductId !== undefined) {
+      const failedFiles: File[] = [];
+      let latestImages = images;
+      for (const file of pendingImages) {
+        const upload = await sendImage(activeProductId, file);
+        if (upload.ok && upload.data) {
+          latestImages = upload.data.product.imageItems ?? latestImages;
+        } else {
+          failedFiles.push(file);
+        }
+      }
+      setImages(latestImages);
+      setPendingImages(failedFiles);
+      setSaving(false);
+      if (failedFiles.length > 0) {
+        setMessage({
+          ok: false,
+          text: `${failedFiles.length.toLocaleString("fa-IR")} تصویر همچنان آپلود نشد.`,
+        });
+        return;
+      }
+      router.push(`/admin/products/${activeProductId}`);
+      return;
+    }
+
+    setSaving(false);
     setMessage({ ok: true, text: "تغییرات ذخیره شد ✅" });
   }
 
   async function uploadImage(file: File) {
+    if (activeProductId === undefined) return;
     setUploading(true);
     setMessage(null);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await api.upload<{ product: AdminProduct }>(
-      `/api/admin/products/${productId}/image`,
-      fd
-    );
+    const res = await sendImage(activeProductId, file);
     setUploading(false);
     if (res.ok && res.data) {
       setImages(res.data.product.imageItems ?? []);
@@ -143,9 +202,10 @@ export default function ProductForm({ productId }: { productId?: number }) {
   }
 
   async function removeImage(img: ImageItem) {
+    if (activeProductId === undefined) return;
     if (!confirm("این تصویر حذف شود؟")) return;
     const res = await api.delete(
-      `/api/admin/products/${productId}/images/${img.id}`
+      `/api/admin/products/${activeProductId}/images/${img.id}`
     );
     if (res.ok) {
       setImages((prev) => prev.filter((i) => i.id !== img.id));
@@ -293,9 +353,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
             </div>
           </div>
 
-          {/* تصاویر — فقط در ویرایش */}
-          {isEdit && (
-            <div className="rounded-2xl border border-slate-100 bg-white p-5">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5">
               <label className="mb-3 block text-xs font-medium text-slate-600">
                 تصاویر محصول
               </label>
@@ -323,17 +381,53 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 ))}
                 {images.length === 0 && (
                   <p className="col-span-3 py-4 text-center text-[11px] text-slate-400">
-                    هنوز تصویری ندارد
+                    {pendingImages.length > 0
+                      ? `${pendingImages.length.toLocaleString("fa-IR")} تصویر آماده آپلود است`
+                      : "هنوز تصویری ندارد"}
                   </p>
                 )}
               </div>
+              {pendingImages.length > 0 && (
+                <ul className="mb-3 space-y-1.5 text-[11px] text-slate-500">
+                  {pendingImages.map((file, index) => (
+                    <li
+                      key={`${file.name}-${file.lastModified}-${index}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2"
+                    >
+                      <span className="truncate" dir="ltr">
+                        {file.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPendingImages((files) =>
+                            files.filter((_, fileIndex) => fileIndex !== index)
+                          )
+                        }
+                        className="shrink-0 text-red-500"
+                      >
+                        حذف
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <input
                 ref={fileRef}
                 type="file"
+                multiple
                 accept="image/jpeg,image/png,image/webp"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadImage(f);
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length === 0) return;
+                  if (isEdit) {
+                    void (async () => {
+                      for (const file of files) await uploadImage(file);
+                    })();
+                  } else {
+                    setPendingImages((current) => [...current, ...files]);
+                    e.target.value = "";
+                  }
                 }}
                 className="hidden"
               />
@@ -343,10 +437,18 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 onClick={() => fileRef.current?.click()}
                 className="w-full rounded-xl border border-dashed border-slate-300 py-2.5 text-xs text-slate-500 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
               >
-                {uploading ? "در حال آپلود..." : "⬆️ آپلود تصویر (حداکثر ۵MB)"}
+                {uploading
+                  ? "در حال آپلود..."
+                  : isEdit
+                    ? "⬆️ آپلود تصاویر (هر فایل حداکثر ۵MB)"
+                    : "➕ انتخاب تصاویر (هر فایل حداکثر ۵MB)"}
               </button>
+              {!isEdit && pendingImages.length > 0 && (
+                <p className="mt-2 text-[11px] leading-5 text-slate-400">
+                  تصاویر پس از ایجاد محصول به‌ترتیب آپلود می‌شوند.
+                </p>
+              )}
             </div>
-          )}
         </div>
       </div>
 
@@ -368,7 +470,13 @@ export default function ProductForm({ productId }: { productId?: number }) {
           disabled={saving}
           className="rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
-          {saving ? "در حال ذخیره..." : isEdit ? "ذخیره تغییرات" : "ایجاد محصول"}
+          {saving
+            ? !isEdit && pendingImages.length > 0
+              ? "در حال ایجاد و آپلود تصاویر..."
+              : "در حال ذخیره..."
+            : isEdit
+              ? "ذخیره تغییرات"
+              : "ایجاد محصول"}
         </button>
         <button
           type="button"
