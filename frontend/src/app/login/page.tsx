@@ -220,6 +220,8 @@ export default function LoginPage() {
   const requestInFlight = useRef(false);
   const sessionCheckGeneration = useRef(0);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- localStorage is browser-only;
+     this one-time effect restores the persisted OTP flow after hydration. */
   useEffect(() => {
     const stored = readStoredOtpState();
     if (stored) {
@@ -240,6 +242,7 @@ export default function LoginPage() {
     }
     setStorageReady(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const checkSession = useCallback(() => {
     const requestId = ++sessionCheckGeneration.current;
