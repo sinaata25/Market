@@ -24,6 +24,7 @@ const SHOP_NAV = [
   { href: "/admin/products", icon: "🛠️", label: "محصولات" },
   { href: "/admin/users", icon: "👥", label: "کاربران" },
   { href: "/admin/reviews", icon: "💬", label: "دیدگاه‌ها" },
+  { href: "/admin/blog", icon: "📝", label: "وبلاگ" },
 ];
 
 // منوی سئو (staff و مدیر سئو)

@@ -124,6 +124,7 @@ INSTALLED_APPS = [
     "orders",
     "adminapi",
     "seo",
+    "blog",
 ]
 
 MIDDLEWARE = [

@@ -3,15 +3,20 @@ import Link from "next/link";
 const columns = [
   {
     title: "گروه صنعتی توانا",
-    links: ["درباره ما", "تماس با ما", "فرصت‌های شغلی", "وبلاگ کشاورزی"],
+    links: [
+      { label: "درباره ما", href: "#" },
+      { label: "تماس با ما", href: "#" },
+      { label: "فرصت‌های شغلی", href: "#" },
+      { label: "وبلاگ کشاورزی", href: "/blog" },
+    ],
   },
   {
     title: "خدمات مشتریان",
-    links: ["پاسخ به پرسش‌ها", "رویه ارسال سفارش", "شرایط بازگشت کالا", "حریم خصوصی"],
+    links: ["پاسخ به پرسش‌ها", "رویه ارسال سفارش", "شرایط بازگشت کالا", "حریم خصوصی"].map((label) => ({ label, href: "#" })),
   },
   {
     title: "راهنمای خرید",
-    links: ["نحوه ثبت سفارش", "شیوه‌های پرداخت", "رهگیری سفارش", "گارانتی محصولات"],
+    links: ["نحوه ثبت سفارش", "شیوه‌های پرداخت", "رهگیری سفارش", "گارانتی محصولات"].map((label) => ({ label, href: "#" })),
   },
 ];
 
@@ -54,10 +59,10 @@ export default function Footer() {
             <div key={col.title}>
               <h3 className="mb-3 font-bold text-slate-700">{col.title}</h3>
               <ul className="space-y-2 text-sm text-slate-500">
-                {col.links.map((l) => (
-                  <li key={l}>
-                    <Link href="#" className="transition hover:text-brand-700">
-                      {l}
+                {col.links.map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="transition hover:text-brand-700">
+                      {link.label}
                     </Link>
                   </li>
                 ))}

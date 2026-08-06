@@ -45,3 +45,17 @@ npm run dev
 - در توسعه، `OTP_SMS_BACKEND=console` کد را فقط در لاگ جنگو می‌نویسد؛ کد هیچ‌گاه در API برنمی‌گردد.
 - دیتابیس توسعه SQLite است (`backend/db.sqlite3`)؛ استقرار با `DJANGO_DEBUG=false` فقط با `DATABASE_URL` از نوع PostgreSQL بالا می‌آید.
 - قرارداد پاسخ همه‌ی APIها: `{ok: true, data}` یا `{ok: false, error, errorCode?, data?}`.
+
+## وبلاگ
+
+صفحات عمومی وبلاگ در `/blog` و `/blog/{slug}` و مدیریت نوشته‌ها در
+`/admin/blog` قرار دارد. پس از دریافت تغییرات جدید، مهاجرت‌ها را اجرا کنید:
+
+```powershell
+cd backend
+.\venv\Scripts\python manage.py migrate
+```
+
+برای canonical و Open Graph URL در فرانت، مقدار `SITE_URL` را در محیط استقرار
+برابر آدرس عمومی سایت قرار دهید. مستندات endpointها در
+[`docs/blog-api.md`](docs/blog-api.md) آمده است.

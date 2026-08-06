@@ -42,7 +42,7 @@ export default function Header() {
 
       {/* نوار دسته‌بندی */}
       <nav className="border-b border-slate-100 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5 text-sm">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-1.5 text-sm">
           <CategoryMenu />
 
           <span className="mx-1 h-5 w-px bg-slate-200" />
@@ -58,6 +58,12 @@ export default function Header() {
             className="whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
           >
             پرفروش‌ترین‌ها
+          </Link>
+          <Link
+            href="/blog"
+            className="whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
+          >
+            وبلاگ کشاورزی
           </Link>
 
           <Link

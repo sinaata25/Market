@@ -9,6 +9,7 @@ from .models import PageMeta, SeoSettings
 # صفحات ثابت سایت
 STATIC_PAGES = [
     {"key": "/", "title": "صفحه اصلی"},
+    {"key": "/blog", "title": "وبلاگ کشاورزی"},
     {"key": "/incredible", "title": "شگفت‌انگیزها"},
     {"key": "/best-sellers", "title": "پرفروش‌ترین‌ها"},
     {"key": "/support", "title": "سوالی دارید؟"},
@@ -169,6 +170,18 @@ def build_sitemap() -> str:
         if (page["pageType"], page["objectKey"]) in noindex:
             continue
         urls.append(f"  <url><loc>{s.site_url}{page['path']}</loc></url>")
+
+    # نوشته‌های وبلاگ منبع متای مستقل دارند و فقط پس از انتشار وارد سایت‌مپ می‌شوند.
+    from blog.models import BlogPost
+
+    for post in BlogPost.objects.published().only("slug", "updated_at"):
+        path = f"/blog/{post.slug}"
+        if path in excluded:
+            continue
+        urls.append(
+            f"  <url><loc>{s.site_url}{path}</loc>"
+            f"<lastmod>{post.updated_at.date().isoformat()}</lastmod></url>"
+        )
 
     body = "\n".join(urls)
     return (
