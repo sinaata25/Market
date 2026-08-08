@@ -28,7 +28,7 @@ export default async function Home() {
       {seo?.site.orgSchemaEnabled && <JsonLd data={orgSchema(seo.site)} />}
 
       {/* بنر اصلی */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-brand-700 to-brand-500 px-6 py-12 text-white sm:px-12 sm:py-16">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-secondary-700 to-brand-600 px-6 py-12 text-white sm:px-12 sm:py-16">
         <div className="relative z-10 max-w-lg">
           <h1 className="mb-3 text-2xl font-bold leading-relaxed sm:text-3xl">
             هر آنچه برای کشاورزی نیاز دارید، یکجا
@@ -79,14 +79,14 @@ export default async function Home() {
 
       {/* شگفت‌انگیزها */}
       {deals.length > 0 && (
-        <section className="mt-10 overflow-hidden rounded-3xl bg-gradient-to-l from-red-600 to-rose-500 p-5">
+        <section className="mt-10 overflow-hidden rounded-3xl bg-gradient-to-l from-accent-600 to-accent-400 p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-secondary-900">
               ⚡ پیشنهاد شگفت‌انگیز
             </h2>
             <Link
               href="/incredible"
-              className="rounded-xl bg-white/20 px-4 py-2 text-xs font-medium text-white backdrop-blur transition hover:bg-white/30"
+              className="rounded-xl bg-secondary-900/10 px-4 py-2 text-xs font-medium text-secondary-900 backdrop-blur transition hover:bg-secondary-900/20"
             >
               مشاهده همه ←
             </Link>

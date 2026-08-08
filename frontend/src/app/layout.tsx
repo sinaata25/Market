@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fa" dir="rtl" className={`${vazirmatn.variable} h-full`}>
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-800 antialiased font-sans">
+      <body className="min-h-full flex flex-col bg-background text-foreground antialiased font-sans">
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />

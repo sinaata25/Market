@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const columns = [
   {
@@ -43,9 +44,13 @@ export default function Footer() {
         <div className="grid grid-cols-2 gap-8 py-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
             <div className="mb-3 flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-lg">
-                🌾
-              </span>
+              <Image
+                src="/brand/logo.png"
+                alt=""
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
+              />
               <span className="text-lg font-bold text-brand-700">
                 گروه صنعتی توانا
               </span>

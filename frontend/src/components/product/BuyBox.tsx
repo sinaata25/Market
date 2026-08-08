@@ -63,7 +63,7 @@ export default function BuyBox({ product }: { product: Product }) {
       <div className="mb-4">
         {product.oldPrice && (
           <div className="mb-1 flex items-center gap-2">
-            <span className="rounded-md bg-red-500 px-1.5 py-0.5 text-[11px] font-bold text-white font-num">
+            <span className="rounded-md bg-accent-500 px-1.5 py-0.5 text-[11px] font-bold text-secondary-900 font-num">
               ٪{discount.toLocaleString("fa-IR")}
             </span>
             <span className="text-sm text-slate-300 line-through font-num">

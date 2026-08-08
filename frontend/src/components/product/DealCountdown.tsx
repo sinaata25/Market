@@ -34,12 +34,12 @@ export default function DealCountdown() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-white/90">پایان تخفیف‌ها تا</span>
+      <span className="text-xs text-secondary-900/90">پایان تخفیف‌ها تا</span>
       <div className="flex items-center gap-1" dir="ltr">
         {[left.h, left.m, left.s].map((part, i) => (
           <span key={i} className="flex items-center gap-1">
-            {i > 0 && <span className="text-white/70">:</span>}
-            <span className="grid h-8 w-9 place-items-center rounded-lg bg-white/20 text-sm font-bold text-white font-num backdrop-blur">
+            {i > 0 && <span className="text-secondary-900/70">:</span>}
+            <span className="grid h-8 w-9 place-items-center rounded-lg bg-secondary-900/10 text-sm font-bold text-secondary-900 font-num backdrop-blur">
               {part}
             </span>
           </span>

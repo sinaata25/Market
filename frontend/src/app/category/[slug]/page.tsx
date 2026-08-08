@@ -178,13 +178,13 @@ export default async function CategoryPage({
           })}
           className={`mr-auto flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition sm:mr-0 ${
             onlyDiscounted
-              ? "bg-red-50 font-bold text-red-500"
-              : "text-slate-500 hover:text-red-500"
+              ? "bg-accent-50 font-bold text-accent-700"
+              : "text-slate-500 hover:text-accent-700"
           }`}
         >
           <span
             className={`relative h-4 w-7 rounded-full transition ${
-              onlyDiscounted ? "bg-red-500" : "bg-slate-300"
+              onlyDiscounted ? "bg-accent-500" : "bg-slate-300"
             }`}
           >
             <span
@@ -212,7 +212,7 @@ export default async function CategoryPage({
           {onlyDiscounted && (
             <Link
               href={buildUrl(slug, sp, { discounted: undefined, page: "1" })}
-              className="flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-red-500 transition hover:bg-red-100"
+              className="flex items-center gap-1.5 rounded-full bg-accent-50 px-3 py-1.5 text-accent-700 transition hover:bg-accent-100"
             >
               تخفیف‌دار <span className="text-sm leading-none">×</span>
             </Link>
