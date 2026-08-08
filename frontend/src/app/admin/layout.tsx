@@ -141,8 +141,8 @@ export default function AdminLayout({
     <div className="mx-auto flex max-w-7xl gap-5 px-4 py-6">
       {/* سایدبار */}
       <aside className="w-56 shrink-0">
-        <div className="sticky top-24 overflow-hidden rounded-2xl bg-slate-900 text-slate-300">
-          <div className="border-b border-slate-700/60 px-5 py-4">
+        <div className="sticky top-24 overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200">
+          <div className="border-b border-secondary-700/60 px-5 py-4">
             <p className="text-sm font-bold text-white">پنل مدیریت</p>
             <p className="mt-1 text-[11px] text-slate-400 font-num" dir="ltr">
               {me.name ?? me.phone}
@@ -162,7 +162,7 @@ export default function AdminLayout({
                     className={`mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition ${
                       active
                         ? "bg-brand-600 font-medium text-white"
-                        : "hover:bg-slate-800 hover:text-white"
+                        : "hover:bg-secondary-800 hover:text-white"
                     }`}
                   >
                     <span>{item.icon}</span>
@@ -186,7 +186,7 @@ export default function AdminLayout({
                   className={`mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition ${
                     active
                       ? "bg-brand-600 font-medium text-white"
-                      : "hover:bg-slate-800 hover:text-white"
+                    : "hover:bg-secondary-800 hover:text-white"
                   }`}
                 >
                   <span>{item.icon}</span>
@@ -195,16 +195,16 @@ export default function AdminLayout({
               );
             })}
           </nav>
-          <div className="border-t border-slate-700/60 p-2">
+          <div className="border-t border-secondary-700/60 p-2">
             <Link
               href="/"
-              className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition hover:bg-slate-800 hover:text-white"
+              className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition hover:bg-secondary-800 hover:text-white"
             >
               <span>🏬</span> مشاهده فروشگاه
             </Link>
             <button
               onClick={logout}
-              className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-red-400 transition hover:bg-slate-800"
+              className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-red-400 transition hover:bg-secondary-800"
             >
               <span>⏻</span> خروج
             </button>

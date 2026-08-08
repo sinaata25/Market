@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   isValidIranMobile,
@@ -759,12 +760,14 @@ export default function LoginPage() {
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-10">
       <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-6 flex flex-col items-center text-center">
-          <span
-            aria-hidden="true"
-            className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-2xl"
-          >
-            🌾
-          </span>
+          <Image
+            src="/brand/logo.png"
+            alt="گروه صنعتی توانا"
+            width={64}
+            height={64}
+            priority
+            className="mb-3 h-16 w-16 object-contain"
+          />
           <h1 className="text-xl font-bold text-slate-800">ورود | ثبت‌نام</h1>
           <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-500">
             {step === "phone" ? (

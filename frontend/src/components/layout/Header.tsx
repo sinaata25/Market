@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import CategoryMenu from "./CategoryMenu";
 import HeaderActions from "./HeaderActions";
 
@@ -10,9 +11,14 @@ export default function Header() {
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
           {/* لوگو */}
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-xl">
-              🌾
-            </span>
+            <Image
+              src="/brand/logo.png"
+              alt=""
+              width={48}
+              height={48}
+              priority
+              className="h-11 w-11 object-contain"
+            />
             <div className="leading-tight">
               <span className="block text-lg font-bold text-brand-700">
                 گروه صنعتی توانا
@@ -49,7 +55,7 @@ export default function Header() {
 
           <Link
             href="/incredible"
-            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-red-500 transition hover:bg-red-50"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-accent-700 transition hover:bg-accent-50"
           >
             ⚡ شگفت‌انگیزها
           </Link>

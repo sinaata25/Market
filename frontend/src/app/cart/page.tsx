@@ -315,7 +315,7 @@ export default function CartPage() {
                 </span>
               </div>
               {cart.discount > 0 && (
-                <div className="flex justify-between text-red-500">
+                <div className="flex justify-between text-accent-700">
                   <span>سود شما از خرید</span>
                   <span className="font-num">
                     {formatPrice(cart.discount)} تومان

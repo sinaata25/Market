@@ -236,7 +236,7 @@ function OrderRow({
                   {o.discount > 0 && (
                     <p className="flex justify-between">
                       <span>تخفیف</span>
-                      <span className="font-num text-red-500">
+                      <span className="font-num text-accent-700">
                         {formatPrice(o.discount)}
                       </span>
                     </p>

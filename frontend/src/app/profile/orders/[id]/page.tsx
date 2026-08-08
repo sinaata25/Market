@@ -207,7 +207,7 @@ export default function OrderDetail({
                 </span>
               </li>
               {order.discount > 0 && (
-                <li className="flex justify-between text-red-500">
+                <li className="flex justify-between text-accent-700">
                   <span>سود شما از خرید</span>
                   <span className="font-num">
                     {formatPrice(order.discount)}

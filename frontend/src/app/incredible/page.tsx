@@ -45,18 +45,18 @@ export default async function IncrediblePage() {
         <span className="text-slate-600">شگفت‌انگیزها</span>
       </nav>
 
-      {/* هدر قرمز با تایمر */}
-      <section className="mb-6 overflow-hidden rounded-3xl bg-gradient-to-l from-red-600 to-rose-500">
+      {/* هدر پیشنهادهای ویژه با تایمر */}
+      <section className="mb-6 overflow-hidden rounded-3xl bg-gradient-to-l from-accent-600 to-accent-400">
         <div className="flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/20 text-4xl backdrop-blur">
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-secondary-900/10 text-4xl backdrop-blur">
               ⚡
             </span>
             <div>
-              <h1 className="text-xl font-bold text-white">
+              <h1 className="text-xl font-bold text-secondary-900">
                 پیشنهاد شگفت‌انگیز
               </h1>
-              <p className="mt-1 text-xs text-white/90 font-num">
+              <p className="mt-1 text-xs text-secondary-900/90 font-num">
                 {sorted.length.toLocaleString("fa-IR")} کالا با تخفیف ویژه
               </p>
             </div>
@@ -66,22 +66,22 @@ export default async function IncrediblePage() {
 
         {/* نوار آمار */}
         {sorted.length > 0 && (
-          <div className="grid grid-cols-2 gap-px border-t border-white/20 bg-white/10 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-px border-t border-secondary-900/20 bg-secondary-900/5 sm:grid-cols-3">
             <div className="bg-transparent px-4 py-3 text-center">
-              <p className="text-sm font-bold text-white font-num">
+              <p className="text-sm font-bold text-secondary-900 font-num">
                 ٪{bestDiscount.toLocaleString("fa-IR")}
               </p>
-              <p className="text-[11px] text-white/80">بیشترین تخفیف</p>
+              <p className="text-[11px] text-secondary-900/80">بیشترین تخفیف</p>
             </div>
             <div className="bg-transparent px-4 py-3 text-center">
-              <p className="text-sm font-bold text-white font-num">
+              <p className="text-sm font-bold text-secondary-900 font-num">
                 {formatPrice(totalSaving)}
               </p>
-              <p className="text-[11px] text-white/80">مجموع سود شما (تومان)</p>
+              <p className="text-[11px] text-secondary-900/80">مجموع سود شما (تومان)</p>
             </div>
             <div className="col-span-2 bg-transparent px-4 py-3 text-center sm:col-span-1">
-              <p className="text-sm font-bold text-white">🚚 ارسال سریع</p>
-              <p className="text-[11px] text-white/80">به سراسر کشور</p>
+              <p className="text-sm font-bold text-secondary-900">🚚 ارسال سریع</p>
+              <p className="text-[11px] text-secondary-900/80">به سراسر کشور</p>
             </div>
           </div>
         )}
@@ -89,10 +89,10 @@ export default async function IncrediblePage() {
 
       {/* پیشنهاد ویژه‌ی امروز */}
       {best && (
-        <section className="mb-6 overflow-hidden rounded-3xl border-2 border-red-100 bg-white">
-          <div className="flex items-center gap-2 bg-red-50 px-5 py-2.5">
+        <section className="mb-6 overflow-hidden rounded-3xl border-2 border-accent-100 bg-white">
+          <div className="flex items-center gap-2 bg-accent-50 px-5 py-2.5">
             <span className="text-sm">🔥</span>
-            <h2 className="text-xs font-bold text-red-600">
+            <h2 className="text-xs font-bold text-accent-800">
               داغ‌ترین پیشنهاد امروز
             </h2>
           </div>
@@ -111,12 +111,12 @@ export default async function IncrediblePage() {
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h3 className="mb-2 text-base font-bold leading-7 text-slate-800 group-hover:text-red-600">
+              <h3 className="mb-2 text-base font-bold leading-7 text-slate-800 group-hover:text-accent-700">
                 {best.title}
               </h3>
               <p className="mb-4 text-xs text-slate-400">{best.category}</p>
               <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-lg bg-red-500 px-2.5 py-1 text-sm font-bold text-white font-num">
+                <span className="rounded-lg bg-accent-500 px-2.5 py-1 text-sm font-bold text-secondary-900 font-num">
                   ٪{bestDiscount.toLocaleString("fa-IR")}
                 </span>
                 <span className="text-sm text-slate-300 line-through font-num">
@@ -130,7 +130,7 @@ export default async function IncrediblePage() {
                 </span>
               </div>
             </div>
-            <span className="shrink-0 rounded-xl bg-red-500 px-6 py-3 text-center text-sm font-bold text-white transition group-hover:bg-red-600">
+            <span className="shrink-0 rounded-xl bg-accent-500 px-6 py-3 text-center text-sm font-bold text-secondary-900 transition group-hover:bg-accent-600">
               مشاهده و خرید
             </span>
           </Link>
