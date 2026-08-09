@@ -55,6 +55,11 @@ export default async function ProductPage({
   const { product, related } = resolved;
   const seo = await fetchSeo("product", String(product.id));
   const hasImages = Boolean(product.images?.length);
+  const productCategories = product.categories?.length
+    ? product.categories
+    : product.categorySlug
+      ? [{ slug: product.categorySlug, title: product.category }]
+      : [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5">
@@ -126,12 +131,17 @@ export default async function ProductPage({
               </span>
             </span>
             <span className="text-slate-300">|</span>
-            <Link
-              href={`/category/${product.categorySlug}`}
-              className="text-brand-600"
-            >
-              {product.category}
-            </Link>
+            <span className="flex flex-wrap items-center gap-2">
+              {productCategories.map((category) => (
+                <Link
+                  key={category.slug}
+                  href={`/category/${category.slug}`}
+                  className="text-brand-600 hover:underline"
+                >
+                  {category.title}
+                </Link>
+              ))}
+            </span>
           </div>
 
           {/* انتخاب رنگ */}

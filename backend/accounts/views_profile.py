@@ -212,7 +212,7 @@ class FavoriteListView(AuthRequired, APIView):
     def get(self, request):
         favorites = request.user.favorites.select_related(
             "product__category"
-        ).prefetch_related("product__images")
+        ).prefetch_related("product__categories", "product__images")
         return ok(
             {"favorites": [product_dto(f.product) for f in favorites]}
         )

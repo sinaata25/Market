@@ -168,7 +168,7 @@ class Command(BaseCommand):
 
         for data in PRODUCTS:
             category = Category.objects.get(title=data["category"])
-            Product.objects.update_or_create(
+            product, _ = Product.objects.update_or_create(
                 id=data["id"],
                 defaults={
                     "title": data["title"],
@@ -187,5 +187,6 @@ class Command(BaseCommand):
                     "category": category,
                 },
             )
+            product.categories.set([category])
         self.stdout.write(self.style.SUCCESS(f"✅ {len(PRODUCTS)} محصول"))
         self.stdout.write("🌱 seed تمام شد.")

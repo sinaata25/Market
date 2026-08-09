@@ -13,6 +13,8 @@ PRODUCT_RESPONSE_KEYS = {
     "titleEn",
     "category",
     "categorySlug",
+    "categories",
+    "categorySlugs",
     "price",
     "oldPrice",
     "rating",

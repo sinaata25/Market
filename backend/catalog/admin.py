@@ -77,10 +77,15 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ["title", "category", "price", "old_price", "stock", "rating"]
-    list_filter = ["category"]
+    list_filter = ["categories"]
     search_fields = ["title", "title_en"]
     list_editable = ["price", "old_price", "stock"]
+    filter_horizontal = ["categories"]
     inlines = [ProductImageInline]
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        form.instance.categories.add(form.instance.category)
 
 
 @admin.register(Review)

@@ -19,6 +19,8 @@ PRODUCT_RESPONSE_KEYS = {
     "titleEn",
     "category",
     "categorySlug",
+    "categories",
+    "categorySlugs",
     "price",
     "oldPrice",
     "rating",
@@ -80,6 +82,52 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(
             set(listed.data["data"]["products"][0]), PRODUCT_RESPONSE_KEYS
         )
+
+    def test_product_can_be_assigned_to_multiple_categories(self):
+        second_category = Category.objects.create(
+            slug="irrigation", title="آبیاری"
+        )
+        created = self.client.post(
+            "/api/admin/products",
+            self.product_payload(
+                categorySlugs=[self.category.slug, second_category.slug]
+            ),
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, 201)
+        product_data = created.data["data"]["product"]
+        self.assertEqual(
+            product_data["categorySlugs"],
+            [self.category.slug, second_category.slug],
+        )
+        product = Product.objects.get(pk=product_data["id"])
+        self.assertEqual(product.category, self.category)
+        self.assertEqual(
+            set(product.categories.values_list("slug", flat=True)),
+            {self.category.slug, second_category.slug},
+        )
+
+        filtered = self.client.get(
+            f"/api/products?category={second_category.slug}"
+        )
+        self.assertEqual(filtered.status_code, 200)
+        self.assertEqual(filtered.data["data"]["total"], 1)
+
+        protected = self.client.delete(
+            f"/api/admin/categories/{second_category.id}"
+        )
+        self.assertEqual(protected.status_code, 409)
+
+        updated = self.client.patch(
+            f"/api/admin/products/{product.id}",
+            self.product_payload(categorySlugs=[second_category.slug]),
+            format="json",
+        )
+        self.assertEqual(updated.status_code, 200)
+        product.refresh_from_db()
+        self.assertEqual(product.category, second_category)
+        self.assertEqual(list(product.categories.all()), [second_category])
 
     def test_new_product_can_receive_an_image_after_creation(self):
         created = self.client.post(

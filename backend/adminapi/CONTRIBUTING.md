@@ -61,10 +61,11 @@ change commits. Staff can toggle `isActive`; inactive categories stay available 
 the management API but are omitted from the public category feed.
 
 `ProductWriteSerializer` defines the dashboard write contract, including camelCase
-names and JSON content. `validate_categorySlug()` resolves the category and places
-the model object in validated data. Cross-field validation enforces price-related
-rules. `apply_product_data()` centralizes mapping from API names to model fields so
-create and update cannot drift.
+names and JSON content. `categorySlugs` accepts one or more unique category slugs;
+the first becomes the backward-compatible primary category and all values populate
+the many-to-many relation. The legacy singular `categorySlug` input remains
+accepted. Cross-field validation enforces price-related rules. `apply_product_data()`
+centralizes mapping from API names to model fields so create and update cannot drift.
 
 - `GET/POST products`: filtered/paginated list and creation.
 - `GET/PATCH/DELETE products/<id>`: detail mutation.

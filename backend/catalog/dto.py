@@ -19,7 +19,13 @@ def category_dto(category: Category) -> dict:
 
 
 def product_dto(product: Product) -> dict:
-    category = product.category
+    assigned_categories = list(product.categories.all())
+    categories = [product.category] + [
+        category
+        for category in assigned_categories
+        if category.pk != product.category_id
+    ]
+    category = categories[0]
     # آدرس‌های نسبی /media/… — فرانت آن‌ها را به جنگو پروکسی می‌کند
     images = [img.image.url for img in product.images.all()]
     return {
@@ -30,6 +36,10 @@ def product_dto(product: Product) -> dict:
         "titleEn": product.title_en or None,
         "category": category.title,
         "categorySlug": category.slug,
+        "categories": [
+            {"slug": item.slug, "title": item.title} for item in categories
+        ],
+        "categorySlugs": [item.slug for item in categories],
         "price": product.price,
         "oldPrice": product.old_price,
         "rating": product.rating,
@@ -39,7 +49,10 @@ def product_dto(product: Product) -> dict:
         "features": product.features or DEFAULT_FEATURES,
         "specs": product.specs
         or [
-            {"label": "دسته‌بندی", "value": category.title},
+            {
+                "label": "دسته‌بندی",
+                "value": "، ".join(item.title for item in categories),
+            },
             {"label": "وضعیت کالا", "value": "نو و اصل"},
             {"label": "ارسال", "value": "از انبار فروشگاه"},
         ],

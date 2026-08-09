@@ -127,7 +127,8 @@ export default function AdminProducts() {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-500">
-                    {p.category}
+                    {p.categories?.map((category) => category.title).join("، ") ??
+                      p.category}
                   </td>
                   <td className="px-3 py-3">
                     <p className="text-xs font-bold text-slate-700 font-num">

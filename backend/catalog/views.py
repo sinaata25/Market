@@ -1,6 +1,6 @@
 import math
 
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
@@ -55,11 +55,15 @@ class ProductListView(APIView):
     """
 
     def get(self, request):
-        qs = Product.objects.select_related("category").prefetch_related("images")
+        qs = Product.objects.select_related("category").prefetch_related(
+            "categories", "images"
+        )
 
         category = request.query_params.get("category")
         if category:
-            qs = qs.filter(category__slug=category)
+            qs = qs.filter(
+                Q(category__slug=category) | Q(categories__slug=category)
+            ).distinct()
 
         search = request.query_params.get("search")
         if search:
@@ -99,25 +103,36 @@ class ProductDetailView(APIView):
         try:
             product = (
                 Product.objects.select_related("category")
-                .prefetch_related("images")
+                .prefetch_related("categories", "images")
                 .get(pk=pk)
             )
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
 
-        # اول هم‌دسته‌ها، بعد پرطرفدارهای سایر دسته‌ها تا سقف ۴ مورد
+        category_ids = {category.id for category in product.categories.all()}
+        category_ids.add(product.category_id)
+
+        # اول محصولات دارای حداقل یک دسته‌ی مشترک، سپس سایر محصولات تا سقف ۴ مورد
         same = list(
             Product.objects.select_related("category")
-            .prefetch_related("images")
-            .filter(category=product.category)
+            .prefetch_related("categories", "images")
+            .filter(
+                Q(category_id__in=category_ids)
+                | Q(categories__id__in=category_ids)
+            )
+            .distinct()
             .exclude(pk=pk)[:4]
         )
         if len(same) < 4:
             others = (
                 Product.objects.select_related("category")
-                .prefetch_related("images")
-                .exclude(category=product.category)
+                .prefetch_related("categories", "images")
+                .exclude(
+                    Q(category_id__in=category_ids)
+                    | Q(categories__id__in=category_ids)
+                )
                 .exclude(pk=pk)
+                .distinct()
                 .order_by("-rating_count")[: 4 - len(same)]
             )
             same.extend(others)

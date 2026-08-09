@@ -45,9 +45,14 @@ class Product(models.Model):
 
     category = models.ForeignKey(
         Category,
-        verbose_name="دسته‌بندی",
+        verbose_name="دسته‌بندی اصلی",
         on_delete=models.PROTECT,
         related_name="products",
+    )
+    categories = models.ManyToManyField(
+        Category,
+        verbose_name="همه دسته‌بندی‌ها",
+        related_name="categorized_products",
     )
 
     class Meta:

@@ -262,14 +262,16 @@ def admin_category_dto(category: Category) -> dict:
     data["productCount"] = (
         category.product_count
         if hasattr(category, "product_count")
-        else category.products.count()
+        else category.categorized_products.count()
     )
     return data
 
 
 class AdminCategoryListView(StaffRequiredMixin, APIView):
     def get(self, request):
-        categories = Category.objects.annotate(product_count=Count("products"))
+        categories = Category.objects.annotate(
+            product_count=Count("categorized_products", distinct=True)
+        )
         return ok(
             {"categories": [admin_category_dto(item) for item in categories]}
         )
@@ -298,6 +300,11 @@ class AdminCategoryDetailView(StaffRequiredMixin, APIView):
         category = Category.objects.filter(pk=pk).first()
         if category is None:
             return fail("دسته‌بندی یافت نشد", 404)
+        if category.products.exists() or category.categorized_products.exists():
+            return fail(
+                "این دسته‌بندی دارای محصول است و تا زمان انتقال یا حذف محصولات قابل حذف نیست",
+                409,
+            )
         icon_name = category.icon.name if category.icon else ""
         icon_storage = category.icon.storage if category.icon else None
         using = category._state.db or "default"
@@ -370,7 +377,10 @@ class ProductWriteSerializer(serializers.Serializer):
     titleEn = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
-    categorySlug = serializers.CharField()
+    categorySlug = serializers.CharField(required=False)
+    categorySlugs = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=False
+    )
     price = serializers.IntegerField(min_value=0)
     oldPrice = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     stock = serializers.IntegerField(min_value=0)
@@ -382,13 +392,22 @@ class ProductWriteSerializer(serializers.Serializer):
         max_length=100, required=False, allow_blank=True, default=""
     )
 
-    def validate_categorySlug(self, value):
-        try:
-            return Category.objects.get(slug=value)
-        except Category.DoesNotExist:
-            raise serializers.ValidationError("دسته‌بندی یافت نشد")
-
     def validate(self, data):
+        slugs = data.pop("categorySlugs", None)
+        legacy_slug = data.pop("categorySlug", None)
+        if slugs is None:
+            slugs = [legacy_slug] if legacy_slug else []
+        slugs = list(dict.fromkeys(slugs))
+        if not slugs:
+            raise serializers.ValidationError("حداقل یک دسته‌بندی انتخاب کنید")
+        categories_by_slug = {
+            category.slug: category
+            for category in Category.objects.filter(slug__in=slugs)
+        }
+        if len(categories_by_slug) != len(slugs):
+            raise serializers.ValidationError("یک یا چند دسته‌بندی یافت نشد")
+        data["categories"] = [categories_by_slug[slug] for slug in slugs]
+
         old_price = data.get("oldPrice")
         if old_price is not None and old_price <= data["price"]:
             raise serializers.ValidationError(
@@ -398,9 +417,10 @@ class ProductWriteSerializer(serializers.Serializer):
 
 
 def apply_product_data(product: Product, data: dict) -> Product:
+    categories = data["categories"]
     product.title = data["title"]
     product.title_en = data.get("titleEn", "")
-    product.category = data["categorySlug"]
+    product.category = categories[0]
     product.price = data["price"]
     product.old_price = data.get("oldPrice")
     product.stock = data["stock"]
@@ -408,6 +428,7 @@ def apply_product_data(product: Product, data: dict) -> Product:
     product.description = data.get("description", "")
     product.warranty = data.get("warranty", "")
     product.save()
+    product.categories.set(categories)
     return product
 
 
@@ -415,7 +436,7 @@ class AdminProductListView(StaffRequiredMixin, APIView):
     def get(self, request):
         qs = (
             Product.objects.select_related("category")
-            .prefetch_related("images")
+            .prefetch_related("categories", "images")
             .order_by("-created_at")
         )
         search = request.query_params.get("search", "").strip()
@@ -449,7 +470,7 @@ class AdminProductDetailView(StaffRequiredMixin, APIView):
     def _get(self, pk: int) -> Product | None:
         return (
             Product.objects.select_related("category")
-            .prefetch_related("images")
+            .prefetch_related("categories", "images")
             .filter(pk=pk)
             .first()
         )
@@ -507,7 +528,16 @@ class AdminProductImageView(StaffRequiredMixin, APIView):
         ProductImage.objects.create(
             product=product, image=file, alt=product.title, order=order
         )
-        return ok({"product": admin_product_dto(Product.objects.select_related("category").prefetch_related("images").get(pk=pk))}, status=201)
+        return ok(
+            {
+                "product": admin_product_dto(
+                    Product.objects.select_related("category")
+                    .prefetch_related("categories", "images")
+                    .get(pk=pk)
+                )
+            },
+            status=201,
+        )
 
 
 class AdminProductImageDetailView(StaffRequiredMixin, APIView):

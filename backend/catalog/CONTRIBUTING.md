@@ -27,14 +27,18 @@ controls whether the category appears in the public category feed; staff APIs
 continue to return all categories. `icon` accepts only validated `.png` or `.svg`
 uploads and may be empty.
 
-`Product` belongs to a category. Monetary values are integer toman amounts.
+`Product.category` is its primary category, retained for stable breadcrumbs, SEO,
+and backward-compatible response fields. `Product.categories` contains every
+assigned category (including the primary one); write APIs keep both relations in
+sync and require at least one category. Monetary values are integer toman amounts.
 `old_price` is nullable and represents the pre-discount display price. `colors`,
 `features`, and `specs` are JSON UI content. Rating and rating count are denormalized
 onto the product for fast listing/sorting and must be recomputed after review
 creation/deletion. Stock is mutated transactionally by the orders app.
 
 `ProductImage` provides an ordered one-to-many image gallery. Code returning a
-product should prefetch `images`; otherwise `product_dto()` creates N+1 queries.
+product should prefetch `categories` and `images`; otherwise `product_dto()` creates
+N+1 queries.
 
 `Review` belongs to a user and product. Its unique database constraint enforces one
 review per user/product even if application-level checks race. Reviews are ordered
@@ -49,8 +53,8 @@ provide presentation defaults for missing features/specs/description/warranty.
 
 Because `product_dto()` is shared across apps, changing it affects product lists,
 details, related products, carts, favorites, and admin responses. Update contract
-tests and the frontend together. It expects `category` to be selected and `images`
-to be prefetched by callers.
+tests and the frontend together. It expects `category` to be selected and both
+`categories` and `images` to be prefetched by callers.
 
 ## Category icon security and lifecycle
 
@@ -107,7 +111,8 @@ production startup depend on demo assets.
 ## Safe change checklist
 
 1. Treat `product_dto()` as a cross-app public contract.
-2. Add `select_related("category")` and `prefetch_related("images")` to bulk DTO calls.
+2. Add `select_related("category")` and `prefetch_related("categories", "images")`
+   to bulk DTO calls.
 3. Keep review uniqueness enforced at the database level.
 4. Recompute denormalized ratings after every review mutation.
 5. Never weaken SVG/PNG content validation to MIME/extension checks.
