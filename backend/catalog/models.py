@@ -8,6 +8,7 @@ from .validators import validate_category_icon
 class Category(models.Model):
     slug = models.SlugField("نامک", unique=True)
     title = models.CharField("عنوان", max_length=100, unique=True)
+    is_active = models.BooleanField("نمایش در فروشگاه", default=True)
     icon = models.FileField(
         "آیکن",
         upload_to="categories/icons/",

@@ -22,8 +22,10 @@ the cart, profile, and admin APIs.
 ## Data model
 
 `Category.slug` is the public category identifier. `sub` is JSON because the UI
-expects a lightweight list rather than normalized subcategory rows. `icon` accepts
-only validated `.png` or `.svg` uploads and may be empty.
+expects a lightweight list rather than normalized subcategory rows. `is_active`
+controls whether the category appears in the public category feed; staff APIs
+continue to return all categories. `icon` accepts only validated `.png` or `.svg`
+uploads and may be empty.
 
 `Product` belongs to a category. Monetary values are integer toman amounts.
 `old_price` is nullable and represents the pre-discount display price. `colors`,
@@ -74,7 +76,7 @@ cleanup problems, not turn a completed update into a false API failure.
 
 ## Public APIs
 
-- `GET /api/categories`: all categories through `category_dto()`.
+- `GET /api/categories`: active categories through `category_dto()`.
 - `GET /api/products`: optional category/search/discount filters, allow-listed
   sort keys, and bounded pagination (`perPage` cannot exceed 50).
 - `GET /api/products/<id>`: product plus up to four related products, preferring
@@ -111,4 +113,3 @@ production startup depend on demo assets.
 5. Never weaken SVG/PNG content validation to MIME/extension checks.
 6. Delete replaced files only after transaction commit and only if unreferenced.
 7. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.
-

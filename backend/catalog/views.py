@@ -42,7 +42,9 @@ class CategoryListView(APIView):
 
     @extend_schema(responses={200: CategoryListEnvelopeSerializer})
     def get(self, request):
-        categories = [category_dto(c) for c in Category.objects.all()]
+        categories = [
+            category_dto(c) for c in Category.objects.filter(is_active=True)
+        ]
         return ok({"categories": categories})
 
 

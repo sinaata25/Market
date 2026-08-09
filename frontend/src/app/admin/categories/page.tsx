@@ -7,6 +7,7 @@ import type { Category } from "@/lib/products";
 
 type AdminCategory = Category & {
   id: number;
+  isActive: boolean;
   productCount: number;
 };
 
@@ -32,6 +33,9 @@ export default function AdminCategoriesPage() {
   const [icon, setIcon] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [changingVisibility, setChangingVisibility] = useState<number | null>(
+    null
+  );
   const [message, setMessage] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const formSection = useRef<HTMLElement>(null);
@@ -162,12 +166,39 @@ export default function AdminCategoriesPage() {
     }
   }
 
+  async function toggleVisibility(category: AdminCategory) {
+    if (changingVisibility !== null) return;
+    setChangingVisibility(category.id);
+    const result = await api.patch<{ category: AdminCategory }>(
+      `/api/admin/categories/${category.id}`,
+      { isActive: !category.isActive }
+    );
+    if (result.ok && result.data) {
+      setCategories((current) =>
+        current.map((item) =>
+          item.id === category.id ? result.data!.category : item
+        )
+      );
+      if (editing?.id === category.id) {
+        setEditing(result.data.category);
+      }
+      notify(
+        category.isActive
+          ? "دسته‌بندی از فروشگاه پنهان شد ✅"
+          : "دسته‌بندی در فروشگاه نمایش داده شد ✅"
+      );
+    } else {
+      notify(result.error ?? "تغییر وضعیت دسته‌بندی انجام نشد");
+    }
+    setChangingVisibility(null);
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-lg font-bold text-slate-800">مدیریت دسته‌بندی‌ها</h1>
         <p className="mt-1 text-xs leading-6 text-slate-400">
-          دسته‌بندی‌های فروشگاه، زیردسته‌ها و آیکن هر دسته را مدیریت کنید.
+          دسته‌بندی‌های فروشگاه، وضعیت نمایش، زیردسته‌ها و آیکن هر دسته را مدیریت کنید.
         </p>
       </div>
 
@@ -287,24 +318,30 @@ export default function AdminCategoriesPage() {
       </section>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-        <table className="w-full min-w-[680px] text-sm">
+        <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-right text-[11px] text-slate-400">
               <th className="px-5 py-3 font-medium">دسته‌بندی</th>
               <th className="px-3 py-3 font-medium">نامک</th>
               <th className="px-3 py-3 font-medium">زیردسته‌ها</th>
               <th className="px-3 py-3 font-medium">محصولات</th>
+              <th className="px-3 py-3 font-medium">وضعیت نمایش</th>
               <th className="px-5 py-3 font-medium">عملیات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={5} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={6} text="در حال بارگذاری..." />
             ) : categories.length === 0 ? (
-              <EmptyRow colSpan={5} text="دسته‌بندی‌ای وجود ندارد" />
+              <EmptyRow colSpan={6} text="دسته‌بندی‌ای وجود ندارد" />
             ) : (
               categories.map((category) => (
-                <tr key={category.id} className="hover:bg-slate-50/60">
+                <tr
+                  key={category.id}
+                  className={`hover:bg-slate-50/60 ${
+                    category.isActive ? "" : "bg-slate-50/50"
+                  }`}
+                >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-brand-50 text-lg">
@@ -335,8 +372,35 @@ export default function AdminCategoriesPage() {
                   <td className="px-3 py-3 text-xs text-slate-500 font-num">
                     {faNum(category.productCount)}
                   </td>
+                  <td className="px-3 py-3">
+                    <span
+                      className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                        category.isActive
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {category.isActive ? "نمایش داده می‌شود" : "پنهان است"}
+                    </span>
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3 text-xs">
+                      <button
+                        type="button"
+                        disabled={changingVisibility !== null}
+                        onClick={() => toggleVisibility(category)}
+                        className={`hover:underline disabled:cursor-not-allowed disabled:opacity-50 ${
+                          category.isActive
+                            ? "text-slate-500"
+                            : "text-emerald-600"
+                        }`}
+                      >
+                        {changingVisibility === category.id
+                          ? "در حال تغییر..."
+                          : category.isActive
+                            ? "پنهان کردن"
+                            : "نمایش دادن"}
+                      </button>
                       <button
                         type="button"
                         onClick={() => startEditing(category)}

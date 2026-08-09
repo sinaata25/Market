@@ -24,6 +24,7 @@ export type Category = {
   title: string;
   icon: string | null;
   sub: string[];
+  isActive?: boolean;
 };
 
 // ناوبری تا زمان دریافت داده‌ی زنده از API با این فهرست بدون آیکن قابل استفاده می‌ماند.

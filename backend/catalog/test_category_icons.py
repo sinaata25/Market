@@ -215,7 +215,10 @@ class CategoryAdminIconTests(TemporaryMediaTestCase):
     def test_admin_form_has_icon_and_no_legacy_field(self):
         form_class = self.model_admin.get_form(self.request)
 
-        self.assertEqual(set(form_class.base_fields), {"slug", "title", "icon", "sub"})
+        self.assertEqual(
+            set(form_class.base_fields),
+            {"slug", "title", "is_active", "icon", "sub"},
+        )
 
     def test_admin_preview_uses_an_external_image_and_handles_no_icon(self):
         blank_category = self.create_category()

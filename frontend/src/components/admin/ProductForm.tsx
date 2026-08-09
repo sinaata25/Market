@@ -63,7 +63,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
   // دسته‌ها + در حالت ویرایش، خود محصول
   useEffect(() => {
-    api.get<{ categories: Category[] }>("/api/categories").then((res) => {
+    api.get<{ categories: Category[] }>("/api/admin/categories").then((res) => {
       if (res.ok && res.data) setCategories(res.data.categories);
     });
     if (editingExistingProduct) {
@@ -305,7 +305,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 <option value="">انتخاب کنید...</option>
                 {categories.map((c) => (
                   <option key={c.slug} value={c.slug}>
-                    {c.title}
+                    {c.title}{c.isActive === false ? " (پنهان)" : ""}
                   </option>
                 ))}
               </select>

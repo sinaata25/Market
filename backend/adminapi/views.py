@@ -242,6 +242,7 @@ class AdminOrderDetailView(StaffRequiredMixin, APIView):
 
 
 class CategoryWriteSerializer(serializers.ModelSerializer):
+    isActive = serializers.BooleanField(source="is_active", required=False)
     sub = serializers.ListField(
         child=serializers.CharField(max_length=100),
         required=False,
@@ -251,12 +252,13 @@ class CategoryWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ["title", "slug", "sub"]
+        fields = ["title", "slug", "sub", "isActive"]
 
 
 def admin_category_dto(category: Category) -> dict:
     data = category_dto(category)
     data["id"] = category.id
+    data["isActive"] = category.is_active
     data["productCount"] = (
         category.product_count
         if hasattr(category, "product_count")

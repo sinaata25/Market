@@ -163,24 +163,43 @@ class AdminApiContractTests(TestCase):
         category = created.data["data"]["category"]
         self.assertEqual(
             set(category),
-            {"id", "slug", "title", "icon", "sub", "productCount"},
+            {
+                "id",
+                "slug",
+                "title",
+                "icon",
+                "sub",
+                "isActive",
+                "productCount",
+            },
         )
+        self.assertEqual(category["isActive"], True)
         self.assertEqual(category["productCount"], 0)
 
         category_id = category["id"]
         updated = self.client.patch(
             f"/api/admin/categories/{category_id}",
-            {"title": "تجهیزات آبیاری", "sub": ["پمپ"]},
+            {
+                "title": "تجهیزات آبیاری",
+                "sub": ["پمپ"],
+                "isActive": False,
+            },
             format="json",
         )
         listed = self.client.get("/api/admin/categories")
+        public = self.client.get("/api/categories")
 
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(
             updated.data["data"]["category"]["title"], "تجهیزات آبیاری"
         )
+        self.assertEqual(updated.data["data"]["category"]["isActive"], False)
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(len(listed.data["data"]["categories"]), 2)
+        self.assertEqual(
+            [item["slug"] for item in public.data["data"]["categories"]],
+            [self.category.slug],
+        )
 
         deleted = self.client.delete(f"/api/admin/categories/{category_id}")
         self.assertEqual(deleted.status_code, 200)

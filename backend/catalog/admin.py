@@ -14,7 +14,8 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ["icon_preview", "title", "slug"]
+    list_display = ["icon_preview", "title", "slug", "is_active"]
+    list_editable = ["is_active"]
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ["icon_preview"]
     search_fields = ["title"]

@@ -57,7 +57,8 @@ Category management exposes staff-only list/create/update/delete endpoints plus 
 separate multipart icon endpoint. Category deletion returns a controlled conflict
 while products reference it. Icon replacement/removal uses catalog's deferred,
 unreferenced-file cleanup helper; do not delete storage objects before the database
-change commits.
+change commits. Staff can toggle `isActive`; inactive categories stay available in
+the management API but are omitted from the public category feed.
 
 `ProductWriteSerializer` defines the dashboard write contract, including camelCase
 names and JSON content. `validate_categorySlug()` resolves the category and places
