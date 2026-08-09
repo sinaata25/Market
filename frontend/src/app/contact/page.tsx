@@ -199,9 +199,12 @@ export default function ContactPage() {
           <div className="relative min-h-72 overflow-hidden bg-brand-50 p-8 sm:p-10">
             <div className="absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-brand-100" />
             <div className="absolute left-12 top-10 h-16 w-16 rounded-3xl bg-accent-200/70" />
-            <div className="relative mx-auto mt-5 max-w-sm space-y-3">
+            <div
+              dir="rtl"
+              className="relative mr-0 ml-auto mt-5 w-full max-w-sm space-y-3 text-right"
+            >
               {["سفارش من چه زمانی ارسال می‌شود؟", "چطور محصول مناسب را انتخاب کنم؟", "شرایط بازگشت کالا چیست؟"].map((question, index) => (
-                <div key={question} className={`rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm ${index === 1 ? "mr-6" : index === 2 ? "mr-12" : ""}`}>
+                <div key={question} className={`rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm ${index === 1 ? "ml-6" : index === 2 ? "ml-12" : ""}`}>
                   <span className="ml-2 font-bold text-brand-600">؟</span>
                   {question}
                 </div>
