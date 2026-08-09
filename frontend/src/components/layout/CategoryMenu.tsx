@@ -8,6 +8,48 @@ import {
   type Category,
 } from "@/lib/products";
 
+type CategoryLink = { slug: string; title: string };
+
+type SectionItem = {
+  category: CategoryLink;
+  depth: number;
+  pathKey: string;
+};
+
+type CategorySection = {
+  heading: CategoryLink;
+  items: SectionItem[];
+  pathKey: string;
+};
+
+function collectSectionItems(
+  category: Category,
+  categoryBySlug: Map<string, Category>,
+  path: Set<string>,
+  depth: number,
+  items: SectionItem[]
+) {
+  for (const child of category.sub) {
+    if (path.has(child.slug)) continue;
+    const childPath = new Set([...path, child.slug]);
+    items.push({
+      category: child,
+      depth,
+      pathKey: [...childPath].join(">"),
+    });
+    const fullChild = categoryBySlug.get(child.slug);
+    if (fullChild) {
+      collectSectionItems(
+        fullChild,
+        categoryBySlug,
+        childPath,
+        depth + 1,
+        items
+      );
+    }
+  }
+}
+
 export default function CategoryMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -20,40 +62,29 @@ export default function CategoryMenu() {
   const categoryBySlug = new Map(
     categories.map((category) => [category.slug, category])
   );
-  const descendants: {
-    category: { slug: string; title: string };
-    depth: number;
-    pathKey: string;
-  }[] = [];
-
-  function collectDescendants(
-    category: Category,
-    depth: number,
-    path: Set<string>
-  ) {
-    for (const child of category.sub) {
-      if (path.has(child.slug)) continue;
-      const childPath = new Set([...path, child.slug]);
-      descendants.push({
-        category: child,
-        depth,
-        pathKey: [...childPath].join(">"),
-      });
-      const fullChild = categoryBySlug.get(child.slug);
-      if (fullChild) {
-        collectDescendants(fullChild, depth + 1, childPath);
-      }
+  const sections: CategorySection[] = (active?.sub ?? []).map((child) => {
+    const items: SectionItem[] = [];
+    const fullChild = categoryBySlug.get(child.slug);
+    const path = new Set([active.slug, child.slug]);
+    if (fullChild) {
+      collectSectionItems(fullChild, categoryBySlug, path, 0, items);
     }
-  }
-
-  if (active) collectDescendants(active, 0, new Set([active.slug]));
+    return {
+      heading: child,
+      items,
+      pathKey: [...path].join(">"),
+    };
+  });
 
   useEffect(() => {
     let ignore = false;
     api.get<{ categories: Category[] }>("/api/categories").then((res) => {
       if (!ignore && res.ok && res.data) {
         setCategories(res.data.categories);
-        setActiveIndex(0);
+        const firstPopulatedRoot = res.data.categories
+          .filter((category) => category.isTopLevel !== false)
+          .findIndex((category) => category.sub.length > 0);
+        setActiveIndex(firstPopulatedRoot >= 0 ? firstPopulatedRoot : 0);
       }
     });
     return () => {
@@ -90,17 +121,36 @@ export default function CategoryMenu() {
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-controls="product-category-menu"
-        className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${
-          open ? "text-brand-700" : "text-slate-700"
+        aria-haspopup="menu"
+        className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${
+          open
+            ? "bg-brand-50 text-brand-700"
+            : "text-slate-700 hover:bg-slate-50"
         }`}
       >
-        <span>☰</span>
-        <span>دسته‌بندی محصولات</span>
-        <span
-          className={`text-xs transition-transform ${open ? "rotate-180" : ""}`}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="h-5 w-5"
         >
-          ▾
-        </span>
+          <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+        <span>دسته‌بندی محصولات</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+            clipRule="evenodd"
+          />
+        </svg>
       </button>
 
       {/* پنل کشویی (مگامنو) */}
@@ -109,73 +159,143 @@ export default function CategoryMenu() {
           id="product-category-menu"
           className="absolute right-0 top-full z-50 pt-2"
         >
-          <div className="flex w-[640px] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
+          <div className="flex h-[min(580px,calc(100vh-9rem))] min-h-96 w-[min(1120px,calc(100vw-2rem))] overflow-hidden rounded-b-2xl rounded-tl-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-18px_rgba(15,23,42,0.35)]">
             {/* ستون دسته‌های اصلی */}
-            <ul className="w-56 shrink-0 border-l border-slate-100 bg-slate-50 py-2">
+            <ul
+              aria-label="دسته‌بندی‌های اصلی"
+              className="w-60 shrink-0 overflow-y-auto border-l border-slate-200 bg-slate-50/80 py-2"
+            >
               {rootCategories.map((c, i) => (
                 <li key={c.slug}>
                   <Link
                     href={`/category/${c.slug}`}
                     onMouseEnter={() => setActiveIndex(i)}
+                    onFocus={() => setActiveIndex(i)}
                     onClick={() => setOpen(false)}
-                    className={`flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition ${
+                    className={`flex min-h-12 items-center gap-3 border-r-2 px-4 py-3 text-xs transition ${
                       activeIndex === i
-                        ? "bg-white font-medium text-brand-700"
-                        : "text-slate-600 hover:text-brand-700"
+                        ? "border-brand-600 bg-white font-bold text-brand-700"
+                        : "border-transparent text-slate-600 hover:bg-white hover:text-brand-700"
                     }`}
                   >
-                    <span className="flex items-center gap-2">
-                      {c.icon && (
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-slate-100">
+                      {c.icon ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={c.icon}
                           alt=""
-                          className="h-4 w-4 shrink-0 object-contain"
+                          className="h-4 w-4 object-contain"
                         />
+                      ) : (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          className="h-4 w-4"
+                        >
+                          <rect x="3" y="3" width="5" height="5" rx="1" />
+                          <rect x="12" y="3" width="5" height="5" rx="1" />
+                          <rect x="3" y="12" width="5" height="5" rx="1" />
+                          <rect x="12" y="12" width="5" height="5" rx="1" />
+                        </svg>
                       )}
-                      {c.title}
                     </span>
-                    <span className="text-xs text-slate-300">‹</span>
+                    <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`text-base ${
+                        activeIndex === i
+                          ? "text-brand-500"
+                          : "text-slate-300"
+                      }`}
+                    >
+                      ‹
+                    </span>
                   </Link>
                 </li>
               ))}
             </ul>
 
             {/* ستون زیردسته‌ها */}
-            <div className="flex-1 p-5">
-              <Link
-                href={`/category/${active.slug}`}
-                onClick={() => setOpen(false)}
-                className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-800 hover:text-brand-700"
-              >
-                {active.icon && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={active.icon}
-                    alt=""
-                    className="h-5 w-5 shrink-0 object-contain"
-                  />
+            <div className="min-w-0 flex-1 overflow-y-auto bg-white">
+              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-6 py-4 backdrop-blur">
+                <Link
+                  href={`/category/${active.slug}`}
+                  onClick={() => setOpen(false)}
+                  className="inline-flex items-center gap-2 text-xs font-bold text-brand-700 transition hover:text-brand-800"
+                >
+                  همه محصولات {active.title}
+                  <span aria-hidden="true" className="text-base">
+                    ‹
+                  </span>
+                </Link>
+              </div>
+
+              <div className="p-6">
+                {sections.length > 0 ? (
+                  <div className="grid grid-cols-2 items-start gap-x-10 gap-y-7 lg:grid-cols-3">
+                    {sections.map((section) => (
+                      <section key={section.pathKey} className="min-w-0">
+                        <Link
+                          href={`/category/${section.heading.slug}`}
+                          onClick={() => setOpen(false)}
+                          className="group mb-2.5 flex items-center gap-2 text-sm font-bold text-slate-800 transition hover:text-brand-700"
+                        >
+                          <span className="h-4 w-0.5 rounded-full bg-brand-600" />
+                          <span className="truncate">{section.heading.title}</span>
+                          <span
+                            aria-hidden="true"
+                            className="text-base text-slate-300 transition group-hover:text-brand-500"
+                          >
+                            ‹
+                          </span>
+                        </Link>
+
+                        {section.items.length > 0 && (
+                          <ul className="space-y-2 border-r border-slate-100 pr-3">
+                            {section.items.map(
+                              ({ category, depth, pathKey }) => (
+                                <li key={pathKey}>
+                                  <Link
+                                    href={`/category/${category.slug}`}
+                                    onClick={() => setOpen(false)}
+                                    className={`block truncate text-xs leading-6 transition hover:text-brand-700 ${
+                                      depth > 0
+                                        ? "text-slate-400"
+                                        : "text-slate-500"
+                                    }`}
+                                    style={{ paddingRight: `${depth * 10}px` }}
+                                  >
+                                    {category.title}
+                                  </Link>
+                                </li>
+                              )
+                            )}
+                          </ul>
+                        )}
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 text-center">
+                    <div>
+                      <span className="mb-3 block text-3xl">🗂️</span>
+                      <p className="text-sm font-medium text-slate-600">
+                        زیردسته‌ای برای {active.title} تعریف نشده است
+                      </p>
+                      <Link
+                        href={`/category/${active.slug}`}
+                        onClick={() => setOpen(false)}
+                        className="mt-3 inline-block text-xs font-bold text-brand-700 hover:text-brand-800"
+                      >
+                        مشاهده محصولات این دسته
+                      </Link>
+                    </div>
+                  </div>
                 )}
-                {active.title}
-                <span className="text-xs text-brand-600">(مشاهده همه)</span>
-              </Link>
-              <ul className="grid grid-cols-2 gap-x-4 gap-y-3">
-                {descendants.map(({ category, depth, pathKey }) => (
-                  <li key={pathKey}>
-                    <Link
-                      href={`/category/${category.slug}`}
-                      onClick={() => setOpen(false)}
-                      className="block text-sm text-slate-500 transition hover:text-brand-700"
-                      style={{ paddingRight: `${depth * 12}px` }}
-                    >
-                      {depth > 0 && (
-                        <span className="ml-1 text-slate-300">↳</span>
-                      )}
-                      {category.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              </div>
             </div>
           </div>
         </div>
