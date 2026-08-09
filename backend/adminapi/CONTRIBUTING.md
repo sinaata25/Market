@@ -51,7 +51,13 @@ order is terminal. Product rows are locked/updated consistently with the custome
 cancellation flow. Do not implement status changes as an unchecked `update()` or
 stock can be restored twice.
 
-## Product management
+## Category and product management
+
+Category management exposes staff-only list/create/update/delete endpoints plus a
+separate multipart icon endpoint. Category deletion returns a controlled conflict
+while products reference it. Icon replacement/removal uses catalog's deferred,
+unreferenced-file cleanup helper; do not delete storage objects before the database
+change commits.
 
 `ProductWriteSerializer` defines the dashboard write contract, including camelCase
 names and JSON content. `validate_categorySlug()` resolves the category and places
@@ -97,4 +103,3 @@ bound page sizes. Use `select_related` for single-valued relationships and
 5. Scope nested image/review/object lookups to their parent where applicable.
 6. Avoid exposing credentials, OTP state, or password hashes in user responses.
 7. Run `./.venv/bin/python manage.py test adminapi orders catalog --verbosity 2`.
-
