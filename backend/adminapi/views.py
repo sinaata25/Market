@@ -5,7 +5,9 @@ from datetime import timedelta
 
 from PIL import Image, UnidentifiedImageError
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Avg, Count, F, IntegerField, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -13,8 +15,10 @@ from rest_framework import serializers
 from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
-from catalog.dto import product_dto
+from catalog.dto import category_dto, product_dto
+from catalog.icon_files import schedule_category_icon_delete
 from catalog.models import Category, Product, ProductImage, Review
+from catalog.validators import validate_category_icon
 from common.responses import fail, ok
 from orders.models import Order, OrderItem
 
@@ -232,6 +236,128 @@ class AdminOrderDetailView(StaffRequiredMixin, APIView):
             order.status = status
             order.save(update_fields=["status"])
         return ok({"order": order_row(order)})
+
+
+# ─── دسته‌بندی‌ها ────────────────────────────────────────────
+
+
+class CategoryWriteSerializer(serializers.ModelSerializer):
+    sub = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        default=list,
+        allow_empty=True,
+    )
+
+    class Meta:
+        model = Category
+        fields = ["title", "slug", "sub"]
+
+
+def admin_category_dto(category: Category) -> dict:
+    data = category_dto(category)
+    data["id"] = category.id
+    data["productCount"] = (
+        category.product_count
+        if hasattr(category, "product_count")
+        else category.products.count()
+    )
+    return data
+
+
+class AdminCategoryListView(StaffRequiredMixin, APIView):
+    def get(self, request):
+        categories = Category.objects.annotate(product_count=Count("products"))
+        return ok(
+            {"categories": [admin_category_dto(item) for item in categories]}
+        )
+
+    def post(self, request):
+        serializer = CategoryWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save()
+        category.product_count = 0
+        return ok({"category": admin_category_dto(category)}, status=201)
+
+
+class AdminCategoryDetailView(StaffRequiredMixin, APIView):
+    def patch(self, request, pk: int):
+        category = Category.objects.filter(pk=pk).first()
+        if category is None:
+            return fail("دسته‌بندی یافت نشد", 404)
+        serializer = CategoryWriteSerializer(
+            category, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save()
+        return ok({"category": admin_category_dto(category)})
+
+    def delete(self, request, pk: int):
+        category = Category.objects.filter(pk=pk).first()
+        if category is None:
+            return fail("دسته‌بندی یافت نشد", 404)
+        icon_name = category.icon.name if category.icon else ""
+        icon_storage = category.icon.storage if category.icon else None
+        using = category._state.db or "default"
+        try:
+            category.delete()
+        except ProtectedError:
+            return fail(
+                "این دسته‌بندی دارای محصول است و تا زمان انتقال یا حذف محصولات قابل حذف نیست",
+                409,
+            )
+        if icon_name:
+            schedule_category_icon_delete(
+                icon_name, icon_storage, using=using
+            )
+        return ok({"deleted": True})
+
+
+class AdminCategoryIconView(StaffRequiredMixin, APIView):
+    def _get(self, pk: int) -> Category | None:
+        return Category.objects.filter(pk=pk).first()
+
+    def post(self, request, pk: int):
+        category = self._get(pk)
+        if category is None:
+            return fail("دسته‌بندی یافت نشد", 404)
+        icon = request.FILES.get("file")
+        if icon is None:
+            return fail("فایل آیکن ارسال نشده است", 422)
+        try:
+            validate_category_icon(icon)
+        except DjangoValidationError as exc:
+            messages = getattr(exc, "messages", None)
+            return fail(messages[0] if messages else "آیکن معتبر نیست", 422)
+
+        old_name = category.icon.name if category.icon else ""
+        old_storage = category.icon.storage if category.icon else None
+        category.icon = icon
+        category.save(update_fields=["icon"])
+        if old_name and old_name != category.icon.name:
+            schedule_category_icon_delete(
+                old_name,
+                old_storage,
+                using=category._state.db or "default",
+            )
+        return ok({"category": admin_category_dto(category)}, status=201)
+
+    def delete(self, request, pk: int):
+        category = self._get(pk)
+        if category is None:
+            return fail("دسته‌بندی یافت نشد", 404)
+        if not category.icon:
+            return ok({"category": admin_category_dto(category)})
+        old_name = category.icon.name
+        old_storage = category.icon.storage
+        category.icon = ""
+        category.save(update_fields=["icon"])
+        schedule_category_icon_delete(
+            old_name,
+            old_storage,
+            using=category._state.db or "default",
+        )
+        return ok({"category": admin_category_dto(category)})
 
 
 # ─── محصولات ─────────────────────────────────────────────────

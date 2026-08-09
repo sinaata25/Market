@@ -3,11 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  api,
-  notifyAuthChanged,
-  subscribeAuthChanged,
-} from "@/lib/client-api";
+import { api, notifyAuthChanged, subscribeAuthChanged } from "@/lib/client-api";
 
 type Me = {
   id: number;
@@ -117,11 +113,18 @@ export default function HeaderActions() {
             <span className="text-xs">▾</span>
           </button>
           {menuOpen && (
-            <div id="account-menu" className="absolute left-0 top-full z-50 pt-2">
+            <div
+              id="account-menu"
+              className="absolute left-0 top-full z-50 pt-2"
+            >
               <div className="w-48 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
                 {[
                   { href: "/profile", icon: "👤", label: "پروفایل من" },
-                  { href: "/profile/orders", icon: "📦", label: "سفارش‌های من" },
+                  {
+                    href: "/profile/orders",
+                    icon: "📦",
+                    label: "سفارش‌های من",
+                  },
                   {
                     href: "/profile/addresses",
                     icon: "📍",
@@ -145,7 +148,7 @@ export default function HeaderActions() {
                 {(user.isStaff || user.isSeoManager) && (
                   <Link
                     href="/admin"
-                    className="block border-t border-slate-100 px-4 py-2.5 text-sm text-violet-600 transition hover:bg-violet-50"
+                    className="block px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
                     onClick={() => setMenuOpen(false)}
                   >
                     🎛️ پنل مدیریت
@@ -175,8 +178,21 @@ export default function HeaderActions() {
         </Link>
       )}
 
+      {user?.isStaff && (
+        <Link
+          href="/admin"
+          aria-label="داشبورد مدیریت"
+          title="داشبورد مدیریت"
+          className="block px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
+        >
+          <span aria-hidden="true">🎛️</span>
+          <span className="hidden sm:inline">داشبورد مدیریت</span>
+        </Link>
+      )}
+
       <Link
         href="/cart"
+        aria-label="سبد خرید"
         className="relative grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-xl transition hover:border-brand-400"
       >
         🛒

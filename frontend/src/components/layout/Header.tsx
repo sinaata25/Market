@@ -48,7 +48,7 @@ export default function Header() {
 
       {/* نوار دسته‌بندی */}
       <nav className="border-b border-slate-100 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-1.5 text-sm">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5 text-sm">
           <CategoryMenu />
 
           <span className="mx-1 h-5 w-px bg-slate-200" />

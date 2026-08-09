@@ -147,3 +147,98 @@ class AdminApiContractTests(TestCase):
             set(response.data["data"]["lowStock"][0]),
             {"id", "title", "stock"},
         )
+
+    def test_category_crud_uses_admin_contract(self):
+        created = self.client.post(
+            "/api/admin/categories",
+            {
+                "title": "آبیاری",
+                "slug": "irrigation",
+                "sub": ["پمپ آب", "اتصالات"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, 201)
+        category = created.data["data"]["category"]
+        self.assertEqual(
+            set(category),
+            {"id", "slug", "title", "icon", "sub", "productCount"},
+        )
+        self.assertEqual(category["productCount"], 0)
+
+        category_id = category["id"]
+        updated = self.client.patch(
+            f"/api/admin/categories/{category_id}",
+            {"title": "تجهیزات آبیاری", "sub": ["پمپ"]},
+            format="json",
+        )
+        listed = self.client.get("/api/admin/categories")
+
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(
+            updated.data["data"]["category"]["title"], "تجهیزات آبیاری"
+        )
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(len(listed.data["data"]["categories"]), 2)
+
+        deleted = self.client.delete(f"/api/admin/categories/{category_id}")
+        self.assertEqual(deleted.status_code, 200)
+        self.assertFalse(Category.objects.filter(pk=category_id).exists())
+
+    def test_category_validation_and_protected_delete_are_controlled(self):
+        duplicate = self.client.post(
+            "/api/admin/categories",
+            {"title": self.category.title, "slug": "other", "sub": []},
+            format="json",
+        )
+        Product.objects.create(
+            title="بیل",
+            category=self.category,
+            price=100_000,
+        )
+        protected = self.client.delete(
+            f"/api/admin/categories/{self.category.id}"
+        )
+
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(duplicate.data["ok"], False)
+        self.assertEqual(protected.status_code, 409)
+        self.assertEqual(protected.data["ok"], False)
+        self.assertTrue(Category.objects.filter(pk=self.category.id).exists())
+
+    def test_non_staff_cannot_manage_categories(self):
+        non_staff = get_user_model().objects.create_user(phone="09120000000")
+        client = APIClient()
+        client.force_authenticate(non_staff)
+
+        response = client.get("/api/admin/categories")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["ok"], False)
+
+    def test_category_icon_can_be_uploaded_and_removed(self):
+        image_bytes = BytesIO()
+        Image.new("RGBA", (2, 2), color="green").save(image_bytes, format="PNG")
+        upload = SimpleUploadedFile(
+            "category.png", image_bytes.getvalue(), content_type="image/png"
+        )
+
+        uploaded = self.client.post(
+            f"/api/admin/categories/{self.category.id}/icon",
+            {"file": upload},
+            format="multipart",
+        )
+
+        self.assertEqual(uploaded.status_code, 201)
+        self.assertTrue(uploaded.data["data"]["category"]["icon"])
+        self.category.refresh_from_db()
+        self.assertTrue(self.category.icon.name.endswith(".png"))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            removed = self.client.delete(
+                f"/api/admin/categories/{self.category.id}/icon"
+            )
+        self.assertEqual(removed.status_code, 200)
+        self.category.refresh_from_db()
+        self.assertFalse(self.category.icon)

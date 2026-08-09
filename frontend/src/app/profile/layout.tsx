@@ -3,11 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  api,
-  notifyAuthChanged,
-  subscribeAuthChanged,
-} from "@/lib/client-api";
+import { api, notifyAuthChanged, subscribeAuthChanged } from "@/lib/client-api";
 
 type Me = {
   id: number;
@@ -138,7 +134,7 @@ export default function ProfileLayout({
               {(me.isStaff || me.isSeoManager) && (
                 <Link
                   href="/admin"
-                  className="mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm text-violet-600 transition hover:bg-violet-50"
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-slate-600 transition hover:bg-blue-50"
                 >
                   <span>🎛️</span> پنل مدیریت
                 </Link>
