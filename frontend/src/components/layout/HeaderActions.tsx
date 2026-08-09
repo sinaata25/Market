@@ -181,12 +181,14 @@ export default function HeaderActions() {
       {user?.isStaff && (
         <Link
           href="/admin"
-          aria-label="داشبورد مدیریت"
-          title="داشبورد مدیریت"
-          className="block px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
+          aria-label="پنل مدیریت"
+          title="پنل مدیریت"
+          // className="block px-4  py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
+
+          className="hidden items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-400 hover:text-brand-700 sm:flex"
         >
-          <span aria-hidden="true">🎛️</span>
-          <span className="hidden sm:inline">داشبورد مدیریت</span>
+          {/* <span aria-hidden="true">🎛️</span> */}
+          <span className="hidden sm:inline">پنل مدیریت</span>
         </Link>
       )}
 
