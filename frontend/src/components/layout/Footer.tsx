@@ -5,8 +5,8 @@ const columns = [
   {
     title: "گروه صنعتی توانا",
     links: [
-      { label: "درباره ما", href: "#" },
-      { label: "تماس با ما", href: "#" },
+      { label: "درباره ما", href: "/about" },
+      { label: "تماس با ما", href: "/contact" },
       { label: "فرصت‌های شغلی", href: "#" },
       { label: "وبلاگ کشاورزی", href: "/blog" },
     ],
