@@ -219,7 +219,7 @@ class FavoriteListView(AuthRequired, APIView):
 
     def post(self, request):
         product_id = request.data.get("productId")
-        product = Product.objects.filter(pk=product_id).first()
+        product = Product.objects.filter(pk=product_id, is_active=True).first()
         if product is None:
             return fail("محصول یافت نشد", 404)
         fav, created = Favorite.objects.get_or_create(

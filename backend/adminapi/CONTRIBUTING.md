@@ -69,6 +69,7 @@ centralizes mapping from API names to model fields so create and update cannot d
 
 - `GET/POST products`: filtered/paginated list and creation.
 - `GET/PATCH/DELETE products/<id>`: detail mutation.
+- `PATCH products/<id>/visibility`: hide or show a product without deleting it.
 - `POST products/<id>/image`: multipart gallery upload.
 - `DELETE products/<id>/images/<image-id>`: deletion scoped to its product.
 

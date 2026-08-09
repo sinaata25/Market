@@ -41,6 +41,7 @@ class Product(models.Model):
     description = models.TextField("توضیحات", blank=True)
     warranty = models.CharField("گارانتی", max_length=100, blank=True)
     stock = models.PositiveIntegerField("موجودی", default=10)
+    is_active = models.BooleanField("نمایش در فروشگاه", default=True)
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     category = models.ForeignKey(

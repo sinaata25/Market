@@ -11,6 +11,10 @@ urlpatterns = [
     path("categories/<int:pk>/icon", views.AdminCategoryIconView.as_view()),
     path("products", views.AdminProductListView.as_view()),
     path("products/<int:pk>", views.AdminProductDetailView.as_view()),
+    path(
+        "products/<int:pk>/visibility",
+        views.AdminProductVisibilityView.as_view(),
+    ),
     path("products/<int:pk>/image", views.AdminProductImageView.as_view()),
     path(
         "products/<int:pk>/images/<int:image_id>",

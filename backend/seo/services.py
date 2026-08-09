@@ -156,9 +156,25 @@ def build_sitemap() -> str:
         (m.page_type, m.object_key)
         for m in PageMeta.objects.filter(robots_index=False)
     }
+    active_product_keys = {
+        str(pk) for pk in Product.objects.filter(is_active=True).values_list("pk", flat=True)
+    }
+    active_category_keys = set(
+        Category.objects.filter(is_active=True).values_list("slug", flat=True)
+    )
 
     urls: list[str] = []
     for page in all_pages():
+        if (
+            page["pageType"] == "product"
+            and page["objectKey"] not in active_product_keys
+        ):
+            continue
+        if (
+            page["pageType"] == "category"
+            and page["objectKey"] not in active_category_keys
+        ):
+            continue
         if page["pageType"] == "static" and not s.sitemap_include_static:
             continue
         if page["pageType"] == "category" and not s.sitemap_include_categories:

@@ -34,7 +34,8 @@ sync and require at least one category. Monetary values are integer toman amount
 `old_price` is nullable and represents the pre-discount display price. `colors`,
 `features`, and `specs` are JSON UI content. Rating and rating count are denormalized
 onto the product for fast listing/sorting and must be recomputed after review
-creation/deletion. Stock is mutated transactionally by the orders app.
+creation/deletion. `is_active` controls storefront visibility without deleting the
+product or its history. Stock is mutated transactionally by the orders app.
 
 `ProductImage` provides an ordered one-to-many image gallery. Code returning a
 product should prefetch `categories` and `images`; otherwise `product_dto()` creates

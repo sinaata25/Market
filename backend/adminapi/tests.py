@@ -32,6 +32,7 @@ PRODUCT_RESPONSE_KEYS = {
     "description",
     "warranty",
     "stock",
+    "isActive",
 }
 
 
@@ -128,6 +129,40 @@ class AdminApiContractTests(TestCase):
         product.refresh_from_db()
         self.assertEqual(product.category, second_category)
         self.assertEqual(list(product.categories.all()), [second_category])
+
+    def test_product_visibility_controls_public_access(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+        product_id = created.data["data"]["product"]["id"]
+
+        hidden = self.client.patch(
+            f"/api/admin/products/{product_id}/visibility",
+            {"isActive": False},
+            format="json",
+        )
+
+        self.assertEqual(hidden.status_code, 200)
+        self.assertEqual(hidden.data["data"]["product"]["isActive"], False)
+        self.assertEqual(self.client.get("/api/products").data["data"]["total"], 0)
+        self.assertEqual(self.client.get(f"/api/products/{product_id}").status_code, 404)
+        self.assertEqual(
+            self.client.post(
+                "/api/cart/items",
+                {"productId": product_id, "qty": 1},
+                format="json",
+            ).status_code,
+            404,
+        )
+
+        shown = self.client.patch(
+            f"/api/admin/products/{product_id}/visibility",
+            {"isActive": True},
+            format="json",
+        )
+        self.assertEqual(shown.status_code, 200)
+        self.assertEqual(shown.data["data"]["product"]["isActive"], True)
+        self.assertEqual(self.client.get(f"/api/products/{product_id}").status_code, 200)
 
     def test_new_product_can_receive_an_image_after_creation(self):
         created = self.client.post(

@@ -63,4 +63,5 @@ def product_dto(product: Product) -> dict:
         ),
         "warranty": product.warranty or "۱۲ ماه ضمانت فروشگاه",
         "stock": product.stock,
+        "isActive": product.is_active,
     }

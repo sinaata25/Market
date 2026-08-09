@@ -19,6 +19,7 @@ export type Product = {
   description?: string;
   warranty?: string;
   stock?: number;
+  isActive?: boolean;
 };
 
 export type Category = {

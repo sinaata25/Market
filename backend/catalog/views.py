@@ -57,7 +57,7 @@ class ProductListView(APIView):
     def get(self, request):
         qs = Product.objects.select_related("category").prefetch_related(
             "categories", "images"
-        )
+        ).filter(is_active=True)
 
         category = request.query_params.get("category")
         if category:
@@ -104,7 +104,7 @@ class ProductDetailView(APIView):
             product = (
                 Product.objects.select_related("category")
                 .prefetch_related("categories", "images")
-                .get(pk=pk)
+                .get(pk=pk, is_active=True)
             )
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
@@ -116,6 +116,7 @@ class ProductDetailView(APIView):
         same = list(
             Product.objects.select_related("category")
             .prefetch_related("categories", "images")
+            .filter(is_active=True)
             .filter(
                 Q(category_id__in=category_ids)
                 | Q(categories__id__in=category_ids)
@@ -127,6 +128,7 @@ class ProductDetailView(APIView):
             others = (
                 Product.objects.select_related("category")
                 .prefetch_related("categories", "images")
+                .filter(is_active=True)
                 .exclude(
                     Q(category_id__in=category_ids)
                     | Q(categories__id__in=category_ids)
@@ -194,6 +196,8 @@ class ReviewListCreateView(APIView):
     """فهرست دیدگاه‌های محصول / ثبت دیدگاه (نیازمند ورود)"""
 
     def get(self, request, pk: int):
+        if not Product.objects.filter(pk=pk, is_active=True).exists():
+            return fail("محصول یافت نشد", 404)
         reviews = Review.objects.filter(product_id=pk).select_related("user")
         return ok(
             {
@@ -215,7 +219,7 @@ class ReviewListCreateView(APIView):
             return fail("برای ثبت دیدگاه ابتدا وارد شوید", 401)
 
         try:
-            product = Product.objects.get(pk=pk)
+            product = Product.objects.get(pk=pk, is_active=True)
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
 

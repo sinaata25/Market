@@ -34,7 +34,7 @@ class CartItemsView(APIView):
         qty = ser.validated_data["qty"]
 
         try:
-            product = Product.objects.get(pk=product_id)
+            product = Product.objects.get(pk=product_id, is_active=True)
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
         if product.stock < 1:

@@ -506,6 +506,27 @@ class AdminProductDetailView(StaffRequiredMixin, APIView):
         return ok({"deleted": True})
 
 
+class ProductVisibilitySerializer(serializers.Serializer):
+    isActive = serializers.BooleanField()
+
+
+class AdminProductVisibilityView(StaffRequiredMixin, APIView):
+    def patch(self, request, pk: int):
+        serializer = ProductVisibilitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = (
+            Product.objects.select_related("category")
+            .prefetch_related("categories", "images")
+            .filter(pk=pk)
+            .first()
+        )
+        if product is None:
+            return fail("محصول یافت نشد", 404)
+        product.is_active = serializer.validated_data["isActive"]
+        product.save(update_fields=["is_active"])
+        return ok({"product": admin_product_dto(product)})
+
+
 class AdminProductImageView(StaffRequiredMixin, APIView):
     """آپلود تصویر محصول (multipart/form-data با فیلد file)"""
 

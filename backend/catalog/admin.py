@@ -76,10 +76,18 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["title", "category", "price", "old_price", "stock", "rating"]
+    list_display = [
+        "title",
+        "category",
+        "price",
+        "old_price",
+        "stock",
+        "rating",
+        "is_active",
+    ]
     list_filter = ["categories"]
     search_fields = ["title", "title_en"]
-    list_editable = ["price", "old_price", "stock"]
+    list_editable = ["price", "old_price", "stock", "is_active"]
     filter_horizontal = ["categories"]
     inlines = [ProductImageInline]
 

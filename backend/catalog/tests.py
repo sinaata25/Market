@@ -26,6 +26,7 @@ PRODUCT_RESPONSE_KEYS = {
     "description",
     "warranty",
     "stock",
+    "isActive",
 }
 
 
