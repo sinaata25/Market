@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from common.responses import fail, ok
 
+from .category_tree import descendant_category_ids, visible_category_ids
 from .dto import category_dto, product_dto
 from .models import Category, Product, Review
 
@@ -18,6 +19,11 @@ SORTS = {
 }
 
 
+class CategoryLinkResponseSerializer(serializers.Serializer):
+    slug = serializers.CharField()
+    title = serializers.CharField()
+
+
 class CategoryResponseSerializer(serializers.Serializer):
     slug = serializers.CharField()
     title = serializers.CharField()
@@ -25,7 +31,8 @@ class CategoryResponseSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Relative media URL for a validated PNG or SVG icon, or null.",
     )
-    sub = serializers.ListField(child=serializers.CharField())
+    sub = CategoryLinkResponseSerializer(many=True)
+    isTopLevel = serializers.BooleanField()
 
 
 class CategoryListDataSerializer(serializers.Serializer):
@@ -42,8 +49,12 @@ class CategoryListView(APIView):
 
     @extend_schema(responses={200: CategoryListEnvelopeSerializer})
     def get(self, request):
+        visible_ids = visible_category_ids()
         categories = [
-            category_dto(c) for c in Category.objects.filter(is_active=True)
+            category_dto(category, visible_ids=visible_ids)
+            for category in Category.objects.filter(id__in=visible_ids).prefetch_related(
+                "parents", "children"
+            )
         ]
         return ok({"categories": categories})
 
@@ -61,9 +72,20 @@ class ProductListView(APIView):
 
         category = request.query_params.get("category")
         if category:
-            qs = qs.filter(
-                Q(category__slug=category) | Q(categories__slug=category)
-            ).distinct()
+            visible_ids = visible_category_ids()
+            selected_category = Category.objects.filter(
+                slug=category, id__in=visible_ids
+            ).first()
+            if selected_category is not None:
+                category_ids = descendant_category_ids(
+                    selected_category.id, allowed_ids=visible_ids
+                )
+                qs = qs.filter(
+                    Q(category_id__in=category_ids)
+                    | Q(categories__id__in=category_ids)
+                ).distinct()
+            else:
+                qs = qs.none()
 
         search = request.query_params.get("search")
         if search:

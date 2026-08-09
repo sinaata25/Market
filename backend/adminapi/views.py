@@ -15,7 +15,8 @@ from rest_framework import serializers
 from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
-from catalog.dto import category_dto, product_dto
+from catalog.category_tree import visible_category_ids
+from catalog.dto import category_dto, category_summary, product_dto
 from catalog.icon_files import schedule_category_icon_delete
 from catalog.models import Category, Product, ProductImage, Review
 from catalog.validators import validate_category_icon
@@ -243,22 +244,58 @@ class AdminOrderDetailView(StaffRequiredMixin, APIView):
 
 class CategoryWriteSerializer(serializers.ModelSerializer):
     isActive = serializers.BooleanField(source="is_active", required=False)
-    sub = serializers.ListField(
-        child=serializers.CharField(max_length=100),
+    parentIds = serializers.PrimaryKeyRelatedField(
+        source="parents",
+        queryset=Category.objects.all(),
+        many=True,
         required=False,
-        default=list,
-        allow_empty=True,
     )
 
     class Meta:
         model = Category
-        fields = ["title", "slug", "sub", "isActive"]
+        fields = ["title", "slug", "parentIds", "isActive"]
+
+    def validate_parentIds(self, parents):
+        category = self.instance
+        if category is None:
+            return parents
+        parent_ids = {parent.pk for parent in parents}
+        if category.pk in parent_ids:
+            raise serializers.ValidationError(
+                "یک دسته‌بندی نمی‌تواند والد خودش باشد"
+            )
+
+        descendants = {category.pk}
+        frontier = {category.pk}
+        while frontier:
+            child_ids = set(
+                Category.objects.filter(parents__id__in=frontier)
+                .exclude(id__in=descendants)
+                .distinct()
+                .values_list("id", flat=True)
+            )
+            descendants.update(child_ids)
+            frontier = child_ids
+        if parent_ids & descendants:
+            raise serializers.ValidationError(
+                "این رابطه باعث ایجاد چرخه در دسته‌بندی‌ها می‌شود"
+            )
+        return parents
 
 
-def admin_category_dto(category: Category) -> dict:
+def admin_category_dto(
+    category: Category, *, visible_ids: set[int] | None = None
+) -> dict:
+    if visible_ids is None:
+        visible_ids = visible_category_ids()
     data = category_dto(category)
     data["id"] = category.id
     data["isActive"] = category.is_active
+    data["effectiveIsActive"] = category.id in visible_ids
+    data["parents"] = [
+        {"id": parent.id, **category_summary(parent)}
+        for parent in category.parents.all()
+    ]
     data["productCount"] = (
         category.product_count
         if hasattr(category, "product_count")
@@ -269,18 +306,33 @@ def admin_category_dto(category: Category) -> dict:
 
 class AdminCategoryListView(StaffRequiredMixin, APIView):
     def get(self, request):
-        categories = Category.objects.annotate(
-            product_count=Count("categorized_products", distinct=True)
+        visible_ids = visible_category_ids()
+        categories = (
+            Category.objects.annotate(
+                product_count=Count("categorized_products", distinct=True)
+            )
+            .prefetch_related("parents", "children")
         )
         return ok(
-            {"categories": [admin_category_dto(item) for item in categories]}
+            {
+                "categories": [
+                    admin_category_dto(item, visible_ids=visible_ids)
+                    for item in categories
+                ]
+            }
         )
 
     def post(self, request):
         serializer = CategoryWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         category = serializer.save()
-        category.product_count = 0
+        category = (
+            Category.objects.annotate(
+                product_count=Count("categorized_products", distinct=True)
+            )
+            .prefetch_related("parents", "children")
+            .get(pk=category.pk)
+        )
         return ok({"category": admin_category_dto(category)}, status=201)
 
 
@@ -294,6 +346,13 @@ class AdminCategoryDetailView(StaffRequiredMixin, APIView):
         )
         serializer.is_valid(raise_exception=True)
         category = serializer.save()
+        category = (
+            Category.objects.annotate(
+                product_count=Count("categorized_products", distinct=True)
+            )
+            .prefetch_related("parents", "children")
+            .get(pk=category.pk)
+        )
         return ok({"category": admin_category_dto(category)})
 
     def delete(self, request, pk: int):
@@ -303,6 +362,11 @@ class AdminCategoryDetailView(StaffRequiredMixin, APIView):
         if category.products.exists() or category.categorized_products.exists():
             return fail(
                 "این دسته‌بندی دارای محصول است و تا زمان انتقال یا حذف محصولات قابل حذف نیست",
+                409,
+            )
+        if category.children.exists():
+            return fail(
+                "این دسته‌بندی والد دسته‌های دیگر است؛ ابتدا رابطه والد را تغییر دهید",
                 409,
             )
         icon_name = category.icon.name if category.icon else ""

@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.html import format_html
 
@@ -12,13 +13,46 @@ class ProductImageInline(admin.TabularInline):
     extra = 1
 
 
+class CategoryAdminForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = "__all__"
+
+    def clean_parents(self):
+        parents = self.cleaned_data.get("parents")
+        category = self.instance
+        if not category.pk or parents is None:
+            return parents
+
+        parent_ids = set(parents.values_list("id", flat=True))
+        if category.pk in parent_ids:
+            raise ValidationError("یک دسته‌بندی نمی‌تواند والد خودش باشد")
+
+        descendants = {category.pk}
+        frontier = {category.pk}
+        while frontier:
+            child_ids = set(
+                Category.objects.filter(parents__id__in=frontier)
+                .exclude(id__in=descendants)
+                .distinct()
+                .values_list("id", flat=True)
+            )
+            descendants.update(child_ids)
+            frontier = child_ids
+        if parent_ids & descendants:
+            raise ValidationError("این رابطه باعث ایجاد چرخه در دسته‌بندی‌ها می‌شود")
+        return parents
+
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
+    form = CategoryAdminForm
     list_display = ["icon_preview", "title", "slug", "is_active"]
     list_editable = ["is_active"]
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ["icon_preview"]
     search_fields = ["title"]
+    filter_horizontal = ["parents"]
     formfield_overrides = {
         models.FileField: {
             "widget": forms.ClearableFileInput(
@@ -72,6 +106,21 @@ class CategoryAdmin(admin.ModelAdmin):
         super().delete_queryset(request, queryset)
         for name, storage, using in icons:
             schedule_category_icon_delete(name, storage, using=using)
+
+    def has_delete_permission(self, request, obj=None):
+        allowed = super().has_delete_permission(request, obj)
+        if not allowed or obj is None:
+            return allowed
+        return not (
+            obj.products.exists()
+            or obj.categorized_products.exists()
+            or obj.children.exists()
+        )
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
 
 
 @admin.register(Product)

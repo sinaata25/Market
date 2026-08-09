@@ -8,19 +8,21 @@ import type { Category } from "@/lib/products";
 type AdminCategory = Category & {
   id: number;
   isActive: boolean;
+  effectiveIsActive: boolean;
+  parents: { id: number; slug: string; title: string }[];
   productCount: number;
 };
 
 type CategoryForm = {
   title: string;
   slug: string;
-  subcategories: string;
+  parentIds: number[];
 };
 
 const EMPTY_FORM: CategoryForm = {
   title: "",
   slug: "",
-  subcategories: "",
+  parentIds: [],
 };
 
 const INPUT_CLASS =
@@ -58,8 +60,22 @@ export default function AdminCategoriesPage() {
   }, [notify]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let ignore = false;
+    api
+      .get<{ categories: AdminCategory[] }>("/api/admin/categories")
+      .then((result) => {
+        if (ignore) return;
+        if (result.ok) {
+          setCategories(result.data?.categories ?? []);
+        } else {
+          notify(result.error ?? "دریافت دسته‌بندی‌ها انجام نشد");
+        }
+        setLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [notify]);
 
   function resetForm() {
     setForm(EMPTY_FORM);
@@ -73,11 +89,20 @@ export default function AdminCategoriesPage() {
     setForm({
       title: category.title,
       slug: category.slug,
-      subcategories: category.sub.join("\n"),
+      parentIds: category.parents.map((parent) => parent.id),
     });
     setIcon(null);
     if (fileInput.current) fileInput.current.value = "";
     formSection.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function toggleParent(parentId: number) {
+    setForm((current) => ({
+      ...current,
+      parentIds: current.parentIds.includes(parentId)
+        ? current.parentIds.filter((id) => id !== parentId)
+        : [...current.parentIds, parentId],
+    }));
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -88,10 +113,7 @@ export default function AdminCategoriesPage() {
     const payload = {
       title: form.title.trim(),
       slug: form.slug.trim(),
-      sub: form.subcategories
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean),
+      parentIds: form.parentIds,
     };
     const result = editing
       ? await api.patch<{ category: AdminCategory }>(
@@ -136,8 +158,14 @@ export default function AdminCategoriesPage() {
   async function remove(category: AdminCategory) {
     const warning = category.productCount
       ? `این دسته‌بندی ${faNum(category.productCount)} محصول دارد و قابل حذف نیست.`
-      : `دسته‌بندی «${category.title}» حذف شود؟ این کار قابل بازگشت نیست.`;
+      : category.sub.length
+        ? "این دسته‌بندی والد دسته‌های دیگری است؛ ابتدا والد آن دسته‌ها را تغییر دهید."
+        : `دسته‌بندی «${category.title}» حذف شود؟ این کار قابل بازگشت نیست.`;
     if (category.productCount) {
+      notify(warning);
+      return;
+    }
+    if (category.sub.length) {
       notify(warning);
       return;
     }
@@ -174,11 +202,6 @@ export default function AdminCategoriesPage() {
       { isActive: !category.isActive }
     );
     if (result.ok && result.data) {
-      setCategories((current) =>
-        current.map((item) =>
-          item.id === category.id ? result.data!.category : item
-        )
-      );
       if (editing?.id === category.id) {
         setEditing(result.data.category);
       }
@@ -187,6 +210,7 @@ export default function AdminCategoriesPage() {
           ? "دسته‌بندی از فروشگاه پنهان شد ✅"
           : "دسته‌بندی در فروشگاه نمایش داده شد ✅"
       );
+      await load();
     } else {
       notify(result.error ?? "تغییر وضعیت دسته‌بندی انجام نشد");
     }
@@ -268,23 +292,45 @@ export default function AdminCategoriesPage() {
             />
           </label>
 
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-slate-600">
-              زیردسته‌ها
-            </span>
-            <textarea
-              rows={5}
-              value={form.subcategories}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  subcategories: event.target.value,
-                }))
-              }
-              className={`${INPUT_CLASS} resize-y`}
-              placeholder={"هر زیردسته را در یک خط وارد کنید\nبیل و کلنگ\nقیچی باغبانی"}
-            />
-          </label>
+          <fieldset className="lg:col-span-2">
+            <legend className="mb-1.5 text-xs font-medium text-slate-600">
+              دسته‌بندی‌های والد (اختیاری)
+            </legend>
+            <div className="grid max-h-52 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-3">
+              {categories.filter((category) => category.id !== editing?.id)
+                .length === 0 ? (
+                <p className="text-xs text-slate-400">
+                  دسته‌بندی دیگری برای انتخاب وجود ندارد
+                </p>
+              ) : (
+                categories
+                  .filter((category) => category.id !== editing?.id)
+                  .map((category) => (
+                    <label
+                      key={category.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-600"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.parentIds.includes(category.id)}
+                        onChange={() => toggleParent(category.id)}
+                        className="h-4 w-4 accent-brand-600"
+                      />
+                      <span>{category.title}</span>
+                      {!category.effectiveIsActive && (
+                        <span className="mr-auto text-[10px] text-slate-400">
+                          پنهان
+                        </span>
+                      )}
+                    </label>
+                  ))
+              )}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
+              بدون والد، دسته در منوی اصلی نمایش داده می‌شود. با انتخاب چند والد،
+              این دسته زیر همه آن‌ها قرار می‌گیرد.
+            </p>
+          </fieldset>
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium text-slate-600">
@@ -318,11 +364,12 @@ export default function AdminCategoriesPage() {
       </section>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-right text-[11px] text-slate-400">
               <th className="px-5 py-3 font-medium">دسته‌بندی</th>
               <th className="px-3 py-3 font-medium">نامک</th>
+              <th className="px-3 py-3 font-medium">والدها</th>
               <th className="px-3 py-3 font-medium">زیردسته‌ها</th>
               <th className="px-3 py-3 font-medium">محصولات</th>
               <th className="px-3 py-3 font-medium">وضعیت نمایش</th>
@@ -331,15 +378,15 @@ export default function AdminCategoriesPage() {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={6} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={7} text="در حال بارگذاری..." />
             ) : categories.length === 0 ? (
-              <EmptyRow colSpan={6} text="دسته‌بندی‌ای وجود ندارد" />
+              <EmptyRow colSpan={7} text="دسته‌بندی‌ای وجود ندارد" />
             ) : (
               categories.map((category) => (
                 <tr
                   key={category.id}
                   className={`hover:bg-slate-50/60 ${
-                    category.isActive ? "" : "bg-slate-50/50"
+                    category.effectiveIsActive ? "" : "bg-slate-50/50"
                   }`}
                 >
                   <td className="px-5 py-3">
@@ -356,17 +403,29 @@ export default function AdminCategoriesPage() {
                           "🗂️"
                         )}
                       </span>
-                      <span className="text-xs font-medium text-slate-700">
-                        {category.title}
-                      </span>
+                      <div>
+                        <span className="block text-xs font-medium text-slate-700">
+                          {category.title}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-slate-400">
+                          {category.isTopLevel ? "دسته اصلی" : "فقط زیردسته"}
+                        </span>
+                      </div>
                     </div>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-400" dir="ltr">
                     {category.slug}
                   </td>
+                  <td className="max-w-[200px] px-3 py-3 text-xs text-slate-500">
+                    {category.parents.length
+                      ? category.parents.map((parent) => parent.title).join("، ")
+                      : "—"}
+                  </td>
                   <td className="max-w-[240px] px-3 py-3 text-xs text-slate-500">
                     <p className="line-clamp-2">
-                      {category.sub.length ? category.sub.join("، ") : "—"}
+                      {category.sub.length
+                        ? category.sub.map((child) => child.title).join("، ")
+                        : "—"}
                     </p>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-500 font-num">
@@ -375,12 +434,18 @@ export default function AdminCategoriesPage() {
                   <td className="px-3 py-3">
                     <span
                       className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
-                        category.isActive
+                        category.effectiveIsActive
                           ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
+                          : category.isActive
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-slate-100 text-slate-500"
                       }`}
                     >
-                      {category.isActive ? "نمایش داده می‌شود" : "پنهان است"}
+                      {category.effectiveIsActive
+                        ? "نمایش داده می‌شود"
+                        : category.isActive
+                          ? "پنهان توسط والد"
+                          : "پنهان شده"}
                     </span>
                   </td>
                   <td className="px-5 py-3">

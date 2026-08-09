@@ -237,7 +237,7 @@ class AdminApiContractTests(TestCase):
             {
                 "title": "آبیاری",
                 "slug": "irrigation",
-                "sub": ["پمپ آب", "اتصالات"],
+                "parentIds": [self.category.id],
             },
             format="json",
         )
@@ -252,11 +252,17 @@ class AdminApiContractTests(TestCase):
                 "title",
                 "icon",
                 "sub",
+                "parents",
+                "isTopLevel",
                 "isActive",
+                "effectiveIsActive",
                 "productCount",
             },
         )
         self.assertEqual(category["isActive"], True)
+        self.assertEqual(category["effectiveIsActive"], True)
+        self.assertEqual(category["isTopLevel"], False)
+        self.assertEqual(category["parents"][0]["id"], self.category.id)
         self.assertEqual(category["productCount"], 0)
 
         category_id = category["id"]
@@ -264,7 +270,6 @@ class AdminApiContractTests(TestCase):
             f"/api/admin/categories/{category_id}",
             {
                 "title": "تجهیزات آبیاری",
-                "sub": ["پمپ"],
                 "isActive": False,
             },
             format="json",
@@ -277,6 +282,9 @@ class AdminApiContractTests(TestCase):
             updated.data["data"]["category"]["title"], "تجهیزات آبیاری"
         )
         self.assertEqual(updated.data["data"]["category"]["isActive"], False)
+        self.assertEqual(
+            updated.data["data"]["category"]["effectiveIsActive"], False
+        )
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(len(listed.data["data"]["categories"]), 2)
         self.assertEqual(
@@ -291,7 +299,7 @@ class AdminApiContractTests(TestCase):
     def test_category_validation_and_protected_delete_are_controlled(self):
         duplicate = self.client.post(
             "/api/admin/categories",
-            {"title": self.category.title, "slug": "other", "sub": []},
+            {"title": self.category.title, "slug": "other", "parentIds": []},
             format="json",
         )
         Product.objects.create(
@@ -308,6 +316,118 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(protected.status_code, 409)
         self.assertEqual(protected.data["ok"], False)
         self.assertTrue(Category.objects.filter(pk=self.category.id).exists())
+
+    def test_shared_subcategory_visibility_and_cycle_validation(self):
+        second_parent = Category.objects.create(
+            slug="irrigation", title="آبیاری"
+        )
+        child = Category.objects.create(slug="pumps", title="پمپ آب")
+        child.parents.set([self.category, second_parent])
+        product = Product.objects.create(
+            title="پمپ آب",
+            category=child,
+            price=100_000,
+        )
+        product.categories.add(child)
+
+        public = self.client.get("/api/categories").data["data"]["categories"]
+        by_slug = {item["slug"]: item for item in public}
+        self.assertEqual(by_slug["pumps"]["isTopLevel"], False)
+        self.assertEqual(by_slug["tools"]["sub"][0]["slug"], "pumps")
+        self.assertEqual(by_slug["irrigation"]["sub"][0]["slug"], "pumps")
+        self.assertEqual(
+            self.client.get("/api/products?category=tools").data["data"]["total"],
+            1,
+        )
+        self.assertEqual(
+            self.client.get("/api/products?category=irrigation").data["data"][
+                "total"
+            ],
+            1,
+        )
+
+        self.client.patch(
+            f"/api/admin/categories/{self.category.id}",
+            {"isActive": False},
+            format="json",
+        )
+        visible_slugs = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(visible_slugs, {"irrigation", "pumps"})
+
+        self.client.patch(
+            f"/api/admin/categories/{second_parent.id}",
+            {"isActive": False},
+            format="json",
+        )
+        self.assertEqual(
+            self.client.get("/api/categories").data["data"]["categories"], []
+        )
+
+        self.client.patch(
+            f"/api/admin/categories/{self.category.id}",
+            {"isActive": True},
+            format="json",
+        )
+        restored_slugs = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(restored_slugs, {"tools", "pumps"})
+
+        self.client.patch(
+            f"/api/admin/categories/{child.id}",
+            {"isActive": False},
+            format="json",
+        )
+        explicitly_hidden = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(explicitly_hidden, {"tools"})
+
+        cycle = self.client.patch(
+            f"/api/admin/categories/{second_parent.id}",
+            {"parentIds": [child.id]},
+            format="json",
+        )
+        self.assertEqual(cycle.status_code, 400)
+        self.assertEqual(cycle.data["ok"], False)
+
+    def test_nested_subcategory_requires_an_active_path_from_a_root(self):
+        child = Category.objects.create(slug="garden", title="باغبانی")
+        grandchild = Category.objects.create(slug="shovels", title="بیل‌ها")
+        child.parents.add(self.category)
+        grandchild.parents.add(child)
+
+        visible = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(visible, {"tools", "garden", "shovels"})
+
+        self.client.patch(
+            f"/api/admin/categories/{child.id}",
+            {"isActive": False},
+            format="json",
+        )
+        visible = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(visible, {"tools"})
 
     def test_non_staff_cannot_manage_categories(self):
         non_staff = get_user_model().objects.create_user(phone="09120000000")

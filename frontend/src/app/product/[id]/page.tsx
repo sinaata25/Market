@@ -4,6 +4,7 @@ import {
   getProductById,
   getProductBySlug,
   getRelatedProducts,
+  getCategories,
 } from "@/lib/catalog";
 import { breadcrumbSchema, fetchSeo, toMetadata } from "@/lib/seo";
 import type { Product } from "@/lib/products";
@@ -53,13 +54,23 @@ export default async function ProductPage({
   if (!resolved) notFound();
 
   const { product, related } = resolved;
-  const seo = await fetchSeo("product", String(product.id));
+  const [seo, storefrontCategories] = await Promise.all([
+    fetchSeo("product", String(product.id)),
+    getCategories(),
+  ]);
   const hasImages = Boolean(product.images?.length);
-  const productCategories = product.categories?.length
+  const assignedCategories = product.categories?.length
     ? product.categories
     : product.categorySlug
       ? [{ slug: product.categorySlug, title: product.category }]
       : [];
+  const visibleCategorySlugs = new Set(
+    storefrontCategories.map((category) => category.slug)
+  );
+  const productCategories = assignedCategories.filter((category) =>
+    visibleCategorySlugs.has(category.slug)
+  );
+  const breadcrumbCategory = productCategories[0];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5">
@@ -69,10 +80,14 @@ export default async function ProductPage({
         <JsonLd
           data={breadcrumbSchema(seo.site, [
             { name: "خانه", path: "/" },
-            {
-              name: product.category,
-              path: `/category/${product.categorySlug}`,
-            },
+            ...(breadcrumbCategory
+              ? [
+                  {
+                    name: breadcrumbCategory.title,
+                    path: `/category/${breadcrumbCategory.slug}`,
+                  },
+                ]
+              : []),
             { name: product.title, path: `/product/${product.id}` },
           ])}
         />
@@ -83,13 +98,17 @@ export default async function ProductPage({
         <Link href="/" className="hover:text-brand-600">
           خانه
         </Link>
-        <span>/</span>
-        <Link
-          href={`/category/${product.categorySlug}`}
-          className="hover:text-brand-600"
-        >
-          {product.category}
-        </Link>
+        {breadcrumbCategory && (
+          <>
+            <span>/</span>
+            <Link
+              href={`/category/${breadcrumbCategory.slug}`}
+              className="hover:text-brand-600"
+            >
+              {breadcrumbCategory.title}
+            </Link>
+          </>
+        )}
         <span>/</span>
         <span className="text-slate-600">{product.title}</span>
       </nav>
@@ -130,18 +149,22 @@ export default async function ProductPage({
                 ({product.ratingCount.toLocaleString("fa-IR")} دیدگاه)
               </span>
             </span>
-            <span className="text-slate-300">|</span>
-            <span className="flex flex-wrap items-center gap-2">
-              {productCategories.map((category) => (
-                <Link
-                  key={category.slug}
-                  href={`/category/${category.slug}`}
-                  className="text-brand-600 hover:underline"
-                >
-                  {category.title}
-                </Link>
-              ))}
-            </span>
+            {productCategories.length > 0 && (
+              <>
+                <span className="text-slate-300">|</span>
+                <span className="flex flex-wrap items-center gap-2">
+                  {productCategories.map((category) => (
+                    <Link
+                      key={category.slug}
+                      href={`/category/${category.slug}`}
+                      className="text-brand-600 hover:underline"
+                    >
+                      {category.title}
+                    </Link>
+                  ))}
+                </span>
+              </>
+            )}
           </div>
 
           {/* انتخاب رنگ */}

@@ -3,6 +3,7 @@
 import json
 
 from catalog.models import Category, Product
+from catalog.category_tree import visible_category_ids
 
 from .models import PageMeta, SeoSettings
 
@@ -160,7 +161,9 @@ def build_sitemap() -> str:
         str(pk) for pk in Product.objects.filter(is_active=True).values_list("pk", flat=True)
     }
     active_category_keys = set(
-        Category.objects.filter(is_active=True).values_list("slug", flat=True)
+        Category.objects.filter(id__in=visible_category_ids()).values_list(
+            "slug", flat=True
+        )
     )
 
     urls: list[str] = []

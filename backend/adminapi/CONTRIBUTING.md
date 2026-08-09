@@ -58,7 +58,11 @@ separate multipart icon endpoint. Category deletion returns a controlled conflic
 while products reference it. Icon replacement/removal uses catalog's deferred,
 unreferenced-file cleanup helper; do not delete storage objects before the database
 change commits. Staff can toggle `isActive`; inactive categories stay available in
-the management API but are omitted from the public category feed.
+the management API but are omitted from the public category feed. `parentIds`
+assigns zero or more real parent categories. Updates reject self-links and cycles;
+categories with children cannot be deleted until those relationships are moved.
+Responses expose both explicit `isActive` and derived `effectiveIsActive` so the
+dashboard can distinguish a manually hidden category from one hidden by an ancestor.
 
 `ProductWriteSerializer` defines the dashboard write contract, including camelCase
 names and JSON content. `categorySlugs` accepts one or more unique category slugs;

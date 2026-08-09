@@ -402,9 +402,11 @@ export default function ProductForm({ productId }: { productId?: number }) {
                         className="h-4 w-4 accent-brand-600"
                       />
                       <span>{category.title}</span>
-                      {category.isActive === false && (
+                      {category.effectiveIsActive === false && (
                         <span className="mr-auto rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500">
-                          پنهان
+                          {category.isActive === false
+                            ? "پنهان"
+                            : "پنهان توسط والد"}
                         </span>
                       )}
                     </label>

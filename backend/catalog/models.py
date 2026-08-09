@@ -16,7 +16,13 @@ class Category(models.Model):
         validators=[validate_category_icon],
         help_text="فایل PNG یا SVG ایمن، حداکثر ۵ مگابایت",
     )
-    sub = models.JSONField("زیردسته‌ها", default=list, blank=True)
+    parents = models.ManyToManyField(
+        "self",
+        verbose_name="دسته‌بندی‌های والد",
+        symmetrical=False,
+        related_name="children",
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "دسته‌بندی"

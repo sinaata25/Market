@@ -9,12 +9,25 @@ DEFAULT_FEATURES = [
 ]
 
 
-def category_dto(category: Category) -> dict:
+def category_summary(category: Category) -> dict:
+    return {
+        "slug": category.slug,
+        "title": category.title,
+    }
+
+
+def category_dto(
+    category: Category, *, visible_ids: set[int] | None = None
+) -> dict:
+    children = list(category.children.all())
+    if visible_ids is not None:
+        children = [child for child in children if child.pk in visible_ids]
     return {
         "slug": category.slug,
         "title": category.title,
         "icon": category.icon.url if category.icon else None,
-        "sub": category.sub or [],
+        "sub": [category_summary(child) for child in children],
+        "isTopLevel": not category.parents.exists(),
     }
 
 

@@ -21,6 +21,9 @@ export default async function Home() {
       getProducts({ onlyDiscounted: true, perPage: 6 }),
       fetchSeo("static", "/"),
     ]);
+  const rootCategories = categories.filter(
+    (category) => category.isTopLevel !== false
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -53,7 +56,7 @@ export default async function Home() {
       <section className="mt-8">
         <h2 className="mb-4 text-lg font-bold text-slate-800">دسته‌بندی‌ها</h2>
         <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
-          {categories.map((c) => (
+          {rootCategories.map((c) => (
             <Link
               key={c.slug}
               href={`/category/${c.slug}`}

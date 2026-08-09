@@ -21,11 +21,14 @@ the cart, profile, and admin APIs.
 
 ## Data model
 
-`Category.slug` is the public category identifier. `sub` is JSON because the UI
-expects a lightweight list rather than normalized subcategory rows. `is_active`
-controls whether the category appears in the public category feed; staff APIs
-continue to return all categories. `icon` accepts only validated `.png` or `.svg`
-uploads and may be empty.
+`Category.slug` is the public category identifier. `parents` is a directed
+self-referential many-to-many relation, so a category can be a child of multiple
+parents. Categories without parents are roots; child-only categories are rendered
+only below their parents. `is_active` controls explicit visibility. Effective
+public visibility requires an all-active path from a root, so hiding a parent also
+hides its exclusive descendants while shared descendants remain reachable through
+another active parent. Staff APIs continue to return every category. `icon` accepts
+only validated `.png` or `.svg` uploads and may be empty.
 
 `Product.category` is its primary category, retained for stable breadcrumbs, SEO,
 and backward-compatible response fields. `Product.categories` contains every
@@ -81,7 +84,8 @@ cleanup problems, not turn a completed update into a false API failure.
 
 ## Public APIs
 
-- `GET /api/categories`: active categories through `category_dto()`.
+- `GET /api/categories`: effectively visible roots and descendants through
+  `category_dto()`; relationships contain real category slugs and titles.
 - `GET /api/products`: optional category/search/discount filters, allow-listed
   sort keys, and bounded pagination (`perPage` cannot exceed 50).
 - `GET /api/products/<id>`: product plus up to four related products, preferring
@@ -119,3 +123,4 @@ production startup depend on demo assets.
 5. Never weaken SVG/PNG content validation to MIME/extension checks.
 6. Delete replaced files only after transaction commit and only if unreferenced.
 7. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.
+8. Keep the category graph acyclic in every write surface, including Django admin.
