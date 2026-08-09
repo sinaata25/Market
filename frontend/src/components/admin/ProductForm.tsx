@@ -50,6 +50,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
   const [loading, setLoading] = useState(editingExistingProduct);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [changingVisibility, setChangingVisibility] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
     null
   );
@@ -97,6 +99,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               warranty: p.warranty ?? "",
             });
             setImages(p.imageItems ?? []);
+            setIsActive(p.isActive !== false);
           }
           setLoading(false);
         });
@@ -148,6 +151,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
     if (!isEdit) {
       const newProductId = res.data.product.id;
       setCreatedProductId(newProductId);
+      setIsActive(res.data.product.isActive !== false);
 
       const failedFiles: File[] = [];
       let latestImages: ImageItem[] = [];
@@ -231,6 +235,32 @@ export default function ProductForm({ productId }: { productId?: number }) {
     }
   }
 
+  async function toggleVisibility() {
+    if (activeProductId === undefined || changingVisibility) return;
+    setChangingVisibility(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/visibility`,
+      { isActive: !isActive }
+    );
+    setChangingVisibility(false);
+    if (result.ok && result.data) {
+      const nextVisibility = result.data.product.isActive !== false;
+      setIsActive(nextVisibility);
+      setMessage({
+        ok: true,
+        text: nextVisibility
+          ? "محصول در فروشگاه نمایش داده شد ✅"
+          : "محصول از فروشگاه پنهان شد ✅",
+      });
+    } else {
+      setMessage({
+        ok: false,
+        text: result.error ?? "تغییر وضعیت محصول انجام نشد",
+      });
+    }
+  }
+
   if (loading) {
     return (
       <div className="grid min-h-[40vh] place-items-center text-sm text-slate-400">
@@ -308,6 +338,47 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
         {/* ستون کناری */}
         <div className="space-y-4">
+          {isEdit && (
+            <div className="rounded-2xl border border-slate-100 bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-slate-600">
+                    وضعیت نمایش محصول
+                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                      isActive
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isActive ? "نمایش داده می‌شود" : "پنهان است"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={changingVisibility}
+                  onClick={toggleVisibility}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isActive
+                      ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  }`}
+                >
+                  {changingVisibility
+                    ? "در حال تغییر..."
+                    : isActive
+                      ? "پنهان کردن"
+                      : "نمایش دادن"}
+                </button>
+              </div>
+              <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                محصول پنهان در فروشگاه نمایش داده نمی‌شود، اما اطلاعات آن در پنل
+                مدیریت باقی می‌ماند.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
