@@ -1,13 +1,15 @@
 """پروفایل کاربر: اطلاعات شخصی، آدرس‌ها، علاقه‌مندی‌ها، خلاصه فعالیت"""
 
 from django.db.models import Count, Sum
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from catalog.dto import product_dto
-from catalog.models import Product, Review
-from catalog.reviews import recompute_product_rating
+from catalog.feedback import verified_purchase_pairs
+from catalog.models import Product, ProductComment, ProductRating
 from common.responses import fail, ok
 from common.utils import is_valid_iran_mobile, normalize_phone
 from orders.models import Order
@@ -69,7 +71,8 @@ class ProfileView(AuthRequired, APIView):
                     "totalSpent": paid.aggregate(s=Sum("total_price"))["s"] or 0,
                     "addressesCount": user.addresses.count(),
                     "favoritesCount": user.favorites.count(),
-                    "reviewsCount": Review.objects.filter(user=user).count(),
+                    "commentsCount": ProductComment.objects.filter(user=user).count(),
+                    "ratingsCount": ProductRating.objects.filter(user=user).count(),
                 },
             }
         )
@@ -245,34 +248,45 @@ class FavoriteCheckView(AuthRequired, APIView):
 # ─── دیدگاه‌های من ───────────────────────────────────────────
 
 
-class MyReviewsView(AuthRequired, APIView):
+class MyCommentsView(AuthRequired, APIView):
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
-        reviews = Review.objects.filter(user=request.user).select_related(
-            "product"
+        comments = list(
+            ProductComment.objects.filter(user=request.user).select_related("product")
+        )
+        verified_pairs = verified_purchase_pairs(
+            {(comment.product_id, comment.user_id) for comment in comments}
         )
         return ok(
             {
-                "reviews": [
+                "comments": [
                     {
-                        "id": r.id,
-                        "rating": r.rating,
-                        "text": r.text,
-                        "createdAt": r.created_at.isoformat(),
-                        "productId": r.product_id,
-                        "productTitle": r.product.title,
-                        "isPublished": r.is_published,
+                        "id": comment.id,
+                        "content": comment.content,
+                        "type": comment.comment_type,
+                        "status": comment.moderation_status,
+                        "parentId": comment.parent_id,
+                        "createdAt": comment.created_at.isoformat(),
+                        "productId": comment.product_id,
+                        "productTitle": comment.product.title,
+                        "isVerifiedPurchase": (
+                            (comment.product_id, comment.user_id) in verified_pairs
+                        ),
                     }
-                    for r in reviews
+                    for comment in comments
                 ]
             }
         )
 
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def delete(self, request):
-        review_id = request.data.get("reviewId")
-        review = Review.objects.filter(pk=review_id, user=request.user).first()
-        if review is None:
+        comment_id = request.data.get("commentId")
+        comment = ProductComment.objects.filter(
+            pk=comment_id, user=request.user
+        ).first()
+        if comment is None:
             return fail("دیدگاه یافت نشد", 404)
-        product_id = review.product_id
-        review.delete()
-        recompute_product_rating(product_id)
+        if comment.replies.exists():
+            return fail("دیدگاهی که پاسخ دارد قابل حذف نیست", 409)
+        comment.delete()
         return ok({"deleted": True})

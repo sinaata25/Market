@@ -132,7 +132,8 @@ All paths below are under `/api/auth/`.
 - `GET/PATCH profile`: profile summary or name update.
 - `GET/POST addresses`, `PATCH/DELETE addresses/<id>`: owned addresses only.
 - `GET/POST favorites`, `GET favorites/<product-id>`: list/add/check favorites.
-- `GET/DELETE my-reviews`: list or delete the authenticated user's review.
+- `GET/DELETE my-comments`: list or delete the authenticated user's own comments,
+  questions, and replies with moderation and verified-purchase state.
 
 Serializers validate request input. The `*ResponseSerializer` classes mainly
 document response envelopes for OpenAPI; response dictionaries are produced by
@@ -154,4 +155,3 @@ document response envelopes for OpenAPI; response dictionaries are produced by
 5. Keep CSRF and both throttle dimensions on send and verify endpoints.
 6. Query profile resources through `request.user` to prevent horizontal access.
 7. Run `./.venv/bin/python manage.py test accounts --verbosity 2`.
-

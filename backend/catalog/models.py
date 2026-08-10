@@ -94,33 +94,93 @@ class ProductImage(models.Model):
         return f"{self.product} — {self.order}"
 
 
-class Review(models.Model):
+class ProductRating(models.Model):
     rating = models.PositiveSmallIntegerField(
         "امتیاز", validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
-    text = models.TextField("متن")
-    is_published = models.BooleanField("منتشر شده", default=False)
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+    updated_at = models.DateTimeField("به‌روزرسانی", auto_now=True)
 
     product = models.ForeignKey(
-        Product, verbose_name="محصول", on_delete=models.CASCADE, related_name="reviews"
+        Product, verbose_name="محصول", on_delete=models.CASCADE, related_name="ratings"
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="کاربر",
         on_delete=models.CASCADE,
-        related_name="reviews",
+        related_name="product_ratings",
     )
 
     class Meta:
-        verbose_name = "دیدگاه"
-        verbose_name_plural = "دیدگاه‌ها"
-        ordering = ["-created_at"]
+        verbose_name = "امتیاز محصول"
+        verbose_name_plural = "امتیازهای محصول"
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "product"], name="unique_user_product_review"
+                fields=["user", "product"], name="unique_user_product_rating"
             )
         ]
 
     def __str__(self) -> str:
         return f"{self.product} — {self.rating}★"
+
+
+class ProductComment(models.Model):
+    class Type(models.TextChoices):
+        COMMENT = "comment", "دیدگاه"
+        QUESTION = "question", "پرسش"
+
+    class ModerationStatus(models.TextChoices):
+        PENDING = "pending", "در انتظار تایید"
+        APPROVED = "approved", "تایید شده"
+        REJECTED = "rejected", "رد شده"
+
+    content = models.TextField("متن")
+    comment_type = models.CharField(
+        "نوع",
+        max_length=16,
+        choices=Type.choices,
+        default=Type.COMMENT,
+    )
+    moderation_status = models.CharField(
+        "وضعیت بررسی",
+        max_length=16,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.PENDING,
+    )
+    created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+    updated_at = models.DateTimeField("به‌روزرسانی", auto_now=True)
+
+    product = models.ForeignKey(
+        Product,
+        verbose_name="محصول",
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="نویسنده",
+        on_delete=models.CASCADE,
+        related_name="product_comments",
+    )
+    parent = models.ForeignKey(
+        "self",
+        verbose_name="پاسخ به",
+        on_delete=models.CASCADE,
+        related_name="replies",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "دیدگاه محصول"
+        verbose_name_plural = "دیدگاه‌های محصول"
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(
+                fields=["product", "moderation_status", "created_at"],
+                name="comment_product_status_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product} — {self.get_comment_type_display()}"

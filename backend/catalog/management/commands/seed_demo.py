@@ -3,7 +3,7 @@
 
 اجرا:  python manage.py seed_demo
 - عکس‌ها از Wikimedia Commons (تصاویر آزاد) دانلود و در media/products ذخیره می‌شوند.
-- چند کاربر نمونه و دیدگاه واقعی ساخته می‌شود و میانگین امتیازها به‌روز می‌شود.
+- چند کاربر نمونه و دیدگاه تاییدشده ساخته می‌شود.
 - ایمن برای اجرای مجدد (idempotent).
 """
 
@@ -13,9 +13,8 @@ import requests
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
-from django.db.models import Avg, Count
 
-from catalog.models import Product, ProductImage, Review
+from catalog.models import Product, ProductComment, ProductImage
 
 User = get_user_model()
 
@@ -151,7 +150,7 @@ class Command(BaseCommand):
         redo = options.get("redo") or []
         if not options["skip_images"]:
             self.seed_images(redo)
-        self.seed_reviews()
+        self.seed_comments()
         self.stdout.write(self.style.SUCCESS("🌱 seed_demo تمام شد."))
 
     # ─── عکس‌ها ─────────────────────────────────────────────
@@ -199,11 +198,10 @@ class Command(BaseCommand):
 
     # ─── کاربران و دیدگاه‌ها ────────────────────────────────
 
-    def seed_reviews(self):
+    def seed_comments(self):
         self.stdout.write("💬 ساخت کاربران و دیدگاه‌های نمونه ...")
         created = 0
-        touched_products = set()
-        for phone, name, product_id, rating, text in DEMO_REVIEWS:
+        for phone, name, product_id, _rating, text in DEMO_REVIEWS:
             product = Product.objects.filter(pk=product_id).first()
             if product is None:
                 continue
@@ -211,25 +209,15 @@ class Command(BaseCommand):
             if not user.name:
                 user.name = name
                 user.save(update_fields=["name"])
-            _, was_created = Review.objects.get_or_create(
+            _, was_created = ProductComment.objects.get_or_create(
                 product=product,
                 user=user,
-                text=text,
-                defaults={"rating": rating, "is_published": True},
+                content=text,
+                defaults={
+                    "moderation_status": ProductComment.ModerationStatus.APPROVED
+                },
             )
             if was_created:
                 created += 1
-            touched_products.add(product_id)
-
-        # میانگین امتیاز محصولات دیدگاه‌دار به‌روز شود
-        for pid in touched_products:
-            agg = Review.objects.filter(
-                product_id=pid, is_published=True
-            ).aggregate(
-                avg=Avg("rating"), count=Count("id")
-            )
-            Product.objects.filter(pk=pid).update(
-                rating=round(agg["avg"] or 0, 1), rating_count=agg["count"]
-            )
 
         self.stdout.write(self.style.SUCCESS(f"   ✅ {created} دیدگاه جدید"))

@@ -83,16 +83,18 @@ the URL product to prevent deleting another product's asset. Product deletion ma
 be blocked by protected order history; return a controlled conflict rather than
 destroying historical integrity.
 
-## User and review management
+## User and comment management
 
 `AdminUserListView` returns/searches users and aggregate activity without exposing
 password hashes, OTP hashes, or private authentication state. Be deliberate when
 adding personal information.
 
-`AdminReviewListView` joins review/user/product for dashboard display.
-`AdminReviewDetailView.delete()` remembers the product, deletes the review, and
-calls `recompute_rating()`. That helper recalculates both denormalized rating fields;
-never delete a review without keeping product aggregates synchronized.
+`AdminCommentListView` joins comment/user/product and can filter by moderation
+status. `AdminCommentDetailView` approves, rejects/unpublishes, or deletes a
+message. `AdminCommentResponseView` always authors replies from the authenticated
+staff account and publishes them immediately. It never accepts an admin-indicator
+flag from the client. Ratings are independent and are not changed by comment
+moderation.
 
 ## Response and query conventions
 

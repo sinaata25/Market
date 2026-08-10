@@ -14,5 +14,5 @@ urlpatterns = [
     path("addresses/<int:pk>", views_profile.AddressDetailView.as_view()),
     path("favorites", views_profile.FavoriteListView.as_view()),
     path("favorites/<int:pk>", views_profile.FavoriteCheckView.as_view()),
-    path("my-reviews", views_profile.MyReviewsView.as_view()),
+    path("my-comments", views_profile.MyCommentsView.as_view()),
 ]

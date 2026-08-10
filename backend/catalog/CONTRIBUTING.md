@@ -3,14 +3,17 @@
 ## Responsibility
 
 `catalog` owns categories, products, product images, public discovery APIs, and
-reviews. It also defines the canonical product/category response DTOs reused by
+ratings, comments, and questions. It also defines the canonical product/category response DTOs reused by
 the cart, profile, and admin APIs.
 
 ## Module map
 
-- `models.py`: `Category`, `Product`, `ProductImage`, and `Review`.
+- `models.py`: `Category`, `Product`, `ProductImage`, `ProductRating`, and
+  `ProductComment`.
 - `dto.py`: stable camelCase public representations for categories/products.
-- `views.py`: category/product/review endpoints.
+- `feedback.py`: purchase verification, rating aggregation, comment DTOs, and
+  visible conversation selection.
+- `views.py`: category, product, rating, and comment endpoints.
 - `validators.py`: strict PNG and SVG category-icon validation.
 - `icon_files.py`: transaction-aware cleanup of replaced/deleted icon files.
 - `admin.py`: Django admin, product image inline, and safe icon lifecycle hooks.
@@ -36,17 +39,24 @@ assigned category (including the primary one); write APIs keep both relations in
 sync and require at least one category. Monetary values are integer toman amounts.
 `old_price` is nullable and represents the pre-discount display price. `colors`,
 `features`, and `specs` are JSON UI content. Rating and rating count are denormalized
-onto the product for fast listing/sorting and must be recomputed after review
-creation/deletion. `is_active` controls storefront visibility without deleting the
+onto the product for fast listing/sorting and must be recomputed after rating
+creation/update/deletion. `is_active` controls storefront visibility without deleting the
 product or its history. Stock is mutated transactionally by the orders app.
 
 `ProductImage` provides an ordered one-to-many image gallery. Code returning a
 product should prefetch `categories` and `images`; otherwise `product_dto()` creates
 N+1 queries.
 
-`Review` belongs to a user and product. Its unique database constraint enforces one
-review per user/product even if application-level checks race. Reviews are ordered
-newest first.
+`ProductRating` contains only a 1–5 star value. Its unique database constraint
+enforces one rating per user/product; updates replace that value. The API accepts a
+rating only when a paid, shipped, or delivered `OrderItem` proves the user purchased
+the product. Product aggregates come only from these rows.
+
+`ProductComment` is independent of ratings and supports comments, questions, and
+self-referential replies. Every customer-created row starts `pending`; staff-created
+official responses start `approved`. Public selectors expose approved rows plus the
+authenticated author's own moderated rows. Admin and verified-purchase indicators
+are derived from the author role and qualifying order data, never request booleans.
 
 ## DTO contract
 
@@ -92,13 +102,14 @@ cleanup problems, not turn a completed update into a false API failure.
   the same category and filling with popular products elsewhere.
 - `GET /api/products/slug/<slug>`: resolve a product SEO slug through `PageMeta`,
   then delegate to the normal detail representation.
-- `GET /api/products/<id>/reviews`: public review list with masked author identity.
-- `POST /api/products/<id>/reviews`: authenticated, validated review creation.
+- `GET /api/products/<id>/rating`: aggregate, current user's rating, and eligibility.
+- `PUT /api/products/<id>/rating`: create/update one purchaser-only rating.
+- `GET /api/products/<id>/comments`: approved threads plus the author's own rows.
+- `POST /api/products/<id>/comments`: create a top-level comment/question or reply.
 
-`ReviewCreateSerializer` enforces rating 1–5 and bounded meaningful text. The view
-checks authentication/product existence/duplicate review, while the database
-constraint remains the race-safe authority. After mutation, recompute the product
-aggregate with `Avg` and `Count`; use zero when no reviews remain.
+Ratings and comments use separate serializers and payloads. Do not add a rating to
+comment writes or comment text to rating writes. Every customer reply independently
+passes moderation even when its parent was approved.
 
 ## Admin behavior
 
@@ -118,9 +129,11 @@ production startup depend on demo assets.
 1. Treat `product_dto()` as a cross-app public contract.
 2. Add `select_related("category")` and `prefetch_related("categories", "images")`
    to bulk DTO calls.
-3. Keep review uniqueness enforced at the database level.
-4. Recompute denormalized ratings after every review mutation.
-5. Never weaken SVG/PNG content validation to MIME/extension checks.
-6. Delete replaced files only after transaction commit and only if unreferenced.
-7. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.
-8. Keep the category graph acyclic in every write surface, including Django admin.
+3. Keep rating uniqueness enforced at the database level.
+4. Recompute denormalized ratings after every rating mutation.
+5. Keep customer moderation, official-author identity, and purchase verification
+   server-derived.
+6. Never weaken SVG/PNG content validation to MIME/extension checks.
+7. Delete replaced files only after transaction commit and only if unreferenced.
+8. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.
+9. Keep the category graph acyclic in every write surface, including Django admin.

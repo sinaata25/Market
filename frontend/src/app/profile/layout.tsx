@@ -18,7 +18,7 @@ const NAV = [
   { href: "/profile/orders", icon: "📦", label: "سفارش‌های من" },
   { href: "/profile/addresses", icon: "📍", label: "آدرس‌های من" },
   { href: "/profile/favorites", icon: "❤️", label: "علاقه‌مندی‌ها" },
-  { href: "/profile/reviews", icon: "💬", label: "دیدگاه‌های من" },
+  { href: "/profile/comments", icon: "💬", label: "دیدگاه‌های من" },
   { href: "/profile/info", icon: "⚙️", label: "اطلاعات حساب" },
 ];
 

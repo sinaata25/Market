@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from rest_framework.test import APIClient
 
-from catalog.models import Category, Product, Review
+from catalog.models import Category, Product, ProductComment
 
 
 PRODUCT_RESPONSE_KEYS = {
@@ -465,41 +465,34 @@ class AdminApiContractTests(TestCase):
         self.category.refresh_from_db()
         self.assertFalse(self.category.icon)
 
-    def test_admin_can_publish_and_unpublish_review(self):
+    def test_admin_can_approve_reject_and_filter_comments(self):
         product = Product.objects.create(
             title="بیل", category=self.category, price=100_000
         )
         reviewer = get_user_model().objects.create_user(phone="09121111111")
-        review = Review.objects.create(
+        comment = ProductComment.objects.create(
             product=product,
             user=reviewer,
-            rating=4,
-            text="دیدگاه در انتظار تایید مدیر",
+            content="دیدگاه در انتظار تایید مدیر",
         )
 
-        listed = self.client.get("/api/admin/reviews")
+        listed = self.client.get("/api/admin/comments?status=pending")
         self.assertEqual(
-            listed.data["data"]["reviews"][0]["isPublished"], False
+            listed.data["data"]["comments"][0]["status"], "pending"
         )
 
-        published = self.client.patch(
-            f"/api/admin/reviews/{review.id}",
-            {"isPublished": True},
+        approved = self.client.patch(
+            f"/api/admin/comments/{comment.id}",
+            {"status": "approved"},
             format="json",
         )
-        product.refresh_from_db()
-        self.assertEqual(published.status_code, 200)
-        self.assertTrue(published.data["data"]["review"]["isPublished"])
-        self.assertEqual(product.rating, 4)
-        self.assertEqual(product.rating_count, 1)
+        self.assertEqual(approved.status_code, 200)
+        self.assertEqual(approved.data["data"]["comment"]["status"], "approved")
 
-        unpublished = self.client.patch(
-            f"/api/admin/reviews/{review.id}",
-            {"isPublished": False},
+        rejected = self.client.patch(
+            f"/api/admin/comments/{comment.id}",
+            {"status": "rejected"},
             format="json",
         )
-        product.refresh_from_db()
-        self.assertEqual(unpublished.status_code, 200)
-        self.assertFalse(unpublished.data["data"]["review"]["isPublished"])
-        self.assertEqual(product.rating, 0)
-        self.assertEqual(product.rating_count, 0)
+        self.assertEqual(rejected.status_code, 200)
+        self.assertEqual(rejected.data["data"]["comment"]["status"], "rejected")

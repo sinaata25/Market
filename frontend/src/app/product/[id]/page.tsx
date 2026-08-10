@@ -146,7 +146,7 @@ export default async function ProductPage({
                 {product.rating.toLocaleString("fa-IR")}
               </span>
               <span className="font-num text-slate-400">
-                ({product.ratingCount.toLocaleString("fa-IR")} دیدگاه)
+                ({product.ratingCount.toLocaleString("fa-IR")} امتیاز)
               </span>
             </span>
             {productCategories.length > 0 && (
@@ -211,7 +211,7 @@ export default async function ProductPage({
         </div>
       </div>
 
-      {/* تب‌های مشخصات / معرفی / دیدگاه */}
+      {/* تب‌های مشخصات / معرفی / امتیاز / گفتگو */}
       <div className="mt-6">
         <ProductTabs product={product} />
       </div>
