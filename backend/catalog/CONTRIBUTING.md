@@ -2,15 +2,17 @@
 
 ## Responsibility
 
-`catalog` owns categories, products, product images, public discovery APIs, and
-ratings, comments, and questions. It also defines the canonical product/category response DTOs reused by
-the cart, profile, and admin APIs.
+`catalog` owns independent brands, categories, products, product images, public
+discovery APIs, ratings, comments, and questions. It also defines the canonical
+brand/category/product response DTOs reused by the cart, profile, and admin APIs.
 
 ## Module map
 
-- `models.py`: `Category`, `Product`, `ProductImage`, `ProductRating`, and
+- `models.py`: `Brand`, `Category`, `Product`, `ProductImage`, `ProductRating`, and
   `ProductComment`.
-- `dto.py`: stable camelCase public representations for categories/products.
+- `dto.py`: stable camelCase public representations for brands/categories/products.
+- `brand_pricing.py`: transactional brand-wide percentage price adjustments.
+- `brand_files.py`: transaction-aware cleanup of replaced/deleted brand logos.
 - `feedback.py`: purchase verification, rating aggregation, comment DTOs, and
   visible conversation selection.
 - `views.py`: category, product, rating, and comment endpoints.
@@ -20,9 +22,15 @@ the cart, profile, and admin APIs.
 - `management/commands/seed_catalog.py`: base catalog seed data.
 - `management/commands/seed_demo.py`: richer development/demo data.
 - `tests.py`: product and review API contracts.
+- `test_brands.py`: brand model, API, permissions, filtering, and pricing tests.
 - `test_category_icons.py`: validation, replacement, deletion, and storage tests.
 
 ## Data model
+
+`Brand` is separate from the category graph. Its `name` and `slug` are unique;
+`description`, validated PNG/SVG `logo`, and `website` are optional. `is_active`
+controls public brand navigation and brand-specific filtering, while staff APIs
+continue to return inactive brands.
 
 `Category.slug` is the public category identifier. `parents` is a directed
 self-referential many-to-many relation, so a category can be a child of multiple
@@ -36,7 +44,9 @@ only validated `.png` or `.svg` uploads and may be empty.
 `Product.category` is its primary category, retained for stable breadcrumbs, SEO,
 and backward-compatible response fields. `Product.categories` contains every
 assigned category (including the primary one); write APIs keep both relations in
-sync and require at least one category. Monetary values are integer toman amounts.
+sync and require at least one category. `Product.brand` is a nullable protected
+foreign key, so a product has zero or one brand independently of all category
+assignments. Monetary values are integer toman amounts.
 `old_price` is nullable and represents the pre-discount display price. `colors`,
 `features`, and `specs` are JSON UI content. Rating and rating count are denormalized
 onto the product for fast listing/sorting and must be recomputed after rating
@@ -44,8 +54,8 @@ creation/update/deletion. `is_active` controls storefront visibility without del
 product or its history. Stock is mutated transactionally by the orders app.
 
 `ProductImage` provides an ordered one-to-many image gallery. Code returning a
-product should prefetch `categories` and `images`; otherwise `product_dto()` creates
-N+1 queries.
+product should select `brand` and prefetch `categories` and `images`; otherwise
+`product_dto()` creates N+1 queries.
 
 `ProductRating` contains only a 1–5 star value. Its unique database constraint
 enforces one rating per user/product; updates replace that value. The API accepts a
@@ -60,15 +70,16 @@ are derived from the author role and qualifying order data, never request boolea
 
 ## DTO contract
 
-`category_dto()` and `product_dto()` deliberately separate the database schema
-from the frontend contract. They convert snake_case fields to camelCase, return
+`brand_dto()`, `category_dto()`, and `product_dto()` deliberately separate the
+database schema from the frontend contract. They convert snake_case fields to camelCase, return
 relative media URLs (proxied by Next.js), include the full image gallery, and
 provide presentation defaults for missing features/specs/description/warranty.
+The product contract includes a brand object or `null`.
 
 Because `product_dto()` is shared across apps, changing it affects product lists,
 details, related products, carts, favorites, and admin responses. Update contract
-tests and the frontend together. It expects `category` to be selected and both
-`categories` and `images` to be prefetched by callers.
+tests and the frontend together. It expects `category` and `brand` to be selected
+and both `categories` and `images` to be prefetched by callers.
 
 ## Category icon security and lifecycle
 
@@ -94,10 +105,11 @@ cleanup problems, not turn a completed update into a false API failure.
 
 ## Public APIs
 
+- `GET /api/brands`: active brands for storefront navigation and brand pages.
 - `GET /api/categories`: effectively visible roots and descendants through
   `category_dto()`; relationships contain real category slugs and titles.
-- `GET /api/products`: optional category/search/discount filters, allow-listed
-  sort keys, and bounded pagination (`perPage` cannot exceed 50).
+- `GET /api/products`: optional independent category/brand/search/discount
+  filters, allow-listed sort keys, and bounded pagination (`perPage` cannot exceed 50).
 - `GET /api/products/<id>`: product plus up to four related products, preferring
   the same category and filling with popular products elsewhere.
 - `GET /api/products/slug/<slug>`: resolve a product SEO slug through `PageMeta`,
@@ -113,9 +125,9 @@ passes moderation even when its parent was approved.
 
 ## Admin behavior
 
-`CategoryAdmin` previews icons without trusting uploaded markup and manages file
+`BrandAdmin` and `CategoryAdmin` preview validated image assets and manage file
 cleanup as described above. `ProductAdmin` embeds `ProductImage` rows as a tabular
-inline. Search/list/filter configuration is operational convenience only; custom
+inline and exposes brand filtering. Search/list/filter configuration is operational convenience only; custom
 storefront management endpoints live in `adminapi`.
 
 ## Seeding
@@ -127,12 +139,11 @@ production startup depend on demo assets.
 ## Safe change checklist
 
 1. Treat `product_dto()` as a cross-app public contract.
-2. Add `select_related("category")` and `prefetch_related("categories", "images")`
+2. Add `select_related("category", "brand")` and `prefetch_related("categories", "images")`
    to bulk DTO calls.
 3. Keep rating uniqueness enforced at the database level.
 4. Recompute denormalized ratings after every rating mutation.
 5. Keep customer moderation, official-author identity, and purchase verification
-   server-derived.
 6. Never weaken SVG/PNG content validation to MIME/extension checks.
 7. Delete replaced files only after transaction commit and only if unreferenced.
 8. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.

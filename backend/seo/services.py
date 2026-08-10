@@ -68,7 +68,7 @@ def default_meta_for(page_type: str, object_key: str) -> dict:
     s = SeoSettings.load()
     if page_type == "product":
         p = (
-            Product.objects.select_related("category")
+            Product.objects.select_related("category", "brand")
             .prefetch_related("images")
             .filter(pk=object_key)
             .first()
@@ -234,7 +234,7 @@ def auto_schema(page_type: str, object_key: str, s: SeoSettings) -> dict | None:
     """اسکیمای خودکار JSON-LD بر اساس نوع صفحه"""
     if page_type == "product":
         p = (
-            Product.objects.select_related("category")
+            Product.objects.select_related("category", "brand")
             .prefetch_related("images")
             .filter(pk=object_key)
             .first()
@@ -251,6 +251,11 @@ def auto_schema(page_type: str, object_key: str, s: SeoSettings) -> dict | None:
             ),
             "description": (p.description or "")[:300],
             "category": p.category.title,
+            "brand": (
+                {"@type": "Brand", "name": p.brand.name}
+                if p.brand_id
+                else None
+            ),
             "aggregateRating": (
                 {
                     "@type": "AggregateRating",

@@ -51,7 +51,21 @@ order is terminal. Product rows are locked/updated consistently with the custome
 cancellation flow. Do not implement status changes as an unchecked `update()` or
 stock can be restored twice.
 
-## Category and product management
+## Brand, category, and product management
+
+Brand management exposes staff-only list/create/update/delete endpoints plus a
+separate multipart logo endpoint. A brand referenced by products cannot be
+deleted. `brandSlug` on product writes assigns one brand or `null` without changing
+category assignments. Inactive brands remain manageable but disappear from public
+brand navigation.
+
+`POST brands/<id>/price-adjustment` accepts an `increase` or `decrease` operation
+and a positive decimal percentage. Decreases must be below 100%. The catalog
+service locks and adjusts only products with that exact brand inside one database
+transaction, using `Decimal` and half-up rounding to the project's whole-toman
+precision. Both current and non-null old prices move by the same factor; other
+brands and unbranded products remain untouched. Keep this business logic in
+`catalog.brand_pricing`, not in the API view.
 
 Category management exposes staff-only list/create/update/delete endpoints plus a
 separate multipart icon endpoint. Category deletion returns a controlled conflict
@@ -68,7 +82,8 @@ dashboard can distinguish a manually hidden category from one hidden by an ances
 names and JSON content. `categorySlugs` accepts one or more unique category slugs;
 the first becomes the backward-compatible primary category and all values populate
 the many-to-many relation. The legacy singular `categorySlug` input remains
-accepted. Cross-field validation enforces price-related rules. `apply_product_data()`
+accepted. Optional `brandSlug` maps separately to `Product.brand`. Cross-field
+validation enforces price-related rules. `apply_product_data()`
 centralizes mapping from API names to model fields so create and update cannot drift.
 
 - `GET/POST products`: filtered/paginated list and creation.
@@ -76,10 +91,14 @@ centralizes mapping from API names to model fields so create and update cannot d
 - `PATCH products/<id>/visibility`: hide or show a product without deleting it.
 - `POST products/<id>/image`: multipart gallery upload.
 - `DELETE products/<id>/images/<image-id>`: deletion scoped to its product.
+- `GET/POST brands`: list and create brands.
+- `PATCH/DELETE brands/<id>`: update or safely delete an unused brand.
+- `POST/DELETE brands/<id>/logo`: replace or remove a validated logo.
+- `POST brands/<id>/price-adjustment`: atomic staff-only bulk price adjustment.
 
 List responses use `product_dto()`; detail responses use `admin_product_dto()`.
-Bulk queries select category and prefetch images. Uploaded image IDs are scoped to
-the URL product to prevent deleting another product's asset. Product deletion may
+Bulk queries select category and brand and prefetch images. Uploaded image IDs are
+scoped to the URL product to prevent deleting another product's asset. Product deletion may
 be blocked by protected order history; return a controlled conflict rather than
 destroying historical integrity.
 

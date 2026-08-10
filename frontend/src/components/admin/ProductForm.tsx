@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client-api";
-import type { Category, Product } from "@/lib/products";
+import type { Brand, Category, Product } from "@/lib/products";
 
 type FormState = {
   title: string;
   titleEn: string;
   categorySlugs: string[];
+  brandSlug: string;
   price: string;
   oldPrice: string;
   stock: string;
@@ -21,6 +22,7 @@ const EMPTY: FormState = {
   title: "",
   titleEn: "",
   categorySlugs: [],
+  brandSlug: "",
   price: "",
   oldPrice: "",
   stock: "10",
@@ -44,6 +46,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [images, setImages] = useState<ImageItem[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [createdProductId, setCreatedProductId] = useState<number>();
@@ -75,10 +78,13 @@ export default function ProductForm({ productId }: { productId?: number }) {
     }));
   }
 
-  // دسته‌ها + در حالت ویرایش، خود محصول
+  // دسته‌ها، برندها + در حالت ویرایش، خود محصول
   useEffect(() => {
     api.get<{ categories: Category[] }>("/api/admin/categories").then((res) => {
       if (res.ok && res.data) setCategories(res.data.categories);
+    });
+    api.get<{ brands: Brand[] }>("/api/admin/brands").then((res) => {
+      if (res.ok && res.data) setBrands(res.data.brands);
     });
     if (editingExistingProduct) {
       api
@@ -91,6 +97,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               titleEn: p.titleEn ?? "",
               categorySlugs:
                 p.categorySlugs ?? (p.categorySlug ? [p.categorySlug] : []),
+              brandSlug: p.brand?.slug ?? "",
               price: String(p.price),
               oldPrice: p.oldPrice ? String(p.oldPrice) : "",
               stock: String(p.stock ?? 0),
@@ -128,6 +135,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
       title: form.title.trim(),
       titleEn: form.titleEn.trim(),
       categorySlugs: form.categorySlugs,
+      brandSlug: form.brandSlug || null,
       price: Number(form.price) || 0,
       oldPrice: form.oldPrice ? Number(form.oldPrice) : null,
       stock: Number(form.stock) || 0,
@@ -380,6 +388,26 @@ export default function ProductForm({ productId }: { productId?: number }) {
           )}
 
           <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                برند
+              </label>
+              <select
+                value={form.brandSlug}
+                onChange={(event) => set("brandSlug", event.target.value)}
+                className={inputCls()}
+              >
+                <option value="">بدون برند</option>
+                {brands.map((brand) => (
+                  <option key={brand.slug} value={brand.slug}>
+                    {brand.name}{brand.isActive === false ? " (پنهان)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                هر محصول می‌تواند حداکثر یک برند داشته باشد.
+              </p>
+            </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
                 دسته‌بندی *

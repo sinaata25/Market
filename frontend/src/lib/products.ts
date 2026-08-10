@@ -6,6 +6,7 @@ export type Product = {
   categorySlug?: string;
   categories?: { slug: string; title: string }[];
   categorySlugs?: string[];
+  brand?: Brand | null;
   price: number;
   oldPrice?: number;
   rating: number;
@@ -20,6 +21,17 @@ export type Product = {
   warranty?: string;
   stock?: number;
   isActive?: boolean;
+};
+
+export type Brand = {
+  name: string;
+  slug: string;
+  description?: string | null;
+  logo?: string | null;
+  website?: string | null;
+  isActive?: boolean;
+  productCount?: number;
+  id?: number;
 };
 
 export type Category = {

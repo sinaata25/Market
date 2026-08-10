@@ -1,5 +1,9 @@
 import "server-only";
-import type { Product as ProductDTO, Category as CategoryDTO } from "@/lib/products";
+import type {
+  Brand as BrandDTO,
+  Product as ProductDTO,
+  Category as CategoryDTO,
+} from "@/lib/products";
 
 // لایه‌ی خواندن کاتالوگ سمت سرور Next — از API جنگو fetch می‌کند
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
@@ -16,8 +20,14 @@ export async function getCategories(): Promise<CategoryDTO[]> {
   return data.categories;
 }
 
+export async function getBrands(): Promise<BrandDTO[]> {
+  const data = await apiGet<{ brands: BrandDTO[] }>("/api/brands");
+  return data.brands;
+}
+
 export type ProductListParams = {
   categorySlug?: string;
+  brandSlug?: string;
   search?: string;
   sort?: "newest" | "cheapest" | "expensive" | "popular";
   page?: number;
@@ -38,6 +48,7 @@ export async function getProducts(
 ): Promise<ProductListResult> {
   const qs = new URLSearchParams();
   if (params.categorySlug) qs.set("category", params.categorySlug);
+  if (params.brandSlug) qs.set("brand", params.brandSlug);
   if (params.search) qs.set("search", params.search);
   if (params.sort) qs.set("sort", params.sort);
   if (params.page) qs.set("page", String(params.page));
