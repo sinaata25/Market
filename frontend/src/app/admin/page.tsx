@@ -20,7 +20,8 @@ type Stats = {
     pendingOrders: number;
     users: number;
     products: number;
-    reviews: number;
+    comments: number;
+    ratings: number;
     avgRating: number;
   };
   salesByDay: { date: string; total: number; count: number }[];
@@ -95,7 +96,7 @@ export default function AdminDashboard() {
           icon="🛠️"
           label="محصولات"
           value={faNum(totals.products)}
-          sub={`${faNum(totals.reviews)} دیدگاه — میانگین ${faNum(totals.avgRating)}★`}
+          sub={`${faNum(totals.comments)} پیام — ${faNum(totals.ratings)} امتیاز — میانگین ${faNum(totals.avgRating)}★`}
           accent="bg-amber-50 text-amber-600"
         />
       </div>

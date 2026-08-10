@@ -21,6 +21,10 @@ urlpatterns = [
         views.AdminProductImageDetailView.as_view(),
     ),
     path("users", views.AdminUserListView.as_view()),
-    path("reviews", views.AdminReviewListView.as_view()),
-    path("reviews/<int:pk>", views.AdminReviewDetailView.as_view()),
+    path("comments", views.AdminCommentListView.as_view()),
+    path("comments/<int:pk>", views.AdminCommentDetailView.as_view()),
+    path(
+        "comments/<int:pk>/responses",
+        views.AdminCommentResponseView.as_view(),
+    ),
 ]

@@ -4,9 +4,9 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.html import format_html
 
+from .feedback import recompute_product_rating
 from .icon_files import schedule_category_icon_delete
-from .models import Category, Product, ProductImage, Review
-from .reviews import recompute_product_rating
+from .models import Category, Product, ProductComment, ProductImage, ProductRating
 
 
 class ProductImageInline(admin.TabularInline):
@@ -146,12 +146,15 @@ class ProductAdmin(admin.ModelAdmin):
         form.instance.categories.add(form.instance.category)
 
 
-@admin.register(Review)
-class ReviewAdmin(admin.ModelAdmin):
-    list_display = ["product", "user", "rating", "is_published", "created_at"]
-    list_editable = ["is_published"]
-    list_filter = ["is_published", "rating"]
-    search_fields = ["text"]
+@admin.register(ProductRating)
+class ProductRatingAdmin(admin.ModelAdmin):
+    list_display = ["product", "user", "rating", "updated_at"]
+    list_filter = ["rating"]
+    search_fields = ["product__title", "user__phone", "user__name"]
+    readonly_fields = ["product", "user", "rating", "created_at", "updated_at"]
+
+    def has_add_permission(self, request):
+        return False
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -167,3 +170,34 @@ class ReviewAdmin(admin.ModelAdmin):
         super().delete_queryset(request, queryset)
         for product_id in product_ids:
             recompute_product_rating(product_id)
+
+
+@admin.register(ProductComment)
+class ProductCommentAdmin(admin.ModelAdmin):
+    list_display = [
+        "product",
+        "user",
+        "comment_type",
+        "moderation_status",
+        "official_response",
+        "created_at",
+    ]
+    list_editable = ["moderation_status"]
+    list_filter = ["moderation_status", "comment_type"]
+    search_fields = ["content", "product__title", "user__phone", "user__name"]
+    readonly_fields = [
+        "product",
+        "user",
+        "parent",
+        "comment_type",
+        "content",
+        "created_at",
+        "updated_at",
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(boolean=True, description="پاسخ رسمی")
+    def official_response(self, obj):
+        return obj.user.is_staff

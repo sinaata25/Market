@@ -3,6 +3,7 @@
 
 from django.core.management.base import BaseCommand
 
+from catalog.feedback import recompute_product_rating
 from catalog.models import Category, Product
 
 CATEGORIES = [
@@ -198,8 +199,8 @@ class Command(BaseCommand):
                     "title_en": data.get("title_en", ""),
                     "price": data["price"],
                     "old_price": data.get("old_price"),
-                    "rating": data["rating"],
-                    "rating_count": data["rating_count"],
+                    "rating": 0,
+                    "rating_count": 0,
                     "badge": data.get("badge", ""),
                     "colors": data.get("colors"),
                     "features": data.get("features"),
@@ -216,5 +217,6 @@ class Command(BaseCommand):
                 for title in data.get("subcategories", [])
             )
             product.categories.set(assigned_categories)
+            recompute_product_rating(product.id)
         self.stdout.write(self.style.SUCCESS(f"✅ {len(PRODUCTS)} محصول"))
         self.stdout.write("🌱 seed تمام شد.")

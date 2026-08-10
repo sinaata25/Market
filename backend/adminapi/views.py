@@ -11,15 +11,23 @@ from django.db.models.deletion import ProtectedError
 from django.db.models import Avg, Count, F, IntegerField, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
 from catalog.category_tree import visible_category_ids
 from catalog.dto import category_dto, category_summary, product_dto
+from catalog.feedback import verified_purchase_pairs
 from catalog.icon_files import schedule_category_icon_delete
-from catalog.models import Category, Product, ProductImage, Review
-from catalog.reviews import recompute_product_rating
+from catalog.models import (
+    Category,
+    Product,
+    ProductComment,
+    ProductImage,
+    ProductRating,
+)
 from catalog.validators import validate_category_icon
 from common.responses import fail, ok
 from orders.models import Order, OrderItem
@@ -163,12 +171,10 @@ class StatsView(StaffRequiredMixin, APIView):
                     ).count(),
                     "users": User.objects.count(),
                     "products": Product.objects.count(),
-                    "reviews": Review.objects.count(),
+                    "comments": ProductComment.objects.count(),
+                    "ratings": ProductRating.objects.count(),
                     "avgRating": round(
-                        Review.objects.filter(is_published=True).aggregate(
-                            a=Avg("rating")
-                        )["a"]
-                        or 0,
+                        ProductRating.objects.aggregate(a=Avg("rating"))["a"] or 0,
                         1,
                     ),
                 },
@@ -685,31 +691,56 @@ class AdminUserListView(StaffRequiredMixin, APIView):
 # ─── دیدگاه‌ها ───────────────────────────────────────────────
 
 
-class AdminReviewListView(StaffRequiredMixin, APIView):
+def admin_comment_row(
+    comment: ProductComment,
+    verified_pairs: set[tuple[int, int]] | None = None,
+) -> dict:
+    return {
+        "id": comment.id,
+        "content": comment.content,
+        "type": comment.comment_type,
+        "status": comment.moderation_status,
+        "parentId": comment.parent_id,
+        "createdAt": comment.created_at.isoformat(),
+        "updatedAt": comment.updated_at.isoformat(),
+        "author": comment.user.name or comment.user.phone,
+        "productId": comment.product_id,
+        "productTitle": comment.product.title,
+        "isAdminResponse": bool(comment.user.is_staff),
+        "isVerifiedPurchase": (comment.product_id, comment.user_id)
+        in (verified_pairs or set()),
+    }
+
+
+class AdminCommentListView(StaffRequiredMixin, APIView):
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
-        qs = Review.objects.select_related("user", "product").order_by("-created_at")
+        qs = ProductComment.objects.select_related("user", "product").order_by(
+            "-created_at"
+        )
+        moderation_status = request.query_params.get("status")
+        if moderation_status:
+            valid_statuses = {
+                value for value, _ in ProductComment.ModerationStatus.choices
+            }
+            if moderation_status not in valid_statuses:
+                return fail("وضعیت بررسی نامعتبر است", 422)
+            qs = qs.filter(moderation_status=moderation_status)
 
         page = positive_page(request.query_params.get("page"))
         if page is None:
             return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
         per_page = 15
         total = qs.count()
-        rows = qs[(page - 1) * per_page : page * per_page]
+        rows = list(qs[(page - 1) * per_page : page * per_page])
+        verified_pairs = verified_purchase_pairs(
+            {(comment.product_id, comment.user_id) for comment in rows}
+        )
 
         return ok(
             {
-                "reviews": [
-                    {
-                        "id": r.id,
-                        "rating": r.rating,
-                        "text": r.text,
-                        "createdAt": r.created_at.isoformat(),
-                        "author": r.user.name or r.user.phone,
-                        "productId": r.product_id,
-                        "productTitle": r.product.title,
-                        "isPublished": r.is_published,
-                    }
-                    for r in rows
+                "comments": [
+                    admin_comment_row(comment, verified_pairs) for comment in rows
                 ],
                 "total": total,
                 "page": page,
@@ -718,36 +749,76 @@ class AdminReviewListView(StaffRequiredMixin, APIView):
         )
 
 
-class ReviewModerationSerializer(serializers.Serializer):
-    isPublished = serializers.BooleanField(required=True)
+class CommentModerationSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=ProductComment.ModerationStatus.choices
+    )
 
 
-class AdminReviewDetailView(StaffRequiredMixin, APIView):
+class AdminCommentDetailView(StaffRequiredMixin, APIView):
+    @extend_schema(
+        request=CommentModerationSerializer,
+        responses={200: OpenApiTypes.OBJECT},
+    )
     def patch(self, request, pk: int):
-        review = Review.objects.filter(pk=pk).first()
-        if review is None:
+        comment = ProductComment.objects.select_related("user", "product").filter(
+            pk=pk
+        ).first()
+        if comment is None:
             return fail("دیدگاه یافت نشد", 404)
 
-        serializer = ReviewModerationSerializer(data=request.data)
+        serializer = CommentModerationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        review.is_published = serializer.validated_data["isPublished"]
-        review.save(update_fields=["is_published"])
-        recompute_product_rating(review.product_id)
-        return ok(
-            {
-                "review": {
-                    "id": review.id,
-                    "isPublished": review.is_published,
-                }
-            }
+        comment.moderation_status = serializer.validated_data["status"]
+        comment.save(update_fields=["moderation_status", "updated_at"])
+        verified_pairs = verified_purchase_pairs(
+            {(comment.product_id, comment.user_id)}
         )
+        return ok({"comment": admin_comment_row(comment, verified_pairs)})
 
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def delete(self, request, pk: int):
-        review = Review.objects.filter(pk=pk).first()
-        if review is None:
+        comment = ProductComment.objects.filter(pk=pk).first()
+        if comment is None:
             return fail("دیدگاه یافت نشد", 404)
-        product_id = review.product_id
-        review.delete()
-        recompute_product_rating(product_id)
+        comment.delete()
         return ok({"deleted": True})
+
+
+class AdminResponseSerializer(serializers.Serializer):
+    content = serializers.CharField(min_length=2, max_length=2000)
+
+
+class AdminCommentResponseView(StaffRequiredMixin, APIView):
+    @extend_schema(
+        request=AdminResponseSerializer,
+        responses={201: OpenApiTypes.OBJECT},
+    )
+    def post(self, request, pk: int):
+        parent = ProductComment.objects.select_related("product").filter(
+            pk=pk,
+            moderation_status=ProductComment.ModerationStatus.APPROVED,
+        ).first()
+        if parent is None:
+            return fail("دیدگاه تاییدشده یافت نشد", 404)
+
+        serializer = AdminResponseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        response = ProductComment.objects.create(
+            product=parent.product,
+            user=request.user,
+            parent=parent,
+            content=serializer.validated_data["content"].strip(),
+            comment_type=parent.comment_type,
+            moderation_status=ProductComment.ModerationStatus.APPROVED,
+        )
+        response = ProductComment.objects.select_related("user", "product").get(
+            pk=response.pk
+        )
+        verified_pairs = verified_purchase_pairs(
+            {(response.product_id, response.user_id)}
+        )
+        return ok(
+            {"comment": admin_comment_row(response, verified_pairs)}, status=201
+        )

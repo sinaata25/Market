@@ -1,6 +1,8 @@
 import math
 
+from django.db import transaction
 from django.db.models import Q
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
@@ -9,7 +11,12 @@ from common.responses import fail, ok
 
 from .category_tree import descendant_category_ids, visible_category_ids
 from .dto import category_dto, product_dto
-from .models import Category, Product, Review
+from .feedback import (
+    has_purchased_product,
+    recompute_product_rating,
+    visible_comment_threads,
+)
+from .models import Category, Product, ProductComment, ProductRating
 
 SORTS = {
     "newest": "-created_at",
@@ -186,14 +193,7 @@ class ProductBySlugView(APIView):
         return view.get(request, pk=product_id)
 
 
-def mask_author(user) -> str:
-    """نام کاربر یا شماره‌ی ماسک‌شده"""
-    if user.name:
-        return user.name
-    return f"کاربر {user.phone[:4]}***{user.phone[-2:]}"
-
-
-class ReviewCreateSerializer(serializers.Serializer):
+class RatingWriteSerializer(serializers.Serializer):
     rating = serializers.IntegerField(
         min_value=1,
         max_value=5,
@@ -203,64 +203,146 @@ class ReviewCreateSerializer(serializers.Serializer):
             "max_value": "امتیاز باید بین ۱ تا ۵ باشد",
         },
     )
-    text = serializers.CharField(
+
+
+class CommentCreateSerializer(serializers.Serializer):
+    content = serializers.CharField(
         min_length=5,
-        max_length=1000,
+        max_length=2000,
         error_messages={
             "required": "متن دیدگاه الزامی است",
             "min_length": "متن دیدگاه حداقل ۵ حرف باشد",
-            "max_length": "متن دیدگاه حداکثر ۱۰۰۰ حرف باشد",
+            "max_length": "متن دیدگاه حداکثر ۲۰۰۰ حرف باشد",
         },
     )
+    type = serializers.ChoiceField(
+        choices=ProductComment.Type.choices,
+        default=ProductComment.Type.COMMENT,
+    )
+    parentId = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 
 
-class ReviewListCreateView(APIView):
-    """فهرست دیدگاه‌های محصول / ثبت دیدگاه (نیازمند ورود)"""
+class ProductRatingView(APIView):
+    """آمار امتیاز و ثبت/ویرایش امتیاز خریدار"""
 
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request, pk: int):
-        if not Product.objects.filter(pk=pk, is_active=True).exists():
+        product = Product.objects.filter(pk=pk, is_active=True).first()
+        if product is None:
             return fail("محصول یافت نشد", 404)
-        reviews = Review.objects.filter(
-            product_id=pk, is_published=True
-        ).select_related("user")
+
+        my_rating = None
+        if request.user.is_authenticated:
+            my_rating = ProductRating.objects.filter(
+                product=product, user=request.user
+            ).values_list("rating", flat=True).first()
         return ok(
             {
-                "reviews": [
-                    {
-                        "id": r.id,
-                        "rating": r.rating,
-                        "text": r.text,
-                        "createdAt": r.created_at.isoformat(),
-                        "author": mask_author(r.user),
-                    }
-                    for r in reviews
-                ]
+                "rating": {
+                    "average": product.rating,
+                    "count": product.rating_count,
+                    "myRating": my_rating,
+                    "canRate": has_purchased_product(request.user, product.id),
+                }
             }
         )
 
-    def post(self, request, pk: int):
+    @extend_schema(
+        request=RatingWriteSerializer,
+        responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT},
+    )
+    def put(self, request, pk: int):
         if not request.user.is_authenticated:
-            return fail("برای ثبت دیدگاه ابتدا وارد شوید", 401)
+            return fail("برای ثبت امتیاز ابتدا وارد شوید", 401)
 
         try:
             product = Product.objects.get(pk=pk, is_active=True)
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
 
-        ser = ReviewCreateSerializer(data=request.data)
+        if not has_purchased_product(request.user, product.id):
+            return fail("فقط خریداران این محصول می‌توانند امتیاز بدهند", 403)
+
+        ser = RatingWriteSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        with transaction.atomic():
+            product = Product.objects.select_for_update().get(pk=product.pk)
+            rating, created = ProductRating.objects.update_or_create(
+                product=product,
+                user=request.user,
+                defaults={"rating": ser.validated_data["rating"]},
+            )
+            recompute_product_rating(product.id)
+            product.refresh_from_db(fields=["rating", "rating_count"])
+        return ok(
+            {
+                "rating": {
+                    "value": rating.rating,
+                    "average": product.rating,
+                    "count": product.rating_count,
+                }
+            },
+            status=201 if created else 200,
+        )
 
-        if Review.objects.filter(product=product, user=request.user).exists():
-            return fail("شما قبلاً برای این محصول دیدگاه ثبت کرده‌اید", 409)
 
-        review = Review.objects.create(
+class ProductCommentListCreateView(APIView):
+    """گفتگوهای تاییدشده و پیام‌های خود کاربر"""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request, pk: int):
+        if not Product.objects.filter(pk=pk, is_active=True).exists():
+            return fail("محصول یافت نشد", 404)
+        return ok({"comments": visible_comment_threads(pk, request.user)})
+
+    @extend_schema(
+        request=CommentCreateSerializer,
+        responses={201: OpenApiTypes.OBJECT},
+    )
+    def post(self, request, pk: int):
+        if not request.user.is_authenticated:
+            return fail("برای ثبت دیدگاه ابتدا وارد شوید", 401)
+
+        product = Product.objects.filter(pk=pk, is_active=True).first()
+        if product is None:
+            return fail("محصول یافت نشد", 404)
+
+        ser = CommentCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        parent = None
+        parent_id = ser.validated_data.get("parentId")
+        if parent_id:
+            parent = ProductComment.objects.filter(
+                pk=parent_id,
+                product=product,
+                moderation_status=ProductComment.ModerationStatus.APPROVED,
+            ).first()
+            if parent is None:
+                return fail("پیام مرجع یافت نشد یا هنوز تایید نشده است", 409)
+
+        status = (
+            ProductComment.ModerationStatus.APPROVED
+            if request.user.is_staff
+            else ProductComment.ModerationStatus.PENDING
+        )
+        comment = ProductComment.objects.create(
             product=product,
             user=request.user,
-            rating=ser.validated_data["rating"],
-            text=ser.validated_data["text"],
+            parent=parent,
+            content=ser.validated_data["content"].strip(),
+            comment_type=(
+                parent.comment_type if parent else ser.validated_data["type"]
+            ),
+            moderation_status=status,
         )
 
         return ok(
-            {"review": {"id": review.id, "isPublished": review.is_published}},
+            {
+                "comment": {
+                    "id": comment.id,
+                    "status": comment.moderation_status,
+                    "isAdminResponse": bool(request.user.is_staff),
+                }
+            },
             status=201,
         )

@@ -20,7 +20,8 @@ type Profile = {
     totalSpent: number;
     addressesCount: number;
     favoritesCount: number;
-    reviewsCount: number;
+    commentsCount: number;
+    ratingsCount: number;
   };
 };
 
