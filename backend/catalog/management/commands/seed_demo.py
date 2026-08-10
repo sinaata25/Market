@@ -212,7 +212,10 @@ class Command(BaseCommand):
                 user.name = name
                 user.save(update_fields=["name"])
             _, was_created = Review.objects.get_or_create(
-                product=product, user=user, text=text, defaults={"rating": rating}
+                product=product,
+                user=user,
+                text=text,
+                defaults={"rating": rating, "is_published": True},
             )
             if was_created:
                 created += 1
@@ -220,7 +223,9 @@ class Command(BaseCommand):
 
         # میانگین امتیاز محصولات دیدگاه‌دار به‌روز شود
         for pid in touched_products:
-            agg = Review.objects.filter(product_id=pid).aggregate(
+            agg = Review.objects.filter(
+                product_id=pid, is_published=True
+            ).aggregate(
                 avg=Avg("rating"), count=Count("id")
             )
             Product.objects.filter(pk=pid).update(

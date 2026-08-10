@@ -6,6 +6,7 @@ from django.utils.html import format_html
 
 from .icon_files import schedule_category_icon_delete
 from .models import Category, Product, ProductImage, Review
+from .reviews import recompute_product_rating
 
 
 class ProductImageInline(admin.TabularInline):
@@ -147,6 +148,22 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    list_display = ["product", "user", "rating", "created_at"]
-    list_filter = ["rating"]
+    list_display = ["product", "user", "rating", "is_published", "created_at"]
+    list_editable = ["is_published"]
+    list_filter = ["is_published", "rating"]
     search_fields = ["text"]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        recompute_product_rating(obj.product_id)
+
+    def delete_model(self, request, obj):
+        product_id = obj.product_id
+        super().delete_model(request, obj)
+        recompute_product_rating(product_id)
+
+    def delete_queryset(self, request, queryset):
+        product_ids = set(queryset.values_list("product_id", flat=True))
+        super().delete_queryset(request, queryset)
+        for product_id in product_ids:
+            recompute_product_rating(product_id)

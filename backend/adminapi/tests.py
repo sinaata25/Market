@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from rest_framework.test import APIClient
 
-from catalog.models import Category, Product
+from catalog.models import Category, Product, Review
 
 
 PRODUCT_RESPONSE_KEYS = {
@@ -464,3 +464,42 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(removed.status_code, 200)
         self.category.refresh_from_db()
         self.assertFalse(self.category.icon)
+
+    def test_admin_can_publish_and_unpublish_review(self):
+        product = Product.objects.create(
+            title="بیل", category=self.category, price=100_000
+        )
+        reviewer = get_user_model().objects.create_user(phone="09121111111")
+        review = Review.objects.create(
+            product=product,
+            user=reviewer,
+            rating=4,
+            text="دیدگاه در انتظار تایید مدیر",
+        )
+
+        listed = self.client.get("/api/admin/reviews")
+        self.assertEqual(
+            listed.data["data"]["reviews"][0]["isPublished"], False
+        )
+
+        published = self.client.patch(
+            f"/api/admin/reviews/{review.id}",
+            {"isPublished": True},
+            format="json",
+        )
+        product.refresh_from_db()
+        self.assertEqual(published.status_code, 200)
+        self.assertTrue(published.data["data"]["review"]["isPublished"])
+        self.assertEqual(product.rating, 4)
+        self.assertEqual(product.rating_count, 1)
+
+        unpublished = self.client.patch(
+            f"/api/admin/reviews/{review.id}",
+            {"isPublished": False},
+            format="json",
+        )
+        product.refresh_from_db()
+        self.assertEqual(unpublished.status_code, 200)
+        self.assertFalse(unpublished.data["data"]["review"]["isPublished"])
+        self.assertEqual(product.rating, 0)
+        self.assertEqual(product.rating_count, 0)

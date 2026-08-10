@@ -12,6 +12,7 @@ type Review = {
   createdAt: string;
   productId: number;
   productTitle: string;
+  isPublished: boolean;
 };
 
 export default function MyReviews() {
@@ -89,6 +90,15 @@ export default function MyReviews() {
                 </div>
                 <span className="shrink-0 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-600 font-num">
                   ★ {faNum(r.rating)}
+                </span>
+                <span
+                  className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+                    r.isPublished
+                      ? "bg-emerald-50 text-emerald-600"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {r.isPublished ? "منتشر شده" : "در انتظار تایید"}
                 </span>
               </div>
               <p className="text-xs leading-6 text-slate-600">{r.text}</p>

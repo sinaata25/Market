@@ -99,6 +99,7 @@ class Review(models.Model):
         "امتیاز", validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
     text = models.TextField("متن")
+    is_published = models.BooleanField("منتشر شده", default=False)
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     product = models.ForeignKey(

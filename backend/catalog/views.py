@@ -1,6 +1,6 @@
 import math
 
-from django.db.models import Avg, Count, Q
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
@@ -220,7 +220,9 @@ class ReviewListCreateView(APIView):
     def get(self, request, pk: int):
         if not Product.objects.filter(pk=pk, is_active=True).exists():
             return fail("محصول یافت نشد", 404)
-        reviews = Review.objects.filter(product_id=pk).select_related("user")
+        reviews = Review.objects.filter(
+            product_id=pk, is_published=True
+        ).select_related("user")
         return ok(
             {
                 "reviews": [
@@ -258,12 +260,7 @@ class ReviewListCreateView(APIView):
             text=ser.validated_data["text"],
         )
 
-        # میانگین و تعداد امتیازها دوباره محاسبه شود
-        agg = Review.objects.filter(product=product).aggregate(
-            avg=Avg("rating"), count=Count("id")
+        return ok(
+            {"review": {"id": review.id, "isPublished": review.is_published}},
+            status=201,
         )
-        product.rating = round(agg["avg"] or 0, 1)
-        product.rating_count = agg["count"]
-        product.save(update_fields=["rating", "rating_count"])
-
-        return ok({"review": {"id": review.id}}, status=201)

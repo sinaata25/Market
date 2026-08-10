@@ -19,6 +19,7 @@ from catalog.category_tree import visible_category_ids
 from catalog.dto import category_dto, category_summary, product_dto
 from catalog.icon_files import schedule_category_icon_delete
 from catalog.models import Category, Product, ProductImage, Review
+from catalog.reviews import recompute_product_rating
 from catalog.validators import validate_category_icon
 from common.responses import fail, ok
 from orders.models import Order, OrderItem
@@ -164,7 +165,11 @@ class StatsView(StaffRequiredMixin, APIView):
                     "products": Product.objects.count(),
                     "reviews": Review.objects.count(),
                     "avgRating": round(
-                        Review.objects.aggregate(a=Avg("rating"))["a"] or 0, 1
+                        Review.objects.filter(is_published=True).aggregate(
+                            a=Avg("rating")
+                        )["a"]
+                        or 0,
+                        1,
                     ),
                 },
                 "salesByDay": sales_by_day,
@@ -680,15 +685,6 @@ class AdminUserListView(StaffRequiredMixin, APIView):
 # ─── دیدگاه‌ها ───────────────────────────────────────────────
 
 
-def recompute_rating(product_id: int):
-    agg = Review.objects.filter(product_id=product_id).aggregate(
-        avg=Avg("rating"), count=Count("id")
-    )
-    Product.objects.filter(pk=product_id).update(
-        rating=round(agg["avg"] or 0, 1), rating_count=agg["count"]
-    )
-
-
 class AdminReviewListView(StaffRequiredMixin, APIView):
     def get(self, request):
         qs = Review.objects.select_related("user", "product").order_by("-created_at")
@@ -711,6 +707,7 @@ class AdminReviewListView(StaffRequiredMixin, APIView):
                         "author": r.user.name or r.user.phone,
                         "productId": r.product_id,
                         "productTitle": r.product.title,
+                        "isPublished": r.is_published,
                     }
                     for r in rows
                 ],
@@ -721,12 +718,36 @@ class AdminReviewListView(StaffRequiredMixin, APIView):
         )
 
 
+class ReviewModerationSerializer(serializers.Serializer):
+    isPublished = serializers.BooleanField(required=True)
+
+
 class AdminReviewDetailView(StaffRequiredMixin, APIView):
+    def patch(self, request, pk: int):
+        review = Review.objects.filter(pk=pk).first()
+        if review is None:
+            return fail("دیدگاه یافت نشد", 404)
+
+        serializer = ReviewModerationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        review.is_published = serializer.validated_data["isPublished"]
+        review.save(update_fields=["is_published"])
+        recompute_product_rating(review.product_id)
+        return ok(
+            {
+                "review": {
+                    "id": review.id,
+                    "isPublished": review.is_published,
+                }
+            }
+        )
+
     def delete(self, request, pk: int):
         review = Review.objects.filter(pk=pk).first()
         if review is None:
             return fail("دیدگاه یافت نشد", 404)
         product_id = review.product_id
         review.delete()
-        recompute_rating(product_id)
+        recompute_product_rating(product_id)
         return ok({"deleted": True})

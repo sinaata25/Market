@@ -1,12 +1,13 @@
 """پروفایل کاربر: اطلاعات شخصی، آدرس‌ها، علاقه‌مندی‌ها، خلاصه فعالیت"""
 
-from django.db.models import Avg, Count, Sum
+from django.db.models import Count, Sum
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from catalog.dto import product_dto
 from catalog.models import Product, Review
+from catalog.reviews import recompute_product_rating
 from common.responses import fail, ok
 from common.utils import is_valid_iran_mobile, normalize_phone
 from orders.models import Order
@@ -259,6 +260,7 @@ class MyReviewsView(AuthRequired, APIView):
                         "createdAt": r.created_at.isoformat(),
                         "productId": r.product_id,
                         "productTitle": r.product.title,
+                        "isPublished": r.is_published,
                     }
                     for r in reviews
                 ]
@@ -272,11 +274,5 @@ class MyReviewsView(AuthRequired, APIView):
             return fail("دیدگاه یافت نشد", 404)
         product_id = review.product_id
         review.delete()
-        aggregate = Review.objects.filter(product_id=product_id).aggregate(
-            avg=Avg("rating"), count=Count("id")
-        )
-        Product.objects.filter(pk=product_id).update(
-            rating=round(aggregate["avg"] or 0, 1),
-            rating_count=aggregate["count"],
-        )
+        recompute_product_rating(product_id)
         return ok({"deleted": True})
