@@ -3,20 +3,20 @@ import math
 from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
 from common.responses import fail, ok
 
 from .category_tree import descendant_category_ids, visible_category_ids
-from .dto import category_dto, product_dto
+from .dto import brand_dto, category_dto, product_dto
 from .feedback import (
     has_purchased_product,
     recompute_product_rating,
     visible_comment_threads,
 )
-from .models import Category, Product, ProductComment, ProductRating
+from .models import Brand, Category, Product, ProductComment, ProductRating
 
 SORTS = {
     "newest": "-created_at",
@@ -51,6 +51,24 @@ class CategoryListEnvelopeSerializer(serializers.Serializer):
     data = CategoryListDataSerializer()
 
 
+class BrandResponseSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    slug = serializers.CharField()
+    description = serializers.CharField(allow_null=True)
+    logo = serializers.CharField(allow_null=True)
+    website = serializers.CharField(allow_null=True)
+    isActive = serializers.BooleanField()
+
+
+class BrandListDataSerializer(serializers.Serializer):
+    brands = BrandResponseSerializer(many=True)
+
+
+class BrandListEnvelopeSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    data = BrandListDataSerializer()
+
+
 class CategoryListView(APIView):
     """فهرست دسته‌بندی‌ها"""
 
@@ -66,14 +84,49 @@ class CategoryListView(APIView):
         return ok({"categories": categories})
 
 
+class BrandListView(APIView):
+    """فهرست برندهای فعال، مستقل از درخت دسته‌بندی"""
+
+    @extend_schema(responses={200: BrandListEnvelopeSerializer})
+    def get(self, request):
+        brands = Brand.objects.filter(is_active=True)
+        return ok({"brands": [brand_dto(brand) for brand in brands]})
+
+
 class ProductListView(APIView):
     """فهرست محصولات با فیلتر، جستجو، مرتب‌سازی و صفحه‌بندی.
 
     مثال: /api/products?category=garden-tools&sort=cheapest&page=1
     """
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "category",
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Category slug; includes visible descendants.",
+            ),
+            OpenApiParameter(
+                "brand",
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Active brand slug; independent from category.",
+            ),
+            OpenApiParameter("search", OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter(
+                "discounted", OpenApiTypes.BOOL, OpenApiParameter.QUERY
+            ),
+            OpenApiParameter("sort", OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter("page", OpenApiTypes.INT, OpenApiParameter.QUERY),
+            OpenApiParameter(
+                "perPage", OpenApiTypes.INT, OpenApiParameter.QUERY
+            ),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+    )
     def get(self, request):
-        qs = Product.objects.select_related("category").prefetch_related(
+        qs = Product.objects.select_related("category", "brand").prefetch_related(
             "categories", "images"
         ).filter(is_active=True)
 
@@ -93,6 +146,10 @@ class ProductListView(APIView):
                 ).distinct()
             else:
                 qs = qs.none()
+
+        brand = request.query_params.get("brand")
+        if brand:
+            qs = qs.filter(brand__slug=brand, brand__is_active=True)
 
         search = request.query_params.get("search")
         if search:
@@ -131,7 +188,7 @@ class ProductDetailView(APIView):
     def get(self, request, pk: int):
         try:
             product = (
-                Product.objects.select_related("category")
+                Product.objects.select_related("category", "brand")
                 .prefetch_related("categories", "images")
                 .get(pk=pk, is_active=True)
             )
@@ -143,7 +200,7 @@ class ProductDetailView(APIView):
 
         # اول محصولات دارای حداقل یک دسته‌ی مشترک، سپس سایر محصولات تا سقف ۴ مورد
         same = list(
-            Product.objects.select_related("category")
+            Product.objects.select_related("category", "brand")
             .prefetch_related("categories", "images")
             .filter(is_active=True)
             .filter(
@@ -155,7 +212,7 @@ class ProductDetailView(APIView):
         )
         if len(same) < 4:
             others = (
-                Product.objects.select_related("category")
+                Product.objects.select_related("category", "brand")
                 .prefetch_related("categories", "images")
                 .filter(is_active=True)
                 .exclude(

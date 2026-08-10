@@ -111,10 +111,11 @@ export default function AdminProducts() {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[840px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-right text-[11px] text-slate-400">
               <th className="px-5 py-3 font-medium">محصول</th>
+              <th className="px-3 py-3 font-medium">برند</th>
               <th className="px-3 py-3 font-medium">دسته</th>
               <th className="px-3 py-3 font-medium">قیمت (تومان)</th>
               <th className="px-3 py-3 font-medium">موجودی</th>
@@ -125,9 +126,9 @@ export default function AdminProducts() {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={7} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={8} text="در حال بارگذاری..." />
             ) : products.length === 0 ? (
-              <EmptyRow colSpan={7} text="محصولی یافت نشد" />
+              <EmptyRow colSpan={8} text="محصولی یافت نشد" />
             ) : (
               products.map((p) => (
                 <tr
@@ -159,6 +160,9 @@ export default function AdminProducts() {
                         )}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-3 py-3 text-xs text-slate-500">
+                    {p.brand?.name ?? "—"}
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-500">
                     {p.categories?.map((category) => category.title).join("، ") ??

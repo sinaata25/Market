@@ -1,6 +1,6 @@
 """تبدیل مدل‌ها به همان ساختاری که فرانت Next.js انتظار دارد (camelCase)"""
 
-from .models import Category, Product
+from .models import Brand, Category, Product
 
 DEFAULT_FEATURES = [
     "کیفیت ساخت بالا و بادوام",
@@ -13,6 +13,17 @@ def category_summary(category: Category) -> dict:
     return {
         "slug": category.slug,
         "title": category.title,
+    }
+
+
+def brand_dto(brand: Brand) -> dict:
+    return {
+        "name": brand.name,
+        "slug": brand.slug,
+        "description": brand.description or None,
+        "logo": brand.logo.url if brand.logo else None,
+        "website": brand.website or None,
+        "isActive": brand.is_active,
     }
 
 
@@ -53,6 +64,7 @@ def product_dto(product: Product) -> dict:
             {"slug": item.slug, "title": item.title} for item in categories
         ],
         "categorySlugs": [item.slug for item in categories],
+        "brand": brand_dto(product.brand) if product.brand_id else None,
         "price": product.price,
         "oldPrice": product.old_price,
         "rating": product.rating,

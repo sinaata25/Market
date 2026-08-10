@@ -5,8 +5,16 @@ from django.db import models
 from django.utils.html import format_html
 
 from .feedback import recompute_product_rating
+from .brand_files import schedule_brand_logo_delete
 from .icon_files import schedule_category_icon_delete
-from .models import Category, Product, ProductComment, ProductImage, ProductRating
+from .models import (
+    Brand,
+    Category,
+    Product,
+    ProductComment,
+    ProductImage,
+    ProductRating,
+)
 
 
 class ProductImageInline(admin.TabularInline):
@@ -124,10 +132,78 @@ class CategoryAdmin(admin.ModelAdmin):
         return actions
 
 
+@admin.register(Brand)
+class BrandAdmin(admin.ModelAdmin):
+    list_display = ["logo_preview", "name", "slug", "is_active", "product_count"]
+    list_editable = ["is_active"]
+    prepopulated_fields = {"slug": ("name",)}
+    readonly_fields = ["logo_preview"]
+    search_fields = ["name", "slug"]
+    formfield_overrides = {
+        models.FileField: {
+            "widget": forms.ClearableFileInput(
+                attrs={"accept": ".png,.svg,image/png,image/svg+xml"}
+            )
+        }
+    }
+
+    @admin.display(description="پیش‌نمایش نشان")
+    def logo_preview(self, obj):
+        if not obj or not obj.logo:
+            return "—"
+        return format_html(
+            '<img src="{}" alt="" style="width: 48px; height: 48px; '
+            'object-fit: contain;" />',
+            obj.logo.url,
+        )
+
+    @admin.display(description="تعداد محصولات")
+    def product_count(self, obj):
+        return obj.products.count()
+
+    def save_model(self, request, obj, form, change):
+        old_name = ""
+        old_storage = None
+        if change:
+            previous = Brand.objects.filter(pk=obj.pk).first()
+            if previous and previous.logo:
+                old_name = previous.logo.name
+                old_storage = previous.logo.storage
+
+        super().save_model(request, obj, form, change)
+        new_name = obj.logo.name if obj.logo else ""
+        if old_name and old_name != new_name:
+            schedule_brand_logo_delete(
+                old_name,
+                old_storage,
+                using=obj._state.db or "default",
+            )
+
+    def delete_model(self, request, obj):
+        name = obj.logo.name if obj.logo else ""
+        storage = obj.logo.storage if obj.logo else None
+        using = obj._state.db or "default"
+        super().delete_model(request, obj)
+        if name:
+            schedule_brand_logo_delete(name, storage, using=using)
+
+    def has_delete_permission(self, request, obj=None):
+        allowed = super().has_delete_permission(request, obj)
+        if not allowed or obj is None:
+            return allowed
+        return not obj.products.exists()
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = [
         "title",
+        "brand",
         "category",
         "price",
         "old_price",
@@ -135,7 +211,7 @@ class ProductAdmin(admin.ModelAdmin):
         "rating",
         "is_active",
     ]
-    list_filter = ["categories"]
+    list_filter = ["brand", "categories"]
     search_fields = ["title", "title_en"]
     list_editable = ["price", "old_price", "stock", "is_active"]
     filter_horizontal = ["categories"]

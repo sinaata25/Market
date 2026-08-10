@@ -21,6 +21,7 @@ PRODUCT_RESPONSE_KEYS = {
     "categorySlug",
     "categories",
     "categorySlugs",
+    "brand",
     "price",
     "oldPrice",
     "rating",

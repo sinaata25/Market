@@ -90,7 +90,7 @@ def cart_dto(cart: Cart | None) -> dict:
         items = [
             {"id": i.id, "qty": i.qty, "product": product_dto(i.product)}
             for i in cart.items.select_related(
-                "product__category"
+                "product__category", "product__brand"
             ).prefetch_related("product__categories", "product__images")
         ]
 

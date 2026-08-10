@@ -9,6 +9,13 @@ urlpatterns = [
     path("categories", views.AdminCategoryListView.as_view()),
     path("categories/<int:pk>", views.AdminCategoryDetailView.as_view()),
     path("categories/<int:pk>/icon", views.AdminCategoryIconView.as_view()),
+    path("brands", views.AdminBrandListView.as_view()),
+    path("brands/<int:pk>", views.AdminBrandDetailView.as_view()),
+    path("brands/<int:pk>/logo", views.AdminBrandLogoView.as_view()),
+    path(
+        "brands/<int:pk>/price-adjustment",
+        views.AdminBrandPriceAdjustmentView.as_view(),
+    ),
     path("products", views.AdminProductListView.as_view()),
     path("products/<int:pk>", views.AdminProductDetailView.as_view()),
     path(

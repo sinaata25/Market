@@ -34,6 +34,11 @@ export default function ProductCard({ product }: { product: Product }) {
       )}
 
       {/* عنوان */}
+      {product.brand && (
+        <span className="mb-1 text-[11px] font-medium text-brand-600">
+          {product.brand.name}
+        </span>
+      )}
       <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm leading-6 text-slate-700 group-hover:text-brand-700">
         {product.title}
       </h3>

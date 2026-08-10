@@ -5,6 +5,31 @@ from django.db import models
 from .validators import validate_category_icon
 
 
+class Brand(models.Model):
+    name = models.CharField("نام", max_length=100, unique=True)
+    slug = models.SlugField("نامک", max_length=100, unique=True)
+    description = models.TextField("توضیحات", blank=True)
+    logo = models.FileField(
+        "نشان تجاری",
+        upload_to="brands/logos/",
+        blank=True,
+        validators=[validate_category_icon],
+        help_text="فایل PNG یا SVG ایمن، حداکثر ۵ مگابایت",
+    )
+    website = models.URLField("وب‌سایت", blank=True)
+    is_active = models.BooleanField("نمایش در فروشگاه", default=True)
+    created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+    updated_at = models.DateTimeField("به‌روزرسانی", auto_now=True)
+
+    class Meta:
+        verbose_name = "برند"
+        verbose_name_plural = "برندها"
+        ordering = ["name", "id"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Category(models.Model):
     slug = models.SlugField("نامک", unique=True)
     title = models.CharField("عنوان", max_length=100, unique=True)
@@ -60,6 +85,14 @@ class Product(models.Model):
         Category,
         verbose_name="همه دسته‌بندی‌ها",
         related_name="categorized_products",
+    )
+    brand = models.ForeignKey(
+        Brand,
+        verbose_name="برند",
+        on_delete=models.PROTECT,
+        related_name="products",
+        null=True,
+        blank=True,
     )
 
     class Meta:

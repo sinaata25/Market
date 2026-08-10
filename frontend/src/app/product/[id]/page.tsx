@@ -138,8 +138,8 @@ export default async function ProductPage({
             </p>
           )}
 
-          {/* امتیاز و دسته */}
-          <div className="mb-5 flex items-center gap-4 text-xs">
+          {/* امتیاز، برند و دسته */}
+          <div className="mb-5 flex flex-wrap items-center gap-4 text-xs">
             <span className="flex items-center gap-1 text-slate-500">
               <span className="text-amber-400">★</span>
               <span className="font-num">
@@ -149,6 +149,25 @@ export default async function ProductPage({
                 ({product.ratingCount.toLocaleString("fa-IR")} امتیاز)
               </span>
             </span>
+            {product.brand && product.brand.isActive !== false && (
+              <>
+                <span className="text-slate-300">|</span>
+                <Link
+                  href={`/brand/${product.brand.slug}`}
+                  className="font-medium text-brand-600 hover:underline"
+                >
+                  برند {product.brand.name}
+                </Link>
+              </>
+            )}
+            {product.brand?.isActive === false && (
+              <>
+                <span className="text-slate-300">|</span>
+                <span className="font-medium text-slate-500">
+                  برند {product.brand.name}
+                </span>
+              </>
+            )}
             {productCategories.length > 0 && (
               <>
                 <span className="text-slate-300">|</span>

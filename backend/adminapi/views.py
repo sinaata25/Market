@@ -2,6 +2,7 @@
 
 import math
 from datetime import timedelta
+from decimal import Decimal
 
 from PIL import Image, UnidentifiedImageError
 from django.contrib.auth import get_user_model
@@ -18,10 +19,13 @@ from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
 from catalog.category_tree import visible_category_ids
-from catalog.dto import category_dto, category_summary, product_dto
+from catalog.brand_files import schedule_brand_logo_delete
+from catalog.brand_pricing import adjust_brand_prices
+from catalog.dto import brand_dto, category_dto, category_summary, product_dto
 from catalog.feedback import verified_purchase_pairs
 from catalog.icon_files import schedule_category_icon_delete
 from catalog.models import (
+    Brand,
     Category,
     Product,
     ProductComment,
@@ -69,6 +73,22 @@ def admin_product_dto(product: Product) -> dict:
     data["imageItems"] = [
         {"id": img.id, "url": img.image.url} for img in product.images.all()
     ]
+    return data
+
+
+def admin_brand_dto(brand: Brand) -> dict:
+    data = brand_dto(brand)
+    data.update(
+        {
+            "id": brand.id,
+            "isActive": brand.is_active,
+            "productCount": (
+                brand.product_count
+                if hasattr(brand, "product_count")
+                else brand.products.count()
+            ),
+        }
+    )
     return data
 
 
@@ -444,6 +464,180 @@ class AdminCategoryIconView(StaffRequiredMixin, APIView):
         return ok({"category": admin_category_dto(category)})
 
 
+# ─── برندها ──────────────────────────────────────────────────
+
+
+class BrandWriteSerializer(serializers.ModelSerializer):
+    isActive = serializers.BooleanField(source="is_active", required=False)
+
+    class Meta:
+        model = Brand
+        fields = [
+            "name",
+            "slug",
+            "description",
+            "website",
+            "isActive",
+        ]
+
+
+class AdminBrandListView(StaffRequiredMixin, APIView):
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        brands = Brand.objects.annotate(product_count=Count("products"))
+        return ok({"brands": [admin_brand_dto(brand) for brand in brands]})
+
+    @extend_schema(request=BrandWriteSerializer, responses={201: OpenApiTypes.OBJECT})
+    def post(self, request):
+        serializer = BrandWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        brand = serializer.save()
+        brand = Brand.objects.annotate(product_count=Count("products")).get(
+            pk=brand.pk
+        )
+        return ok({"brand": admin_brand_dto(brand)}, status=201)
+
+
+class AdminBrandDetailView(StaffRequiredMixin, APIView):
+    @extend_schema(request=BrandWriteSerializer, responses={200: OpenApiTypes.OBJECT})
+    def patch(self, request, pk: int):
+        brand = Brand.objects.filter(pk=pk).first()
+        if brand is None:
+            return fail("برند یافت نشد", 404)
+        serializer = BrandWriteSerializer(brand, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        brand = serializer.save()
+        brand = Brand.objects.annotate(product_count=Count("products")).get(
+            pk=brand.pk
+        )
+        return ok({"brand": admin_brand_dto(brand)})
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def delete(self, request, pk: int):
+        brand = Brand.objects.filter(pk=pk).first()
+        if brand is None:
+            return fail("برند یافت نشد", 404)
+        if brand.products.exists():
+            return fail(
+                "این برند دارای محصول است؛ ابتدا برند محصولات را تغییر دهید",
+                409,
+            )
+        logo_name = brand.logo.name if brand.logo else ""
+        logo_storage = brand.logo.storage if brand.logo else None
+        using = brand._state.db or "default"
+        try:
+            brand.delete()
+        except ProtectedError:
+            return fail(
+                "این برند دارای محصول است؛ ابتدا برند محصولات را تغییر دهید",
+                409,
+            )
+        if logo_name:
+            schedule_brand_logo_delete(logo_name, logo_storage, using=using)
+        return ok({"deleted": True})
+
+
+class BrandLogoUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(
+        help_text="Validated PNG or safe SVG logo, up to 5 MB."
+    )
+
+
+class AdminBrandLogoView(StaffRequiredMixin, APIView):
+    def _get(self, pk: int) -> Brand | None:
+        return Brand.objects.filter(pk=pk).first()
+
+    @extend_schema(
+        request=BrandLogoUploadSerializer,
+        responses={201: OpenApiTypes.OBJECT},
+    )
+    def post(self, request, pk: int):
+        brand = self._get(pk)
+        if brand is None:
+            return fail("برند یافت نشد", 404)
+        logo = request.FILES.get("file")
+        if logo is None:
+            return fail("فایل نشان تجاری ارسال نشده است", 422)
+        try:
+            validate_category_icon(logo)
+        except DjangoValidationError as exc:
+            messages = getattr(exc, "messages", None)
+            return fail(
+                messages[0] if messages else "نشان تجاری معتبر نیست", 422
+            )
+
+        old_name = brand.logo.name if brand.logo else ""
+        old_storage = brand.logo.storage if brand.logo else None
+        brand.logo = logo
+        brand.save(update_fields=["logo", "updated_at"])
+        if old_name and old_name != brand.logo.name:
+            schedule_brand_logo_delete(
+                old_name,
+                old_storage,
+                using=brand._state.db or "default",
+            )
+        return ok({"brand": admin_brand_dto(brand)}, status=201)
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def delete(self, request, pk: int):
+        brand = self._get(pk)
+        if brand is None:
+            return fail("برند یافت نشد", 404)
+        if not brand.logo:
+            return ok({"brand": admin_brand_dto(brand)})
+        old_name = brand.logo.name
+        old_storage = brand.logo.storage
+        brand.logo = ""
+        brand.save(update_fields=["logo", "updated_at"])
+        schedule_brand_logo_delete(
+            old_name,
+            old_storage,
+            using=brand._state.db or "default",
+        )
+        return ok({"brand": admin_brand_dto(brand)})
+
+
+class BrandPriceAdjustmentSerializer(serializers.Serializer):
+    operation = serializers.ChoiceField(choices=["increase", "decrease"])
+    percentage = serializers.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        max_value=Decimal("1000"),
+    )
+
+    def validate(self, data):
+        if data["operation"] == "decrease" and data["percentage"] >= 100:
+            raise serializers.ValidationError(
+                "درصد کاهش باید کمتر از ۱۰۰ باشد"
+            )
+        return data
+
+
+class AdminBrandPriceAdjustmentView(StaffRequiredMixin, APIView):
+    @extend_schema(
+        request=BrandPriceAdjustmentSerializer,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def post(self, request, pk: int):
+        brand = Brand.objects.filter(pk=pk).first()
+        if brand is None:
+            return fail("برند یافت نشد", 404)
+        serializer = BrandPriceAdjustmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        updated_count = adjust_brand_prices(
+            brand=brand,
+            operation=serializer.validated_data["operation"],
+            percentage=serializer.validated_data["percentage"],
+        )
+        return ok(
+            {
+                "brand": {"id": brand.id, "name": brand.name},
+                "updatedCount": updated_count,
+            }
+        )
+
+
 # ─── محصولات ─────────────────────────────────────────────────
 
 
@@ -455,6 +649,9 @@ class ProductWriteSerializer(serializers.Serializer):
     categorySlug = serializers.CharField(required=False)
     categorySlugs = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=False
+    )
+    brandSlug = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
     )
     price = serializers.IntegerField(min_value=0)
     oldPrice = serializers.IntegerField(min_value=0, required=False, allow_null=True)
@@ -483,6 +680,15 @@ class ProductWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError("یک یا چند دسته‌بندی یافت نشد")
         data["categories"] = [categories_by_slug[slug] for slug in slugs]
 
+        brand_slug = data.pop("brandSlug", None)
+        if brand_slug:
+            brand = Brand.objects.filter(slug=brand_slug).first()
+            if brand is None:
+                raise serializers.ValidationError("برند یافت نشد")
+            data["brand"] = brand
+        else:
+            data["brand"] = None
+
         old_price = data.get("oldPrice")
         if old_price is not None and old_price <= data["price"]:
             raise serializers.ValidationError(
@@ -496,6 +702,7 @@ def apply_product_data(product: Product, data: dict) -> Product:
     product.title = data["title"]
     product.title_en = data.get("titleEn", "")
     product.category = categories[0]
+    product.brand = data["brand"]
     product.price = data["price"]
     product.old_price = data.get("oldPrice")
     product.stock = data["stock"]
@@ -510,7 +717,7 @@ def apply_product_data(product: Product, data: dict) -> Product:
 class AdminProductListView(StaffRequiredMixin, APIView):
     def get(self, request):
         qs = (
-            Product.objects.select_related("category")
+            Product.objects.select_related("category", "brand")
             .prefetch_related("categories", "images")
             .order_by("-created_at")
         )
@@ -544,7 +751,7 @@ class AdminProductListView(StaffRequiredMixin, APIView):
 class AdminProductDetailView(StaffRequiredMixin, APIView):
     def _get(self, pk: int) -> Product | None:
         return (
-            Product.objects.select_related("category")
+            Product.objects.select_related("category", "brand")
             .prefetch_related("categories", "images")
             .filter(pk=pk)
             .first()
@@ -590,7 +797,7 @@ class AdminProductVisibilityView(StaffRequiredMixin, APIView):
         serializer = ProductVisibilitySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         product = (
-            Product.objects.select_related("category")
+            Product.objects.select_related("category", "brand")
             .prefetch_related("categories", "images")
             .filter(pk=pk)
             .first()
@@ -627,7 +834,7 @@ class AdminProductImageView(StaffRequiredMixin, APIView):
         return ok(
             {
                 "product": admin_product_dto(
-                    Product.objects.select_related("category")
+                    Product.objects.select_related("category", "brand")
                     .prefetch_related("categories", "images")
                     .get(pk=pk)
                 )

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import CategoryMenu from "./CategoryMenu";
+import BrandMenu from "./BrandMenu";
 import HeaderActions from "./HeaderActions";
 
 export default function Header() {
@@ -50,6 +51,7 @@ export default function Header() {
       <nav className="border-b border-slate-100 bg-white">
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5 text-sm">
           <CategoryMenu />
+          <BrandMenu />
 
           <span className="mx-1 h-5 w-px bg-slate-200" />
 
