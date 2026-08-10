@@ -9,17 +9,36 @@ DEFAULT_FEATURES = [
 ]
 
 
-def category_dto(category: Category) -> dict:
+def category_summary(category: Category) -> dict:
+    return {
+        "slug": category.slug,
+        "title": category.title,
+    }
+
+
+def category_dto(
+    category: Category, *, visible_ids: set[int] | None = None
+) -> dict:
+    children = list(category.children.all())
+    if visible_ids is not None:
+        children = [child for child in children if child.pk in visible_ids]
     return {
         "slug": category.slug,
         "title": category.title,
         "icon": category.icon.url if category.icon else None,
-        "sub": category.sub or [],
+        "sub": [category_summary(child) for child in children],
+        "isTopLevel": not category.parents.exists(),
     }
 
 
 def product_dto(product: Product) -> dict:
-    category = product.category
+    assigned_categories = list(product.categories.all())
+    categories = [product.category] + [
+        category
+        for category in assigned_categories
+        if category.pk != product.category_id
+    ]
+    category = categories[0]
     # آدرس‌های نسبی /media/… — فرانت آن‌ها را به جنگو پروکسی می‌کند
     images = [img.image.url for img in product.images.all()]
     return {
@@ -30,6 +49,10 @@ def product_dto(product: Product) -> dict:
         "titleEn": product.title_en or None,
         "category": category.title,
         "categorySlug": category.slug,
+        "categories": [
+            {"slug": item.slug, "title": item.title} for item in categories
+        ],
+        "categorySlugs": [item.slug for item in categories],
         "price": product.price,
         "oldPrice": product.old_price,
         "rating": product.rating,
@@ -39,7 +62,10 @@ def product_dto(product: Product) -> dict:
         "features": product.features or DEFAULT_FEATURES,
         "specs": product.specs
         or [
-            {"label": "دسته‌بندی", "value": category.title},
+            {
+                "label": "دسته‌بندی",
+                "value": "، ".join(item.title for item in categories),
+            },
             {"label": "وضعیت کالا", "value": "نو و اصل"},
             {"label": "ارسال", "value": "از انبار فروشگاه"},
         ],
@@ -50,4 +76,5 @@ def product_dto(product: Product) -> dict:
         ),
         "warranty": product.warranty or "۱۲ ماه ضمانت فروشگاه",
         "stock": product.stock,
+        "isActive": product.is_active,
     }

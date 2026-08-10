@@ -13,6 +13,8 @@ PRODUCT_RESPONSE_KEYS = {
     "titleEn",
     "category",
     "categorySlug",
+    "categories",
+    "categorySlugs",
     "price",
     "oldPrice",
     "rating",
@@ -24,6 +26,7 @@ PRODUCT_RESPONSE_KEYS = {
     "description",
     "warranty",
     "stock",
+    "isActive",
 }
 
 
@@ -82,10 +85,41 @@ class ReviewContractTests(TestCase):
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 409)
         self.assertEqual(Review.objects.count(), 1)
+        review = Review.objects.get()
+        self.assertFalse(review.is_published)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.rating_count, 0)
+
+    def test_only_published_reviews_are_visible_publicly(self):
+        pending = Review.objects.create(
+            product=self.product,
+            user=self.user,
+            rating=2,
+            text="این دیدگاه هنوز تایید نشده است",
+        )
+        second_user = get_user_model().objects.create_user(phone="09121111111")
+        published = Review.objects.create(
+            product=self.product,
+            user=second_user,
+            rating=5,
+            text="این دیدگاه تایید شده است",
+            is_published=True,
+        )
+
+        response = self.client.get(f"/api/products/{self.product.id}/reviews")
+
+        self.assertEqual(response.status_code, 200)
+        review_ids = [r["id"] for r in response.data["data"]["reviews"]]
+        self.assertEqual(review_ids, [published.id])
+        self.assertNotIn(pending.id, review_ids)
 
     def test_deleting_own_review_recomputes_product_rating(self):
         review = Review.objects.create(
-            product=self.product, user=self.user, rating=5, text="عالی بود"
+            product=self.product,
+            user=self.user,
+            rating=5,
+            text="عالی بود",
+            is_published=True,
         )
         self.product.rating = 5
         self.product.rating_count = 1
@@ -118,5 +152,7 @@ class ReviewContractTests(TestCase):
                 "createdAt",
                 "productId",
                 "productTitle",
+                "isPublished",
             },
         )
+        self.assertFalse(review["isPublished"])

@@ -15,9 +15,11 @@ from rest_framework import serializers
 from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
-from catalog.dto import category_dto, product_dto
+from catalog.category_tree import visible_category_ids
+from catalog.dto import category_dto, category_summary, product_dto
 from catalog.icon_files import schedule_category_icon_delete
 from catalog.models import Category, Product, ProductImage, Review
+from catalog.reviews import recompute_product_rating
 from catalog.validators import validate_category_icon
 from common.responses import fail, ok
 from orders.models import Order, OrderItem
@@ -163,7 +165,11 @@ class StatsView(StaffRequiredMixin, APIView):
                     "products": Product.objects.count(),
                     "reviews": Review.objects.count(),
                     "avgRating": round(
-                        Review.objects.aggregate(a=Avg("rating"))["a"] or 0, 1
+                        Review.objects.filter(is_published=True).aggregate(
+                            a=Avg("rating")
+                        )["a"]
+                        or 0,
+                        1,
                     ),
                 },
                 "salesByDay": sales_by_day,
@@ -242,41 +248,96 @@ class AdminOrderDetailView(StaffRequiredMixin, APIView):
 
 
 class CategoryWriteSerializer(serializers.ModelSerializer):
-    sub = serializers.ListField(
-        child=serializers.CharField(max_length=100),
+    isActive = serializers.BooleanField(source="is_active", required=False)
+    parentIds = serializers.PrimaryKeyRelatedField(
+        source="parents",
+        queryset=Category.objects.all(),
+        many=True,
         required=False,
-        default=list,
-        allow_empty=True,
     )
 
     class Meta:
         model = Category
-        fields = ["title", "slug", "sub"]
+        fields = ["title", "slug", "parentIds", "isActive"]
+
+    def validate_parentIds(self, parents):
+        category = self.instance
+        if category is None:
+            return parents
+        parent_ids = {parent.pk for parent in parents}
+        if category.pk in parent_ids:
+            raise serializers.ValidationError(
+                "یک دسته‌بندی نمی‌تواند والد خودش باشد"
+            )
+
+        descendants = {category.pk}
+        frontier = {category.pk}
+        while frontier:
+            child_ids = set(
+                Category.objects.filter(parents__id__in=frontier)
+                .exclude(id__in=descendants)
+                .distinct()
+                .values_list("id", flat=True)
+            )
+            descendants.update(child_ids)
+            frontier = child_ids
+        if parent_ids & descendants:
+            raise serializers.ValidationError(
+                "این رابطه باعث ایجاد چرخه در دسته‌بندی‌ها می‌شود"
+            )
+        return parents
 
 
-def admin_category_dto(category: Category) -> dict:
+def admin_category_dto(
+    category: Category, *, visible_ids: set[int] | None = None
+) -> dict:
+    if visible_ids is None:
+        visible_ids = visible_category_ids()
     data = category_dto(category)
     data["id"] = category.id
+    data["isActive"] = category.is_active
+    data["effectiveIsActive"] = category.id in visible_ids
+    data["parents"] = [
+        {"id": parent.id, **category_summary(parent)}
+        for parent in category.parents.all()
+    ]
     data["productCount"] = (
         category.product_count
         if hasattr(category, "product_count")
-        else category.products.count()
+        else category.categorized_products.count()
     )
     return data
 
 
 class AdminCategoryListView(StaffRequiredMixin, APIView):
     def get(self, request):
-        categories = Category.objects.annotate(product_count=Count("products"))
+        visible_ids = visible_category_ids()
+        categories = (
+            Category.objects.annotate(
+                product_count=Count("categorized_products", distinct=True)
+            )
+            .prefetch_related("parents", "children")
+        )
         return ok(
-            {"categories": [admin_category_dto(item) for item in categories]}
+            {
+                "categories": [
+                    admin_category_dto(item, visible_ids=visible_ids)
+                    for item in categories
+                ]
+            }
         )
 
     def post(self, request):
         serializer = CategoryWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         category = serializer.save()
-        category.product_count = 0
+        category = (
+            Category.objects.annotate(
+                product_count=Count("categorized_products", distinct=True)
+            )
+            .prefetch_related("parents", "children")
+            .get(pk=category.pk)
+        )
         return ok({"category": admin_category_dto(category)}, status=201)
 
 
@@ -290,12 +351,29 @@ class AdminCategoryDetailView(StaffRequiredMixin, APIView):
         )
         serializer.is_valid(raise_exception=True)
         category = serializer.save()
+        category = (
+            Category.objects.annotate(
+                product_count=Count("categorized_products", distinct=True)
+            )
+            .prefetch_related("parents", "children")
+            .get(pk=category.pk)
+        )
         return ok({"category": admin_category_dto(category)})
 
     def delete(self, request, pk: int):
         category = Category.objects.filter(pk=pk).first()
         if category is None:
             return fail("دسته‌بندی یافت نشد", 404)
+        if category.products.exists() or category.categorized_products.exists():
+            return fail(
+                "این دسته‌بندی دارای محصول است و تا زمان انتقال یا حذف محصولات قابل حذف نیست",
+                409,
+            )
+        if category.children.exists():
+            return fail(
+                "این دسته‌بندی والد دسته‌های دیگر است؛ ابتدا رابطه والد را تغییر دهید",
+                409,
+            )
         icon_name = category.icon.name if category.icon else ""
         icon_storage = category.icon.storage if category.icon else None
         using = category._state.db or "default"
@@ -368,7 +446,10 @@ class ProductWriteSerializer(serializers.Serializer):
     titleEn = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
-    categorySlug = serializers.CharField()
+    categorySlug = serializers.CharField(required=False)
+    categorySlugs = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=False
+    )
     price = serializers.IntegerField(min_value=0)
     oldPrice = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     stock = serializers.IntegerField(min_value=0)
@@ -380,13 +461,22 @@ class ProductWriteSerializer(serializers.Serializer):
         max_length=100, required=False, allow_blank=True, default=""
     )
 
-    def validate_categorySlug(self, value):
-        try:
-            return Category.objects.get(slug=value)
-        except Category.DoesNotExist:
-            raise serializers.ValidationError("دسته‌بندی یافت نشد")
-
     def validate(self, data):
+        slugs = data.pop("categorySlugs", None)
+        legacy_slug = data.pop("categorySlug", None)
+        if slugs is None:
+            slugs = [legacy_slug] if legacy_slug else []
+        slugs = list(dict.fromkeys(slugs))
+        if not slugs:
+            raise serializers.ValidationError("حداقل یک دسته‌بندی انتخاب کنید")
+        categories_by_slug = {
+            category.slug: category
+            for category in Category.objects.filter(slug__in=slugs)
+        }
+        if len(categories_by_slug) != len(slugs):
+            raise serializers.ValidationError("یک یا چند دسته‌بندی یافت نشد")
+        data["categories"] = [categories_by_slug[slug] for slug in slugs]
+
         old_price = data.get("oldPrice")
         if old_price is not None and old_price <= data["price"]:
             raise serializers.ValidationError(
@@ -396,9 +486,10 @@ class ProductWriteSerializer(serializers.Serializer):
 
 
 def apply_product_data(product: Product, data: dict) -> Product:
+    categories = data["categories"]
     product.title = data["title"]
     product.title_en = data.get("titleEn", "")
-    product.category = data["categorySlug"]
+    product.category = categories[0]
     product.price = data["price"]
     product.old_price = data.get("oldPrice")
     product.stock = data["stock"]
@@ -406,6 +497,7 @@ def apply_product_data(product: Product, data: dict) -> Product:
     product.description = data.get("description", "")
     product.warranty = data.get("warranty", "")
     product.save()
+    product.categories.set(categories)
     return product
 
 
@@ -413,7 +505,7 @@ class AdminProductListView(StaffRequiredMixin, APIView):
     def get(self, request):
         qs = (
             Product.objects.select_related("category")
-            .prefetch_related("images")
+            .prefetch_related("categories", "images")
             .order_by("-created_at")
         )
         search = request.query_params.get("search", "").strip()
@@ -447,7 +539,7 @@ class AdminProductDetailView(StaffRequiredMixin, APIView):
     def _get(self, pk: int) -> Product | None:
         return (
             Product.objects.select_related("category")
-            .prefetch_related("images")
+            .prefetch_related("categories", "images")
             .filter(pk=pk)
             .first()
         )
@@ -483,6 +575,27 @@ class AdminProductDetailView(StaffRequiredMixin, APIView):
         return ok({"deleted": True})
 
 
+class ProductVisibilitySerializer(serializers.Serializer):
+    isActive = serializers.BooleanField()
+
+
+class AdminProductVisibilityView(StaffRequiredMixin, APIView):
+    def patch(self, request, pk: int):
+        serializer = ProductVisibilitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = (
+            Product.objects.select_related("category")
+            .prefetch_related("categories", "images")
+            .filter(pk=pk)
+            .first()
+        )
+        if product is None:
+            return fail("محصول یافت نشد", 404)
+        product.is_active = serializer.validated_data["isActive"]
+        product.save(update_fields=["is_active"])
+        return ok({"product": admin_product_dto(product)})
+
+
 class AdminProductImageView(StaffRequiredMixin, APIView):
     """آپلود تصویر محصول (multipart/form-data با فیلد file)"""
 
@@ -505,7 +618,16 @@ class AdminProductImageView(StaffRequiredMixin, APIView):
         ProductImage.objects.create(
             product=product, image=file, alt=product.title, order=order
         )
-        return ok({"product": admin_product_dto(Product.objects.select_related("category").prefetch_related("images").get(pk=pk))}, status=201)
+        return ok(
+            {
+                "product": admin_product_dto(
+                    Product.objects.select_related("category")
+                    .prefetch_related("categories", "images")
+                    .get(pk=pk)
+                )
+            },
+            status=201,
+        )
 
 
 class AdminProductImageDetailView(StaffRequiredMixin, APIView):
@@ -563,15 +685,6 @@ class AdminUserListView(StaffRequiredMixin, APIView):
 # ─── دیدگاه‌ها ───────────────────────────────────────────────
 
 
-def recompute_rating(product_id: int):
-    agg = Review.objects.filter(product_id=product_id).aggregate(
-        avg=Avg("rating"), count=Count("id")
-    )
-    Product.objects.filter(pk=product_id).update(
-        rating=round(agg["avg"] or 0, 1), rating_count=agg["count"]
-    )
-
-
 class AdminReviewListView(StaffRequiredMixin, APIView):
     def get(self, request):
         qs = Review.objects.select_related("user", "product").order_by("-created_at")
@@ -594,6 +707,7 @@ class AdminReviewListView(StaffRequiredMixin, APIView):
                         "author": r.user.name or r.user.phone,
                         "productId": r.product_id,
                         "productTitle": r.product.title,
+                        "isPublished": r.is_published,
                     }
                     for r in rows
                 ],
@@ -604,12 +718,36 @@ class AdminReviewListView(StaffRequiredMixin, APIView):
         )
 
 
+class ReviewModerationSerializer(serializers.Serializer):
+    isPublished = serializers.BooleanField(required=True)
+
+
 class AdminReviewDetailView(StaffRequiredMixin, APIView):
+    def patch(self, request, pk: int):
+        review = Review.objects.filter(pk=pk).first()
+        if review is None:
+            return fail("دیدگاه یافت نشد", 404)
+
+        serializer = ReviewModerationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        review.is_published = serializer.validated_data["isPublished"]
+        review.save(update_fields=["is_published"])
+        recompute_product_rating(review.product_id)
+        return ok(
+            {
+                "review": {
+                    "id": review.id,
+                    "isPublished": review.is_published,
+                }
+            }
+        )
+
     def delete(self, request, pk: int):
         review = Review.objects.filter(pk=pk).first()
         if review is None:
             return fail("دیدگاه یافت نشد", 404)
         product_id = review.product_id
         review.delete()
-        recompute_rating(product_id)
+        recompute_product_rating(product_id)
         return ok({"deleted": True})

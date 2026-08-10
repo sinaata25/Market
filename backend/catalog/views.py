@@ -1,12 +1,13 @@
 import math
 
-from django.db.models import Avg, Count
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
 from common.responses import fail, ok
 
+from .category_tree import descendant_category_ids, visible_category_ids
 from .dto import category_dto, product_dto
 from .models import Category, Product, Review
 
@@ -18,6 +19,11 @@ SORTS = {
 }
 
 
+class CategoryLinkResponseSerializer(serializers.Serializer):
+    slug = serializers.CharField()
+    title = serializers.CharField()
+
+
 class CategoryResponseSerializer(serializers.Serializer):
     slug = serializers.CharField()
     title = serializers.CharField()
@@ -25,7 +31,8 @@ class CategoryResponseSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Relative media URL for a validated PNG or SVG icon, or null.",
     )
-    sub = serializers.ListField(child=serializers.CharField())
+    sub = CategoryLinkResponseSerializer(many=True)
+    isTopLevel = serializers.BooleanField()
 
 
 class CategoryListDataSerializer(serializers.Serializer):
@@ -42,7 +49,13 @@ class CategoryListView(APIView):
 
     @extend_schema(responses={200: CategoryListEnvelopeSerializer})
     def get(self, request):
-        categories = [category_dto(c) for c in Category.objects.all()]
+        visible_ids = visible_category_ids()
+        categories = [
+            category_dto(category, visible_ids=visible_ids)
+            for category in Category.objects.filter(id__in=visible_ids).prefetch_related(
+                "parents", "children"
+            )
+        ]
         return ok({"categories": categories})
 
 
@@ -53,11 +66,26 @@ class ProductListView(APIView):
     """
 
     def get(self, request):
-        qs = Product.objects.select_related("category").prefetch_related("images")
+        qs = Product.objects.select_related("category").prefetch_related(
+            "categories", "images"
+        ).filter(is_active=True)
 
         category = request.query_params.get("category")
         if category:
-            qs = qs.filter(category__slug=category)
+            visible_ids = visible_category_ids()
+            selected_category = Category.objects.filter(
+                slug=category, id__in=visible_ids
+            ).first()
+            if selected_category is not None:
+                category_ids = descendant_category_ids(
+                    selected_category.id, allowed_ids=visible_ids
+                )
+                qs = qs.filter(
+                    Q(category_id__in=category_ids)
+                    | Q(categories__id__in=category_ids)
+                ).distinct()
+            else:
+                qs = qs.none()
 
         search = request.query_params.get("search")
         if search:
@@ -97,25 +125,38 @@ class ProductDetailView(APIView):
         try:
             product = (
                 Product.objects.select_related("category")
-                .prefetch_related("images")
-                .get(pk=pk)
+                .prefetch_related("categories", "images")
+                .get(pk=pk, is_active=True)
             )
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
 
-        # اول هم‌دسته‌ها، بعد پرطرفدارهای سایر دسته‌ها تا سقف ۴ مورد
+        category_ids = {category.id for category in product.categories.all()}
+        category_ids.add(product.category_id)
+
+        # اول محصولات دارای حداقل یک دسته‌ی مشترک، سپس سایر محصولات تا سقف ۴ مورد
         same = list(
             Product.objects.select_related("category")
-            .prefetch_related("images")
-            .filter(category=product.category)
+            .prefetch_related("categories", "images")
+            .filter(is_active=True)
+            .filter(
+                Q(category_id__in=category_ids)
+                | Q(categories__id__in=category_ids)
+            )
+            .distinct()
             .exclude(pk=pk)[:4]
         )
         if len(same) < 4:
             others = (
                 Product.objects.select_related("category")
-                .prefetch_related("images")
-                .exclude(category=product.category)
+                .prefetch_related("categories", "images")
+                .filter(is_active=True)
+                .exclude(
+                    Q(category_id__in=category_ids)
+                    | Q(categories__id__in=category_ids)
+                )
                 .exclude(pk=pk)
+                .distinct()
                 .order_by("-rating_count")[: 4 - len(same)]
             )
             same.extend(others)
@@ -177,7 +218,11 @@ class ReviewListCreateView(APIView):
     """فهرست دیدگاه‌های محصول / ثبت دیدگاه (نیازمند ورود)"""
 
     def get(self, request, pk: int):
-        reviews = Review.objects.filter(product_id=pk).select_related("user")
+        if not Product.objects.filter(pk=pk, is_active=True).exists():
+            return fail("محصول یافت نشد", 404)
+        reviews = Review.objects.filter(
+            product_id=pk, is_published=True
+        ).select_related("user")
         return ok(
             {
                 "reviews": [
@@ -198,7 +243,7 @@ class ReviewListCreateView(APIView):
             return fail("برای ثبت دیدگاه ابتدا وارد شوید", 401)
 
         try:
-            product = Product.objects.get(pk=pk)
+            product = Product.objects.get(pk=pk, is_active=True)
         except Product.DoesNotExist:
             return fail("محصول یافت نشد", 404)
 
@@ -215,12 +260,7 @@ class ReviewListCreateView(APIView):
             text=ser.validated_data["text"],
         )
 
-        # میانگین و تعداد امتیازها دوباره محاسبه شود
-        agg = Review.objects.filter(product=product).aggregate(
-            avg=Avg("rating"), count=Count("id")
+        return ok(
+            {"review": {"id": review.id, "isPublished": review.is_published}},
+            status=201,
         )
-        product.rating = round(agg["avg"] or 0, 1)
-        product.rating_count = agg["count"]
-        product.save(update_fields=["rating", "rating_count"])
-
-        return ok({"review": {"id": review.id}}, status=201)

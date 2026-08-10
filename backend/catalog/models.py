@@ -8,6 +8,7 @@ from .validators import validate_category_icon
 class Category(models.Model):
     slug = models.SlugField("نامک", unique=True)
     title = models.CharField("عنوان", max_length=100, unique=True)
+    is_active = models.BooleanField("نمایش در فروشگاه", default=True)
     icon = models.FileField(
         "آیکن",
         upload_to="categories/icons/",
@@ -15,7 +16,13 @@ class Category(models.Model):
         validators=[validate_category_icon],
         help_text="فایل PNG یا SVG ایمن، حداکثر ۵ مگابایت",
     )
-    sub = models.JSONField("زیردسته‌ها", default=list, blank=True)
+    parents = models.ManyToManyField(
+        "self",
+        verbose_name="دسته‌بندی‌های والد",
+        symmetrical=False,
+        related_name="children",
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "دسته‌بندی"
@@ -40,13 +47,19 @@ class Product(models.Model):
     description = models.TextField("توضیحات", blank=True)
     warranty = models.CharField("گارانتی", max_length=100, blank=True)
     stock = models.PositiveIntegerField("موجودی", default=10)
+    is_active = models.BooleanField("نمایش در فروشگاه", default=True)
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     category = models.ForeignKey(
         Category,
-        verbose_name="دسته‌بندی",
+        verbose_name="دسته‌بندی اصلی",
         on_delete=models.PROTECT,
         related_name="products",
+    )
+    categories = models.ManyToManyField(
+        Category,
+        verbose_name="همه دسته‌بندی‌ها",
+        related_name="categorized_products",
     )
 
     class Meta:
@@ -86,6 +99,7 @@ class Review(models.Model):
         "امتیاز", validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
     text = models.TextField("متن")
+    is_published = models.BooleanField("منتشر شده", default=False)
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     product = models.ForeignKey(

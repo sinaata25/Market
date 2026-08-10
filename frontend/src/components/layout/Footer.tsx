@@ -5,19 +5,29 @@ const columns = [
   {
     title: "گروه صنعتی توانا",
     links: [
-      { label: "درباره ما", href: "#" },
-      { label: "تماس با ما", href: "#" },
-      { label: "فرصت‌های شغلی", href: "#" },
+      { label: "درباره ما", href: "/about" },
+      { label: "تماس با ما", href: "/contact" },
+      // { label: "فرصت‌های شغلی", href: "#" },
       { label: "وبلاگ کشاورزی", href: "/blog" },
     ],
   },
   {
     title: "خدمات مشتریان",
-    links: ["پاسخ به پرسش‌ها", "رویه ارسال سفارش", "شرایط بازگشت کالا", "حریم خصوصی"].map((label) => ({ label, href: "#" })),
+    links: [
+      { label: "پاسخ به پرسش‌ها", href: "/support" },
+      { label: "رویه ارسال سفارش", href: "/help/shipping" },
+      { label: "شرایط بازگشت کالا", href: "/help/returns" },
+      // "حریم خصوصی"
+    ],
   },
   {
     title: "راهنمای خرید",
-    links: ["نحوه ثبت سفارش", "شیوه‌های پرداخت", "رهگیری سفارش", "گارانتی محصولات"].map((label) => ({ label, href: "#" })),
+    links: [
+      { label: "نحوه ثبت سفارش", href: "/help/how-to-order" },
+      // "شیوه‌های پرداخت",
+      { label: "رهگیری سفارش", href: "/help/track-order" },
+      { label: "گارانتی محصولات", href: "/help/warranty" },
+    ],
   },
 ];
 

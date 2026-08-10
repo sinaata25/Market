@@ -91,7 +91,7 @@ def cart_dto(cart: Cart | None) -> dict:
             {"id": i.id, "qty": i.qty, "product": product_dto(i.product)}
             for i in cart.items.select_related(
                 "product__category"
-            ).prefetch_related("product__images")
+            ).prefetch_related("product__categories", "product__images")
         ]
 
     items_price = sum(

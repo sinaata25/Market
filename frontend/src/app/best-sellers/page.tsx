@@ -33,6 +33,9 @@ export default async function BestSellersPage({
   const top3 = items.slice(0, 3);
   const rest = items.slice(3);
   const activeTitle = categories.find((c) => c.slug === activeCategory)?.title;
+  const rootCategories = categories.filter(
+    (category) => category.isTopLevel !== false
+  );
 
   function url(slug?: string) {
     return slug ? `/best-sellers?category=${slug}` : "/best-sellers";
@@ -81,7 +84,7 @@ export default async function BestSellersPage({
         >
           همه دسته‌ها
         </Link>
-        {categories.map((c) => (
+        {rootCategories.map((c) => (
           <Link
             key={c.slug}
             href={url(c.slug)}

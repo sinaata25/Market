@@ -151,6 +151,14 @@ class OrderListCreateView(APIView):
             return fail("سبد خرید شما خالی است", 409)
 
         items = list(cart.items.select_related("product"))
+        hidden_product = next(
+            (item.product for item in items if not item.product.is_active), None
+        )
+        if hidden_product is not None:
+            return fail(
+                f"محصول «{hidden_product.title}» دیگر قابل سفارش نیست؛ آن را از سبد حذف کنید",
+                409,
+            )
 
         # محاسبه مبالغ
         items_price = sum(

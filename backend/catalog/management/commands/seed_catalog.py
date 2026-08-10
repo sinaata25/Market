@@ -54,6 +54,7 @@ PRODUCTS = [
         "title": "اره موتوری حرفه‌ای ۵۲ سی‌سی با تیغه ۵۰ سانتی",
         "title_en": "Professional Chainsaw 52cc 50cm",
         "category": "ابزار موتوری",
+        "subcategories": ["اره موتوری"],
         "price": 4_850_000,
         "old_price": 5_600_000,
         "rating": 4.6,
@@ -88,6 +89,7 @@ PRODUCTS = [
         "id": 2,
         "title": "سمپاش پشتی شارژی ۱۶ لیتری با باتری لیتیومی",
         "category": "سمپاش‌ها",
+        "subcategories": ["سمپاش پشتی", "سمپاش شارژی"],
         "price": 1_980_000,
         "old_price": 2_350_000,
         "rating": 4.4,
@@ -98,6 +100,7 @@ PRODUCTS = [
         "id": 3,
         "title": "بیل باغبانی استیل ضدزنگ دسته چوبی",
         "category": "ابزار باغبانی",
+        "subcategories": ["بیل و کلنگ"],
         "price": 420_000,
         "rating": 4.8,
         "rating_count": 89,
@@ -106,6 +109,7 @@ PRODUCTS = [
         "id": 4,
         "title": "شیلنگ آبیاری تقویت‌شده ۲۰ متری ضد پیچش",
         "category": "آبیاری",
+        "subcategories": ["شیلنگ آبیاری"],
         "price": 690_000,
         "old_price": 820_000,
         "rating": 4.3,
@@ -115,6 +119,7 @@ PRODUCTS = [
         "id": 5,
         "title": "قیچی باغبانی شاخه‌زنی تیغه فولادی ژاپنی",
         "category": "ابزار باغبانی",
+        "subcategories": ["قیچی باغبانی"],
         "price": 350_000,
         "rating": 4.7,
         "rating_count": 142,
@@ -124,6 +129,7 @@ PRODUCTS = [
         "id": 6,
         "title": "ست بذر سبزیجات ارگانیک ۱۲ عددی",
         "category": "بذر و نهال",
+        "subcategories": ["بذر سبزیجات"],
         "price": 185_000,
         "old_price": 240_000,
         "rating": 4.5,
@@ -133,6 +139,7 @@ PRODUCTS = [
         "id": 7,
         "title": "دستکش کار ضد برش مخصوص باغبانی (جفت)",
         "category": "ایمنی و حفاظت",
+        "subcategories": ["دستکش کار"],
         "price": 95_000,
         "rating": 4.2,
         "rating_count": 47,
@@ -141,6 +148,7 @@ PRODUCTS = [
         "id": 8,
         "title": "کود مایع رشد گیاهان ۱ لیتری غلیظ",
         "category": "کود و سم",
+        "subcategories": ["کود آلی"],
         "price": 145_000,
         "old_price": 175_000,
         "rating": 4.6,
@@ -156,19 +164,34 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("🌱 شروع seed ...")
 
+        root_categories = {}
         for data in CATEGORIES:
-            Category.objects.update_or_create(
+            category, _ = Category.objects.update_or_create(
                 slug=data["slug"],
                 defaults={
                     "title": data["title"],
-                    "sub": data["sub"],
                 },
             )
+            root_categories[data["slug"]] = category
+
+        for data in CATEGORIES:
+            parent = root_categories[data["slug"]]
+            for index, title in enumerate(data["sub"]):
+                child = Category.objects.filter(title=title).first()
+                if child is None:
+                    base_slug = f"{parent.slug[:40]}-sub-{index + 1}"
+                    slug = base_slug
+                    suffix = 2
+                    while Category.objects.filter(slug=slug).exists():
+                        slug = f"{base_slug[:46]}-{suffix}"
+                        suffix += 1
+                    child = Category.objects.create(title=title, slug=slug)
+                child.parents.add(parent)
         self.stdout.write(self.style.SUCCESS(f"✅ {len(CATEGORIES)} دسته‌بندی"))
 
         for data in PRODUCTS:
             category = Category.objects.get(title=data["category"])
-            Product.objects.update_or_create(
+            product, _ = Product.objects.update_or_create(
                 id=data["id"],
                 defaults={
                     "title": data["title"],
@@ -187,5 +210,11 @@ class Command(BaseCommand):
                     "category": category,
                 },
             )
+            assigned_categories = [category]
+            assigned_categories.extend(
+                Category.objects.get(title=title)
+                for title in data.get("subcategories", [])
+            )
+            product.categories.set(assigned_categories)
         self.stdout.write(self.style.SUCCESS(f"✅ {len(PRODUCTS)} محصول"))
         self.stdout.write("🌱 seed تمام شد.")

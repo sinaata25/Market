@@ -77,16 +77,20 @@ class CategoryIconValidationTests(TemporaryMediaTestCase):
         category = Category.objects.create(
             slug="garden-tools",
             title="ابزار باغبانی",
-            sub=["بیل", "قیچی"],
         )
+        child = Category.objects.create(slug="shovels", title="بیل")
+        child.parents.add(category)
 
         response = self.client.get("/api/categories")
 
         self.assertEqual(response.status_code, 200)
         item = response.data["data"]["categories"][0]
-        self.assertEqual(set(item), {"slug", "title", "icon", "sub"})
+        self.assertEqual(
+            set(item), {"slug", "title", "icon", "sub", "isTopLevel"}
+        )
         self.assertIsNone(item["icon"])
-        self.assertEqual(item["sub"], ["بیل", "قیچی"])
+        self.assertEqual(item["sub"], [{"slug": "shovels", "title": "بیل"}])
+        self.assertEqual(item["isTopLevel"], True)
         self.assertEqual(category.icon.name, "")
 
     def test_valid_png_is_stored_and_returned_as_media_url(self):
@@ -207,7 +211,6 @@ class CategoryAdminIconTests(TemporaryMediaTestCase):
         return {
             "slug": category.slug,
             "title": category.title,
-            "sub": "[]",
             "_save": "Save",
             **extra,
         }
@@ -215,7 +218,10 @@ class CategoryAdminIconTests(TemporaryMediaTestCase):
     def test_admin_form_has_icon_and_no_legacy_field(self):
         form_class = self.model_admin.get_form(self.request)
 
-        self.assertEqual(set(form_class.base_fields), {"slug", "title", "icon", "sub"})
+        self.assertEqual(
+            set(form_class.base_fields),
+            {"slug", "title", "is_active", "icon", "parents"},
+        )
 
     def test_admin_preview_uses_an_external_image_and_handles_no_icon(self):
         blank_category = self.create_category()
@@ -232,6 +238,22 @@ class CategoryAdminIconTests(TemporaryMediaTestCase):
         self.assertNotIn("<svg", preview)
         self.assertEqual(self.model_admin.icon_preview(blank_category), "—")
 
+    def test_admin_form_rejects_cycles_and_parent_delete_is_disabled(self):
+        parent = self.create_category(slug="parent", title="والد")
+        child = self.create_category(slug="child", title="فرزند")
+        child.parents.add(parent)
+
+        response = self.client.post(
+            reverse("admin:catalog_category_change", args=[parent.id]),
+            self.change_payload(parent, parents=[child.id]),
+        )
+
+        parent.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(parent.parents.exists())
+        self.assertContains(response, "چرخه")
+        self.assertFalse(self.model_admin.has_delete_permission(self.request, parent))
+
     def test_admin_can_create_categories_with_png_svg_or_no_icon(self):
         cases = (
             ("png", png_upload()),
@@ -242,7 +264,6 @@ class CategoryAdminIconTests(TemporaryMediaTestCase):
             payload = {
                 "slug": f"category-{index}",
                 "title": f"دسته {index}",
-                "sub": "[]",
                 "_save": "Save",
             }
             if icon is not None:

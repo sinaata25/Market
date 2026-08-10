@@ -44,7 +44,9 @@ export default function ProductTabs({ product }: { product: Product }) {
     e.preventDefault();
     setSubmitting(true);
     setReviewMessage("");
-    const res = await api.post<{ review: { id: number } }>(
+    const res = await api.post<{
+      review: { id: number; isPublished: boolean };
+    }>(
       `/api/products/${product.id}/reviews`,
       { rating: reviewRating, text: reviewText }
     );
@@ -58,11 +60,7 @@ export default function ProductTabs({ product }: { product: Product }) {
       return;
     }
     setReviewText("");
-    setReviewMessage("دیدگاه شما ثبت شد.");
-    const refreshed = await api.get<{ reviews: Review[] }>(
-      `/api/products/${product.id}/reviews`
-    );
-    if (refreshed.ok && refreshed.data) setReviews(refreshed.data.reviews);
+    setReviewMessage("دیدگاه شما ثبت شد و پس از تایید مدیر منتشر می‌شود.");
   }
 
   return (

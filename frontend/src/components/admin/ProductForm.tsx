@@ -8,7 +8,7 @@ import type { Category, Product } from "@/lib/products";
 type FormState = {
   title: string;
   titleEn: string;
-  categorySlug: string;
+  categorySlugs: string[];
   price: string;
   oldPrice: string;
   stock: string;
@@ -20,7 +20,7 @@ type FormState = {
 const EMPTY: FormState = {
   title: "",
   titleEn: "",
-  categorySlug: "",
+  categorySlugs: [],
   price: "",
   oldPrice: "",
   stock: "10",
@@ -50,6 +50,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
   const [loading, setLoading] = useState(editingExistingProduct);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [changingVisibility, setChangingVisibility] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
     null
   );
@@ -57,13 +59,25 @@ export default function ProductForm({ productId }: { productId?: number }) {
   const activeProductId = productId ?? createdProductId;
   const isEdit = activeProductId !== undefined;
 
-  function set<K extends keyof FormState>(key: K, value: string) {
+  function set<K extends Exclude<keyof FormState, "categorySlugs">>(
+    key: K,
+    value: string
+  ) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function toggleCategory(slug: string) {
+    setForm((current) => ({
+      ...current,
+      categorySlugs: current.categorySlugs.includes(slug)
+        ? current.categorySlugs.filter((item) => item !== slug)
+        : [...current.categorySlugs, slug],
+    }));
   }
 
   // دسته‌ها + در حالت ویرایش، خود محصول
   useEffect(() => {
-    api.get<{ categories: Category[] }>("/api/categories").then((res) => {
+    api.get<{ categories: Category[] }>("/api/admin/categories").then((res) => {
       if (res.ok && res.data) setCategories(res.data.categories);
     });
     if (editingExistingProduct) {
@@ -75,7 +89,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
             setForm({
               title: p.title,
               titleEn: p.titleEn ?? "",
-              categorySlug: p.categorySlug ?? "",
+              categorySlugs:
+                p.categorySlugs ?? (p.categorySlug ? [p.categorySlug] : []),
               price: String(p.price),
               oldPrice: p.oldPrice ? String(p.oldPrice) : "",
               stock: String(p.stock ?? 0),
@@ -84,6 +99,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               warranty: p.warranty ?? "",
             });
             setImages(p.imageItems ?? []);
+            setIsActive(p.isActive !== false);
           }
           setLoading(false);
         });
@@ -101,13 +117,17 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (form.categorySlugs.length === 0) {
+      setMessage({ ok: false, text: "حداقل یک دسته‌بندی انتخاب کنید" });
+      return;
+    }
     setSaving(true);
     setMessage(null);
 
     const payload = {
       title: form.title.trim(),
       titleEn: form.titleEn.trim(),
-      categorySlug: form.categorySlug,
+      categorySlugs: form.categorySlugs,
       price: Number(form.price) || 0,
       oldPrice: form.oldPrice ? Number(form.oldPrice) : null,
       stock: Number(form.stock) || 0,
@@ -131,6 +151,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
     if (!isEdit) {
       const newProductId = res.data.product.id;
       setCreatedProductId(newProductId);
+      setIsActive(res.data.product.isActive !== false);
 
       const failedFiles: File[] = [];
       let latestImages: ImageItem[] = [];
@@ -214,6 +235,32 @@ export default function ProductForm({ productId }: { productId?: number }) {
     }
   }
 
+  async function toggleVisibility() {
+    if (activeProductId === undefined || changingVisibility) return;
+    setChangingVisibility(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/visibility`,
+      { isActive: !isActive }
+    );
+    setChangingVisibility(false);
+    if (result.ok && result.data) {
+      const nextVisibility = result.data.product.isActive !== false;
+      setIsActive(nextVisibility);
+      setMessage({
+        ok: true,
+        text: nextVisibility
+          ? "محصول در فروشگاه نمایش داده شد ✅"
+          : "محصول از فروشگاه پنهان شد ✅",
+      });
+    } else {
+      setMessage({
+        ok: false,
+        text: result.error ?? "تغییر وضعیت محصول انجام نشد",
+      });
+    }
+  }
+
   if (loading) {
     return (
       <div className="grid min-h-[40vh] place-items-center text-sm text-slate-400">
@@ -291,24 +338,107 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
         {/* ستون کناری */}
         <div className="space-y-4">
+          {isEdit && (
+            <div className="rounded-2xl border border-slate-100 bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-slate-600">
+                    وضعیت نمایش محصول
+                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                      isActive
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isActive ? "نمایش داده می‌شود" : "پنهان است"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={changingVisibility}
+                  onClick={toggleVisibility}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isActive
+                      ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  }`}
+                >
+                  {changingVisibility
+                    ? "در حال تغییر..."
+                    : isActive
+                      ? "پنهان کردن"
+                      : "نمایش دادن"}
+                </button>
+              </div>
+              <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                محصول پنهان در فروشگاه نمایش داده نمی‌شود، اما اطلاعات آن در پنل
+                مدیریت باقی می‌ماند.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
                 دسته‌بندی *
               </label>
-              <select
-                required
-                value={form.categorySlug}
-                onChange={(e) => set("categorySlug", e.target.value)}
-                className={inputCls()}
-              >
-                <option value="">انتخاب کنید...</option>
-                {categories.map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                {categories.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    دسته‌بندی‌ای برای انتخاب وجود ندارد
+                  </p>
+                ) : (
+                  categories.map((category) => (
+                    <label
+                      key={category.slug}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 transition hover:bg-white"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.categorySlugs.includes(category.slug)}
+                        onChange={() => toggleCategory(category.slug)}
+                        className="h-4 w-4 accent-brand-600"
+                      />
+                      <span>{category.title}</span>
+                      {category.effectiveIsActive === false && (
+                        <span className="mr-auto rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500">
+                          {category.isActive === false
+                            ? "پنهان"
+                            : "پنهان توسط والد"}
+                        </span>
+                      )}
+                    </label>
+                  ))
+                )}
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                می‌توانید یک یا چند دسته‌بندی انتخاب کنید. اولین انتخاب، دسته‌بندی
+                اصلی محصول است.
+              </p>
+              {form.categorySlugs.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {form.categorySlugs.map((slug, index) => {
+                    const category = categories.find(
+                      (item) => item.slug === slug
+                    );
+                    return (
+                      <span
+                        key={slug}
+                        className={`rounded-lg px-2 py-1 text-[10px] ${
+                          index === 0
+                            ? "bg-brand-100 text-brand-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {category?.title ?? slug}
+                        {index === 0 ? " (اصلی)" : ""}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

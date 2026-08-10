@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from rest_framework.test import APIClient
 
-from catalog.models import Category, Product
+from catalog.models import Category, Product, Review
 
 
 PRODUCT_RESPONSE_KEYS = {
@@ -19,6 +19,8 @@ PRODUCT_RESPONSE_KEYS = {
     "titleEn",
     "category",
     "categorySlug",
+    "categories",
+    "categorySlugs",
     "price",
     "oldPrice",
     "rating",
@@ -30,6 +32,7 @@ PRODUCT_RESPONSE_KEYS = {
     "description",
     "warranty",
     "stock",
+    "isActive",
 }
 
 
@@ -80,6 +83,86 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(
             set(listed.data["data"]["products"][0]), PRODUCT_RESPONSE_KEYS
         )
+
+    def test_product_can_be_assigned_to_multiple_categories(self):
+        second_category = Category.objects.create(
+            slug="irrigation", title="آبیاری"
+        )
+        created = self.client.post(
+            "/api/admin/products",
+            self.product_payload(
+                categorySlugs=[self.category.slug, second_category.slug]
+            ),
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, 201)
+        product_data = created.data["data"]["product"]
+        self.assertEqual(
+            product_data["categorySlugs"],
+            [self.category.slug, second_category.slug],
+        )
+        product = Product.objects.get(pk=product_data["id"])
+        self.assertEqual(product.category, self.category)
+        self.assertEqual(
+            set(product.categories.values_list("slug", flat=True)),
+            {self.category.slug, second_category.slug},
+        )
+
+        filtered = self.client.get(
+            f"/api/products?category={second_category.slug}"
+        )
+        self.assertEqual(filtered.status_code, 200)
+        self.assertEqual(filtered.data["data"]["total"], 1)
+
+        protected = self.client.delete(
+            f"/api/admin/categories/{second_category.id}"
+        )
+        self.assertEqual(protected.status_code, 409)
+
+        updated = self.client.patch(
+            f"/api/admin/products/{product.id}",
+            self.product_payload(categorySlugs=[second_category.slug]),
+            format="json",
+        )
+        self.assertEqual(updated.status_code, 200)
+        product.refresh_from_db()
+        self.assertEqual(product.category, second_category)
+        self.assertEqual(list(product.categories.all()), [second_category])
+
+    def test_product_visibility_controls_public_access(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+        product_id = created.data["data"]["product"]["id"]
+
+        hidden = self.client.patch(
+            f"/api/admin/products/{product_id}/visibility",
+            {"isActive": False},
+            format="json",
+        )
+
+        self.assertEqual(hidden.status_code, 200)
+        self.assertEqual(hidden.data["data"]["product"]["isActive"], False)
+        self.assertEqual(self.client.get("/api/products").data["data"]["total"], 0)
+        self.assertEqual(self.client.get(f"/api/products/{product_id}").status_code, 404)
+        self.assertEqual(
+            self.client.post(
+                "/api/cart/items",
+                {"productId": product_id, "qty": 1},
+                format="json",
+            ).status_code,
+            404,
+        )
+
+        shown = self.client.patch(
+            f"/api/admin/products/{product_id}/visibility",
+            {"isActive": True},
+            format="json",
+        )
+        self.assertEqual(shown.status_code, 200)
+        self.assertEqual(shown.data["data"]["product"]["isActive"], True)
+        self.assertEqual(self.client.get(f"/api/products/{product_id}").status_code, 200)
 
     def test_new_product_can_receive_an_image_after_creation(self):
         created = self.client.post(
@@ -154,7 +237,7 @@ class AdminApiContractTests(TestCase):
             {
                 "title": "آبیاری",
                 "slug": "irrigation",
-                "sub": ["پمپ آب", "اتصالات"],
+                "parentIds": [self.category.id],
             },
             format="json",
         )
@@ -163,24 +246,51 @@ class AdminApiContractTests(TestCase):
         category = created.data["data"]["category"]
         self.assertEqual(
             set(category),
-            {"id", "slug", "title", "icon", "sub", "productCount"},
+            {
+                "id",
+                "slug",
+                "title",
+                "icon",
+                "sub",
+                "parents",
+                "isTopLevel",
+                "isActive",
+                "effectiveIsActive",
+                "productCount",
+            },
         )
+        self.assertEqual(category["isActive"], True)
+        self.assertEqual(category["effectiveIsActive"], True)
+        self.assertEqual(category["isTopLevel"], False)
+        self.assertEqual(category["parents"][0]["id"], self.category.id)
         self.assertEqual(category["productCount"], 0)
 
         category_id = category["id"]
         updated = self.client.patch(
             f"/api/admin/categories/{category_id}",
-            {"title": "تجهیزات آبیاری", "sub": ["پمپ"]},
+            {
+                "title": "تجهیزات آبیاری",
+                "isActive": False,
+            },
             format="json",
         )
         listed = self.client.get("/api/admin/categories")
+        public = self.client.get("/api/categories")
 
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(
             updated.data["data"]["category"]["title"], "تجهیزات آبیاری"
         )
+        self.assertEqual(updated.data["data"]["category"]["isActive"], False)
+        self.assertEqual(
+            updated.data["data"]["category"]["effectiveIsActive"], False
+        )
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(len(listed.data["data"]["categories"]), 2)
+        self.assertEqual(
+            [item["slug"] for item in public.data["data"]["categories"]],
+            [self.category.slug],
+        )
 
         deleted = self.client.delete(f"/api/admin/categories/{category_id}")
         self.assertEqual(deleted.status_code, 200)
@@ -189,7 +299,7 @@ class AdminApiContractTests(TestCase):
     def test_category_validation_and_protected_delete_are_controlled(self):
         duplicate = self.client.post(
             "/api/admin/categories",
-            {"title": self.category.title, "slug": "other", "sub": []},
+            {"title": self.category.title, "slug": "other", "parentIds": []},
             format="json",
         )
         Product.objects.create(
@@ -206,6 +316,118 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(protected.status_code, 409)
         self.assertEqual(protected.data["ok"], False)
         self.assertTrue(Category.objects.filter(pk=self.category.id).exists())
+
+    def test_shared_subcategory_visibility_and_cycle_validation(self):
+        second_parent = Category.objects.create(
+            slug="irrigation", title="آبیاری"
+        )
+        child = Category.objects.create(slug="pumps", title="پمپ آب")
+        child.parents.set([self.category, second_parent])
+        product = Product.objects.create(
+            title="پمپ آب",
+            category=child,
+            price=100_000,
+        )
+        product.categories.add(child)
+
+        public = self.client.get("/api/categories").data["data"]["categories"]
+        by_slug = {item["slug"]: item for item in public}
+        self.assertEqual(by_slug["pumps"]["isTopLevel"], False)
+        self.assertEqual(by_slug["tools"]["sub"][0]["slug"], "pumps")
+        self.assertEqual(by_slug["irrigation"]["sub"][0]["slug"], "pumps")
+        self.assertEqual(
+            self.client.get("/api/products?category=tools").data["data"]["total"],
+            1,
+        )
+        self.assertEqual(
+            self.client.get("/api/products?category=irrigation").data["data"][
+                "total"
+            ],
+            1,
+        )
+
+        self.client.patch(
+            f"/api/admin/categories/{self.category.id}",
+            {"isActive": False},
+            format="json",
+        )
+        visible_slugs = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(visible_slugs, {"irrigation", "pumps"})
+
+        self.client.patch(
+            f"/api/admin/categories/{second_parent.id}",
+            {"isActive": False},
+            format="json",
+        )
+        self.assertEqual(
+            self.client.get("/api/categories").data["data"]["categories"], []
+        )
+
+        self.client.patch(
+            f"/api/admin/categories/{self.category.id}",
+            {"isActive": True},
+            format="json",
+        )
+        restored_slugs = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(restored_slugs, {"tools", "pumps"})
+
+        self.client.patch(
+            f"/api/admin/categories/{child.id}",
+            {"isActive": False},
+            format="json",
+        )
+        explicitly_hidden = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(explicitly_hidden, {"tools"})
+
+        cycle = self.client.patch(
+            f"/api/admin/categories/{second_parent.id}",
+            {"parentIds": [child.id]},
+            format="json",
+        )
+        self.assertEqual(cycle.status_code, 400)
+        self.assertEqual(cycle.data["ok"], False)
+
+    def test_nested_subcategory_requires_an_active_path_from_a_root(self):
+        child = Category.objects.create(slug="garden", title="باغبانی")
+        grandchild = Category.objects.create(slug="shovels", title="بیل‌ها")
+        child.parents.add(self.category)
+        grandchild.parents.add(child)
+
+        visible = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(visible, {"tools", "garden", "shovels"})
+
+        self.client.patch(
+            f"/api/admin/categories/{child.id}",
+            {"isActive": False},
+            format="json",
+        )
+        visible = {
+            item["slug"]
+            for item in self.client.get("/api/categories").data["data"][
+                "categories"
+            ]
+        }
+        self.assertEqual(visible, {"tools"})
 
     def test_non_staff_cannot_manage_categories(self):
         non_staff = get_user_model().objects.create_user(phone="09120000000")
@@ -242,3 +464,42 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(removed.status_code, 200)
         self.category.refresh_from_db()
         self.assertFalse(self.category.icon)
+
+    def test_admin_can_publish_and_unpublish_review(self):
+        product = Product.objects.create(
+            title="بیل", category=self.category, price=100_000
+        )
+        reviewer = get_user_model().objects.create_user(phone="09121111111")
+        review = Review.objects.create(
+            product=product,
+            user=reviewer,
+            rating=4,
+            text="دیدگاه در انتظار تایید مدیر",
+        )
+
+        listed = self.client.get("/api/admin/reviews")
+        self.assertEqual(
+            listed.data["data"]["reviews"][0]["isPublished"], False
+        )
+
+        published = self.client.patch(
+            f"/api/admin/reviews/{review.id}",
+            {"isPublished": True},
+            format="json",
+        )
+        product.refresh_from_db()
+        self.assertEqual(published.status_code, 200)
+        self.assertTrue(published.data["data"]["review"]["isPublished"])
+        self.assertEqual(product.rating, 4)
+        self.assertEqual(product.rating_count, 1)
+
+        unpublished = self.client.patch(
+            f"/api/admin/reviews/{review.id}",
+            {"isPublished": False},
+            format="json",
+        )
+        product.refresh_from_db()
+        self.assertEqual(unpublished.status_code, 200)
+        self.assertFalse(unpublished.data["data"]["review"]["isPublished"])
+        self.assertEqual(product.rating, 0)
+        self.assertEqual(product.rating_count, 0)

@@ -57,16 +57,23 @@ Category management exposes staff-only list/create/update/delete endpoints plus 
 separate multipart icon endpoint. Category deletion returns a controlled conflict
 while products reference it. Icon replacement/removal uses catalog's deferred,
 unreferenced-file cleanup helper; do not delete storage objects before the database
-change commits.
+change commits. Staff can toggle `isActive`; inactive categories stay available in
+the management API but are omitted from the public category feed. `parentIds`
+assigns zero or more real parent categories. Updates reject self-links and cycles;
+categories with children cannot be deleted until those relationships are moved.
+Responses expose both explicit `isActive` and derived `effectiveIsActive` so the
+dashboard can distinguish a manually hidden category from one hidden by an ancestor.
 
 `ProductWriteSerializer` defines the dashboard write contract, including camelCase
-names and JSON content. `validate_categorySlug()` resolves the category and places
-the model object in validated data. Cross-field validation enforces price-related
-rules. `apply_product_data()` centralizes mapping from API names to model fields so
-create and update cannot drift.
+names and JSON content. `categorySlugs` accepts one or more unique category slugs;
+the first becomes the backward-compatible primary category and all values populate
+the many-to-many relation. The legacy singular `categorySlug` input remains
+accepted. Cross-field validation enforces price-related rules. `apply_product_data()`
+centralizes mapping from API names to model fields so create and update cannot drift.
 
 - `GET/POST products`: filtered/paginated list and creation.
 - `GET/PATCH/DELETE products/<id>`: detail mutation.
+- `PATCH products/<id>/visibility`: hide or show a product without deleting it.
 - `POST products/<id>/image`: multipart gallery upload.
 - `DELETE products/<id>/images/<image-id>`: deletion scoped to its product.
 

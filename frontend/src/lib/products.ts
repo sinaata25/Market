@@ -4,6 +4,8 @@ export type Product = {
   titleEn?: string;
   category: string;
   categorySlug?: string;
+  categories?: { slug: string; title: string }[];
+  categorySlugs?: string[];
   price: number;
   oldPrice?: number;
   rating: number;
@@ -17,13 +19,17 @@ export type Product = {
   description?: string;
   warranty?: string;
   stock?: number;
+  isActive?: boolean;
 };
 
 export type Category = {
   slug: string;
   title: string;
   icon: string | null;
-  sub: string[];
+  sub: { slug: string; title: string }[];
+  isTopLevel?: boolean;
+  isActive?: boolean;
+  effectiveIsActive?: boolean;
 };
 
 // ناوبری تا زمان دریافت داده‌ی زنده از API با این فهرست بدون آیکن قابل استفاده می‌ماند.
@@ -32,49 +38,57 @@ export const categories: Category[] = [
     slug: "garden-tools",
     title: "ابزار باغبانی",
     icon: null,
-    sub: ["بیل و کلنگ", "قیچی باغبانی", "شن‌کش", "اره شاخه‌زنی", "ماله و کج‌بیل"],
+    sub: [],
+    isTopLevel: true,
   },
   {
     slug: "sprayers",
     title: "سمپاش‌ها",
     icon: null,
-    sub: ["سمپاش پشتی", "سمپاش شارژی", "سمپاش موتوری", "سمپاش دستی", "نازل و لوازم جانبی"],
+    sub: [],
+    isTopLevel: true,
   },
   {
     slug: "power-tools",
     title: "ابزار موتوری",
     icon: null,
-    sub: ["اره موتوری", "علف‌زن", "موتور برق", "دروگر", "تیلر و کولتیواتور"],
+    sub: [],
+    isTopLevel: true,
   },
   {
     slug: "irrigation",
     title: "آبیاری",
     icon: null,
-    sub: ["شیلنگ آبیاری", "آبیاری قطره‌ای", "پمپ آب", "اتصالات", "تایمر آبیاری"],
+    sub: [],
+    isTopLevel: true,
   },
   {
     slug: "seeds",
     title: "بذر و نهال",
     icon: null,
-    sub: ["بذر سبزیجات", "بذر صیفی", "نهال میوه", "پیاز گل", "خاک و بستر کشت"],
+    sub: [],
+    isTopLevel: true,
   },
   {
     slug: "machinery",
     title: "ماشین‌آلات",
     icon: null,
-    sub: ["تراکتور", "ادوات خاک‌ورزی", "کمباین", "نشاکار", "یدکی ماشین‌آلات"],
+    sub: [],
+    isTopLevel: true,
   },
   {
     slug: "safety",
     title: "ایمنی و حفاظت",
     icon: null,
-    sub: ["دستکش کار", "ماسک و فیلتر", "عینک ایمنی", "چکمه و کفش کار", "لباس کار"],
+    sub: [],
+    isTopLevel: true,
   },
   {
     slug: "fertilizer",
     title: "کود و سم",
     icon: null,
-    sub: ["کود شیمیایی", "کود آلی", "سم دفع آفات", "علف‌کش", "محرک رشد"],
+    sub: [],
+    isTopLevel: true,
   },
 ];
 

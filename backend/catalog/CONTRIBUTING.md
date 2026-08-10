@@ -21,18 +21,28 @@ the cart, profile, and admin APIs.
 
 ## Data model
 
-`Category.slug` is the public category identifier. `sub` is JSON because the UI
-expects a lightweight list rather than normalized subcategory rows. `icon` accepts
+`Category.slug` is the public category identifier. `parents` is a directed
+self-referential many-to-many relation, so a category can be a child of multiple
+parents. Categories without parents are roots; child-only categories are rendered
+only below their parents. `is_active` controls explicit visibility. Effective
+public visibility requires an all-active path from a root, so hiding a parent also
+hides its exclusive descendants while shared descendants remain reachable through
+another active parent. Staff APIs continue to return every category. `icon` accepts
 only validated `.png` or `.svg` uploads and may be empty.
 
-`Product` belongs to a category. Monetary values are integer toman amounts.
+`Product.category` is its primary category, retained for stable breadcrumbs, SEO,
+and backward-compatible response fields. `Product.categories` contains every
+assigned category (including the primary one); write APIs keep both relations in
+sync and require at least one category. Monetary values are integer toman amounts.
 `old_price` is nullable and represents the pre-discount display price. `colors`,
 `features`, and `specs` are JSON UI content. Rating and rating count are denormalized
 onto the product for fast listing/sorting and must be recomputed after review
-creation/deletion. Stock is mutated transactionally by the orders app.
+creation/deletion. `is_active` controls storefront visibility without deleting the
+product or its history. Stock is mutated transactionally by the orders app.
 
 `ProductImage` provides an ordered one-to-many image gallery. Code returning a
-product should prefetch `images`; otherwise `product_dto()` creates N+1 queries.
+product should prefetch `categories` and `images`; otherwise `product_dto()` creates
+N+1 queries.
 
 `Review` belongs to a user and product. Its unique database constraint enforces one
 review per user/product even if application-level checks race. Reviews are ordered
@@ -47,8 +57,8 @@ provide presentation defaults for missing features/specs/description/warranty.
 
 Because `product_dto()` is shared across apps, changing it affects product lists,
 details, related products, carts, favorites, and admin responses. Update contract
-tests and the frontend together. It expects `category` to be selected and `images`
-to be prefetched by callers.
+tests and the frontend together. It expects `category` to be selected and both
+`categories` and `images` to be prefetched by callers.
 
 ## Category icon security and lifecycle
 
@@ -74,7 +84,8 @@ cleanup problems, not turn a completed update into a false API failure.
 
 ## Public APIs
 
-- `GET /api/categories`: all categories through `category_dto()`.
+- `GET /api/categories`: effectively visible roots and descendants through
+  `category_dto()`; relationships contain real category slugs and titles.
 - `GET /api/products`: optional category/search/discount filters, allow-listed
   sort keys, and bounded pagination (`perPage` cannot exceed 50).
 - `GET /api/products/<id>`: product plus up to four related products, preferring
@@ -105,10 +116,11 @@ production startup depend on demo assets.
 ## Safe change checklist
 
 1. Treat `product_dto()` as a cross-app public contract.
-2. Add `select_related("category")` and `prefetch_related("images")` to bulk DTO calls.
+2. Add `select_related("category")` and `prefetch_related("categories", "images")`
+   to bulk DTO calls.
 3. Keep review uniqueness enforced at the database level.
 4. Recompute denormalized ratings after every review mutation.
 5. Never weaken SVG/PNG content validation to MIME/extension checks.
 6. Delete replaced files only after transaction commit and only if unreferenced.
 7. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.
-
+8. Keep the category graph acyclic in every write surface, including Django admin.

@@ -127,25 +127,15 @@ export default async function CategoryPage({
         {/* زیردسته‌ها */}
         {category.sub.length > 0 && (
           <div className="flex flex-wrap gap-2 border-t border-brand-100/60 bg-white/60 px-6 py-4">
-            {category.sub.map((s) => {
-              const active = search === s;
-              return (
-                <Link
-                  key={s}
-                  href={buildUrl(slug, sp, {
-                    search: active ? undefined : s,
-                    page: "1",
-                  })}
-                  className={`rounded-full border px-4 py-1.5 text-xs transition ${
-                    active
-                      ? "border-brand-500 bg-brand-600 font-medium text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
-                  }`}
-                >
-                  {s}
-                </Link>
-              );
-            })}
+            {category.sub.map((subcategory) => (
+              <Link
+                key={subcategory.slug}
+                href={`/category/${subcategory.slug}`}
+                className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-600 transition hover:border-brand-400 hover:text-brand-700"
+              >
+                {subcategory.title}
+              </Link>
+            ))}
           </div>
         )}
       </section>
@@ -293,7 +283,7 @@ export default async function CategoryPage({
         </h2>
         <div className="grid grid-cols-4 gap-3 sm:grid-cols-7">
           {categories
-            .filter((c) => c.slug !== slug)
+            .filter((c) => c.isTopLevel !== false && c.slug !== slug)
             .map((c) => (
               <Link
                 key={c.slug}

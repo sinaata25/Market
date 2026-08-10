@@ -13,6 +13,9 @@ export default function AdminProducts() {
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [changingVisibility, setChangingVisibility] = useState<number | null>(
+    null
+  );
   const [message, setMessage] = useState("");
 
   const load = useCallback(() => {
@@ -45,6 +48,31 @@ export default function AdminProducts() {
     } else {
       setMessage(res.error ?? "خطا در حذف");
     }
+    setTimeout(() => setMessage(""), 4000);
+  }
+
+  async function toggleVisibility(product: Product) {
+    if (changingVisibility !== null) return;
+    setChangingVisibility(product.id);
+    const result = await api.patch<{ product: Product }>(
+      `/api/admin/products/${product.id}/visibility`,
+      { isActive: product.isActive === false }
+    );
+    if (result.ok && result.data) {
+      setProducts((current) =>
+        current.map((item) =>
+          item.id === product.id ? result.data!.product : item
+        )
+      );
+      setMessage(
+        product.isActive === false
+          ? "محصول در فروشگاه نمایش داده شد ✅"
+          : "محصول از فروشگاه پنهان شد ✅"
+      );
+    } else {
+      setMessage(result.error ?? "تغییر وضعیت محصول انجام نشد");
+    }
+    setChangingVisibility(null);
     setTimeout(() => setMessage(""), 4000);
   }
 
@@ -83,7 +111,7 @@ export default function AdminProducts() {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-right text-[11px] text-slate-400">
               <th className="px-5 py-3 font-medium">محصول</th>
@@ -91,17 +119,23 @@ export default function AdminProducts() {
               <th className="px-3 py-3 font-medium">قیمت (تومان)</th>
               <th className="px-3 py-3 font-medium">موجودی</th>
               <th className="px-3 py-3 font-medium">امتیاز</th>
+              <th className="px-3 py-3 font-medium">وضعیت نمایش</th>
               <th className="px-5 py-3 font-medium">عملیات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={6} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={7} text="در حال بارگذاری..." />
             ) : products.length === 0 ? (
-              <EmptyRow colSpan={6} text="محصولی یافت نشد" />
+              <EmptyRow colSpan={7} text="محصولی یافت نشد" />
             ) : (
               products.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/60">
+                <tr
+                  key={p.id}
+                  className={`hover:bg-slate-50/60 ${
+                    p.isActive === false ? "bg-slate-50/50" : ""
+                  }`}
+                >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
                       {p.image && (
@@ -127,7 +161,8 @@ export default function AdminProducts() {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-500">
-                    {p.category}
+                    {p.categories?.map((category) => category.title).join("، ") ??
+                      p.category}
                   </td>
                   <td className="px-3 py-3">
                     <p className="text-xs font-bold text-slate-700 font-num">
@@ -156,8 +191,35 @@ export default function AdminProducts() {
                     ★ {faNum(p.rating)}{" "}
                     <span className="text-slate-300">({faNum(p.ratingCount)})</span>
                   </td>
+                  <td className="px-3 py-3">
+                    <span
+                      className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                        p.isActive === false
+                          ? "bg-slate-100 text-slate-500"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {p.isActive === false ? "پنهان است" : "نمایش داده می‌شود"}
+                    </span>
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3 text-xs">
+                      <button
+                        type="button"
+                        disabled={changingVisibility !== null}
+                        onClick={() => toggleVisibility(p)}
+                        className={`hover:underline disabled:cursor-not-allowed disabled:opacity-50 ${
+                          p.isActive === false
+                            ? "text-emerald-600"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {changingVisibility === p.id
+                          ? "در حال تغییر..."
+                          : p.isActive === false
+                            ? "نمایش دادن"
+                            : "پنهان کردن"}
+                      </button>
                       <Link
                         href={`/admin/products/${p.id}`}
                         className="text-brand-600 hover:underline"
