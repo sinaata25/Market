@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatPrice, type Product } from "@/lib/products";
+import AddToCartButton from "@/components/product/AddToCartButton";
 
 export default function ProductCard({ product }: { product: Product }) {
   const discount = product.oldPrice
@@ -7,10 +8,7 @@ export default function ProductCard({ product }: { product: Product }) {
     : 0;
 
   return (
-    <Link
-      href={`/product/${product.id}`}
-      className="group flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-3 transition hover:border-brand-200 hover:shadow-md"
-    >
+    <article className="@container/card group relative flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-3 transition hover:border-brand-200 hover:shadow-md focus-within:border-brand-300">
       {product.image && (
         <div className="relative mb-3 aspect-square overflow-hidden rounded-xl bg-slate-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -40,7 +38,12 @@ export default function ProductCard({ product }: { product: Product }) {
         </span>
       )}
       <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm leading-6 text-slate-700 group-hover:text-brand-700">
-        {product.title}
+        <Link
+          href={`/product/${product.id}`}
+          className="after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand-500 focus-visible:after:ring-offset-2"
+        >
+          {product.title}
+        </Link>
       </h3>
 
       {/* امتیاز */}
@@ -55,8 +58,8 @@ export default function ProductCard({ product }: { product: Product }) {
       </div>
 
       {/* قیمت */}
-      <div className="mt-auto flex items-end justify-between">
-        <div>
+      <div className="mt-auto flex flex-col items-end gap-2 @min-[11rem]/card:flex-row @min-[11rem]/card:justify-between">
+        <div className="w-full min-w-0 @min-[11rem]/card:w-auto">
           {product.oldPrice && (
             <div className="flex items-center gap-1">
               <span className="rounded-md bg-accent-50 px-1.5 py-0.5 text-[11px] font-bold text-accent-700 font-num">
@@ -67,14 +70,21 @@ export default function ProductCard({ product }: { product: Product }) {
               </span>
             </div>
           )}
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-base font-bold text-slate-800 font-num">
+          <div className="mt-1 flex flex-col items-start @min-[11rem]/card:flex-row @min-[11rem]/card:items-baseline @min-[11rem]/card:gap-1">
+            <span className="text-sm font-bold text-slate-800 font-num @min-[11rem]/card:text-base">
               {formatPrice(product.price)}
             </span>
-            <span className="text-xs text-slate-400">تومان</span>
+            <span className="text-[10px] text-slate-400 @min-[11rem]/card:text-xs">
+              تومان
+            </span>
           </div>
         </div>
+        <AddToCartButton
+          productId={product.id}
+          productTitle={product.title}
+          stock={product.stock}
+        />
       </div>
-    </Link>
+    </article>
   );
 }

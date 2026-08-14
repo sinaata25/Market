@@ -4,6 +4,7 @@ import { formatPrice } from "@/lib/products";
 import { fetchSeo, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
 import DealCountdown from "@/components/product/DealCountdown";
+import AddToCartButton from "@/components/product/AddToCartButton";
 
 export const dynamic = "force-dynamic";
 
@@ -89,17 +90,14 @@ export default async function IncrediblePage() {
 
       {/* پیشنهاد ویژه‌ی امروز */}
       {best && (
-        <section className="mb-6 overflow-hidden rounded-3xl border-2 border-accent-100 bg-white">
+        <section className="mb-6 overflow-hidden rounded-3xl border-2 border-accent-100 bg-white transition focus-within:border-accent-400">
           <div className="flex items-center gap-2 bg-accent-50 px-5 py-2.5">
             <span className="text-sm">🔥</span>
             <h2 className="text-xs font-bold text-accent-800">
               داغ‌ترین پیشنهاد امروز
             </h2>
           </div>
-          <Link
-            href={`/product/${best.id}`}
-            className="group flex flex-col gap-5 p-5 sm:flex-row sm:items-center"
-          >
+          <div className="group relative flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
             {best.image && (
               <div className="h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-50 sm:w-40">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -112,7 +110,12 @@ export default async function IncrediblePage() {
             )}
             <div className="min-w-0 flex-1">
               <h3 className="mb-2 text-base font-bold leading-7 text-slate-800 group-hover:text-accent-700">
-                {best.title}
+                <Link
+                  href={`/product/${best.id}`}
+                  className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-accent-400"
+                >
+                  {best.title}
+                </Link>
               </h3>
               <p className="mb-4 text-xs text-slate-400">{best.category}</p>
               <div className="flex flex-wrap items-center gap-3">
@@ -130,10 +133,20 @@ export default async function IncrediblePage() {
                 </span>
               </div>
             </div>
-            <span className="shrink-0 rounded-xl bg-accent-500 px-6 py-3 text-center text-sm font-bold text-secondary-900 transition group-hover:bg-accent-600">
-              مشاهده و خرید
-            </span>
-          </Link>
+            <div className="relative z-10 flex shrink-0 items-center gap-2">
+              <Link
+                href={`/product/${best.id}`}
+                className="rounded-xl bg-accent-500 px-6 py-3 text-center text-sm font-bold text-secondary-900 transition hover:bg-accent-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600"
+              >
+                مشاهده و خرید
+              </Link>
+              <AddToCartButton
+                productId={best.id}
+                productTitle={best.title}
+                stock={best.stock}
+              />
+            </div>
+          </div>
         </section>
       )}
 
