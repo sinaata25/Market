@@ -3,6 +3,7 @@ import { getCategories, getProducts } from "@/lib/catalog";
 import { formatPrice } from "@/lib/products";
 import { fetchSeo, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
+import AddToCartButton from "@/components/product/AddToCartButton";
 
 export const dynamic = "force-dynamic";
 
@@ -127,18 +128,17 @@ export default async function BestSellersPage({
             <h2 className="mb-4 text-base font-bold text-slate-800">
               🏅 سه محصول برتر
             </h2>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3">
               {top3.map((p, i) => (
-                <Link
+                <article
                   key={p.id}
-                  href={`/product/${p.id}`}
-                  className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-amber-200 hover:shadow-md"
+                  className="group relative flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-amber-200 hover:shadow-md focus-within:border-amber-300 md:flex-col md:items-stretch lg:flex-row lg:items-center"
                 >
                   <span className="absolute left-3 top-3 text-2xl">
                     {MEDALS[i]}
                   </span>
                   {p.image && (
-                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50 md:h-28 md:w-full lg:h-20 lg:w-20">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={p.image}
@@ -149,7 +149,12 @@ export default async function BestSellersPage({
                   )}
                   <div className="min-w-0 flex-1">
                     <h3 className="mb-2 line-clamp-2 text-xs leading-5 text-slate-700 group-hover:text-brand-700">
-                      {p.title}
+                      <Link
+                        href={`/product/${p.id}`}
+                        className="after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-amber-400 focus-visible:after:ring-offset-2"
+                      >
+                        {p.title}
+                      </Link>
                     </h3>
                     <div className="mb-1.5 flex items-center gap-1 text-[11px] text-slate-400">
                       <span className="text-amber-400">★</span>
@@ -160,14 +165,21 @@ export default async function BestSellersPage({
                         ({p.ratingCount.toLocaleString("fa-IR")} دیدگاه)
                       </span>
                     </div>
-                    <p className="text-sm font-bold text-slate-800 font-num">
-                      {formatPrice(p.price)}
-                      <span className="mr-1 text-[11px] font-normal text-slate-400">
-                        تومان
-                      </span>
-                    </p>
+                    <div className="flex items-end justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 font-num">
+                        {formatPrice(p.price)}
+                        <span className="mr-1 text-[11px] font-normal text-slate-400">
+                          تومان
+                        </span>
+                      </p>
+                      <AddToCartButton
+                        productId={p.id}
+                        productTitle={p.title}
+                        stock={p.stock}
+                      />
+                    </div>
                   </div>
-                </Link>
+                </article>
               ))}
             </div>
           </section>

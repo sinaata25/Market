@@ -49,7 +49,7 @@ User = get_user_model()
 
 TEST_SHOP = {
     "OTP_LENGTH": 4,
-    "OTP_TTL_SECONDS": 120,
+    "OTP_TTL_SECONDS": 300,
     "OTP_RESEND_COOLDOWN_SECONDS": 60,
     "OTP_MAX_ATTEMPTS": 5,
     "OTP_RETENTION_DAYS": 7,
@@ -207,7 +207,7 @@ class OtpServiceTests(TestCase):
         self.assertNotEqual(challenge.code_hash, code)
         self.assertTrue(check_password(code, challenge.code_hash))
         self.assertEqual(challenge.provider_message_id, "42")
-        self.assertEqual(issued.expires_in, 120)
+        self.assertEqual(issued.expires_in, 300)
         self.assertEqual(issued.resend_after, 60)
         self.assertEqual(issued.delivery_status, "accepted")
         self.assertEqual(challenge.delivery_status, "accepted")
@@ -777,7 +777,7 @@ class OtpApiTests(TestCase):
         self.assertIsNone(response.data["data"]["user"])
         self.assertEqual(
             response.data["data"]["otpConfig"],
-            {"codeLength": 4, "expiresIn": 120, "resendAfter": 60},
+            {"codeLength": 4, "expiresIn": 300, "resendAfter": 60},
         )
 
     @patch("accounts.otp.send_otp_sms", return_value=SmsDeliveryResult("42"))
@@ -950,7 +950,7 @@ class OtpApiTests(TestCase):
         self.assertEqual(me.data["data"]["user"]["phone"], self.phone)
         self.assertEqual(
             me.data["data"]["otpConfig"],
-            {"codeLength": 4, "expiresIn": 120, "resendAfter": 60},
+            {"codeLength": 4, "expiresIn": 300, "resendAfter": 60},
         )
         self.assertIn("sessionid", self.client.cookies)
         self.assertEqual(self.client.session["auth_method"], "otp")

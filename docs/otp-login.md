@@ -17,7 +17,7 @@ Content-Type: application/json
 ```json
 {
   "sending_type": "pattern",
-  "from_number": "+983000505",
+  "from_number": "+98<ACCOUNT_ASSIGNED_SENDER>",
   "code": "APPROVED_PATTERN_CODE",
   "recipients": ["+989121234567"],
   "params": {"otp_code": "1234"}
@@ -49,8 +49,10 @@ For example:
 ```
 
 Define `otp_code` as the variable, copy the returned `pattern_code`, obtain a
-non-expiring API key, and select a sender assigned to the account (for example
-`+983000505`). Patterns are never created during a login request.
+non-expiring API key, and select a sender assigned to the account. Do not copy
+the illustrative sender from the IPPanel documentation: confirm the exact
+transactional/pattern-capable line in your own IPPanel account. Patterns are
+never created during a login request.
 
 ## 3. Install and configure
 
@@ -79,14 +81,14 @@ DATABASE_URL=postgresql://market:<password>@postgres.internal:5432/market?sslmod
 
 OTP_SMS_BACKEND=ippanel
 OTP_LENGTH=4
-OTP_TTL_SECONDS=120
+OTP_TTL_SECONDS=300
 OTP_RESEND_COOLDOWN_SECONDS=60
 OTP_MAX_ATTEMPTS=5
 OTP_RETENTION_DAYS=7
 
 IPPANEL_BASE_URL=https://edge.ippanel.com/v1
 IPPANEL_API_KEY=<secret-api-key>
-IPPANEL_FROM_NUMBER=+983000505
+IPPANEL_FROM_NUMBER=<account-assigned-sender-in-e164>
 IPPANEL_PATTERN_CODE=<active-pattern-code>
 IPPANEL_OTP_PARAMETER=otp_code
 IPPANEL_CONNECT_TIMEOUT=3

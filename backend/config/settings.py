@@ -288,7 +288,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SHOP = {
     "OTP_LENGTH": env_int("OTP_LENGTH", 4, minimum=4, maximum=10),
     "OTP_TTL_SECONDS": env_int(
-        "OTP_TTL_SECONDS", 120, minimum=60, maximum=600
+        "OTP_TTL_SECONDS", 300, minimum=60, maximum=600
     ),
     "OTP_RESEND_COOLDOWN_SECONDS": env_int(
         "OTP_RESEND_COOLDOWN_SECONDS", 60, minimum=40
