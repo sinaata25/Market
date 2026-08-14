@@ -5,6 +5,11 @@ import path from "path";
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
+  // دستورهای نسخه‌ی Next در AGENTS.md ریشه‌ی همین مخزن نگهداری می‌شوند.
+  agentRules: false,
+  // توسعه‌دهندگان پروژه از localhost و 127.0.0.1 استفاده می‌کنند؛ Next 16
+  // درخواست‌های asset/HMR از origin دوم را بدون این مجوز مسدود می‌کند.
+  allowedDevOrigins: ["127.0.0.1"],
   // ریشه‌ی workspace را به همین پوشه محدود می‌کند تا هشدار چند lockfile رفع شود
   turbopack: {
     root: path.join(__dirname),
