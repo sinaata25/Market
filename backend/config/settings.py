@@ -319,6 +319,13 @@ if not DEBUG and OTP_SMS_BACKEND == "console":
         "OTP_SMS_BACKEND=console is only allowed when DJANGO_DEBUG=true"
     )
 
+# پیامک‌های سفارش از همان درگاه OTP استفاده می‌کنند. در IPPanel برای
+# هر یک از این رویدادها باید یک الگوی تأییدشدهٔ جداگانه ساخته شود.
+# Opt in after both approved pattern codes have been provisioned. This keeps an
+# existing IPPanel deployment bootable during an env-first rollout; explicitly
+# enabling the feature still fails fast below if either code is missing.
+ORDER_SMS_ENABLED = env_bool("ORDER_SMS_ENABLED", False)
+
 IPPANEL = {
     "BASE_URL": os.getenv("IPPANEL_BASE_URL", "https://edge.ippanel.com/v1").rstrip(
         "/"
@@ -327,6 +334,14 @@ IPPANEL = {
     "FROM_NUMBER": os.getenv("IPPANEL_FROM_NUMBER", "").strip(),
     "PATTERN_CODE": os.getenv("IPPANEL_PATTERN_CODE", "").strip(),
     "OTP_PARAMETER": os.getenv("IPPANEL_OTP_PARAMETER", "otp_code").strip(),
+    "NEW_ORDER_PATTERN_CODE": os.getenv(
+        "IPPANEL_NEW_ORDER_PATTERN_CODE", ""
+    ).strip()
+    or ("console-new-order" if OTP_SMS_BACKEND == "console" else ""),
+    "ORDER_STATUS_PATTERN_CODE": os.getenv(
+        "IPPANEL_ORDER_STATUS_PATTERN_CODE", ""
+    ).strip()
+    or ("console-order-status" if OTP_SMS_BACKEND == "console" else ""),
     "CONNECT_TIMEOUT": env_float(
         "IPPANEL_CONNECT_TIMEOUT", 3.0, maximum=10.0
     ),
@@ -334,11 +349,17 @@ IPPANEL = {
 }
 
 if OTP_SMS_BACKEND == "ippanel":
-    missing = [
-        key
-        for key in ("API_KEY", "FROM_NUMBER", "PATTERN_CODE", "OTP_PARAMETER")
-        if not IPPANEL[key]
+    required_ippanel_keys = [
+        "API_KEY",
+        "FROM_NUMBER",
+        "PATTERN_CODE",
+        "OTP_PARAMETER",
     ]
+    if ORDER_SMS_ENABLED:
+        required_ippanel_keys.extend(
+            ["NEW_ORDER_PATTERN_CODE", "ORDER_STATUS_PATTERN_CODE"]
+        )
+    missing = [key for key in required_ippanel_keys if not IPPANEL[key]]
     if missing:
         names = ", ".join(f"IPPANEL_{key}" for key in missing)
         raise ImproperlyConfigured(f"Missing IPPanel configuration: {names}")

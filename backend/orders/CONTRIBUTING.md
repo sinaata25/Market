@@ -10,6 +10,8 @@ customer cancellation with exactly-once stock restoration.
 
 - `models.py`: order header, status machine, and snapshot line items.
 - `views.py`: validation, checkout transaction, DTOs, listing/detail/cancellation.
+- `notifications.py`: post-commit admin/customer SMS delivery.
+- `signals.py`: detects creation and persisted status transitions.
 - `admin.py`: Django admin inspection of orders and inline items.
 - `tests.py`: cancellation and stock-restoration invariants.
 
@@ -56,6 +58,28 @@ needs an explicit pending/idempotency design rather than holding locks over I/O.
 authority; if generation strategy changes, handle collisions without exposing a
 partial order.
 
+## SMS notifications
+
+Creating an order schedules one approved-pattern SMS for every active staff user.
+Changing an existing order's status schedules one SMS to the phone copied onto the
+order. Initial creation is not treated as a customer-facing status change, and
+saving the same status again must not send another message.
+
+Signals register callbacks with `transaction.on_commit()`, so rolled-back orders
+or transitions never produce a message and provider I/O never runs while checkout
+locks are held. Delivery failure is logged and does not roll back a valid order.
+IPPanel does not provide an idempotency key for this endpoint, so uncertain sends
+are not retried automatically. A durable retry guarantee would require a
+transactional outbox and a worker.
+
+The IPPanel account needs two separately approved patterns. The new-order pattern
+uses `customer_name` and `order_code`; the status pattern uses `order_code` and
+`status`. Configure their codes with `IPPANEL_NEW_ORDER_PATTERN_CODE` and
+`IPPANEL_ORDER_STATUS_PATTERN_CODE`, then opt in with `ORDER_SMS_ENABLED=true`.
+The feature defaults off so an existing deployment can receive the code before
+its approved patterns are provisioned. Status writes must use `Order.save()`;
+queryset bulk updates and raw SQL bypass Django signals.
+
 ## Cancellation
 
 The order detail POST action cancels an eligible owned order. It locks the order,
@@ -87,4 +111,3 @@ separate `/api/admin/orders` surface.
 5. Keep user queries ownership-scoped.
 6. Design payment integrations around idempotency and short transactions.
 7. Run `./.venv/bin/python manage.py test orders --verbosity 2`.
-

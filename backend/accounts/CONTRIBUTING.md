@@ -106,7 +106,9 @@ state, while `views.py` owns the HTTP session and guest-cart merge.
 immediately resend. `IPPanelSmsBackend` sends the provider's documented pattern
 payload, uses separate connect/read timeouts, validates the success envelope, and
 never returns provider internals to the client. Phone numbers are masked in logs.
-The console backend is development-only and is rejected by production settings.
+`send_pattern_sms()` is the shared approved-pattern entry point; the OTP helper is
+a compatibility wrapper around it. The console backend is development-only and is
+rejected by production settings.
 
 ## Throttling and CSRF
 

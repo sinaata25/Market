@@ -1,4 +1,4 @@
-"""SMS delivery backends used by the OTP login flow."""
+"""SMS delivery backends for approved patterns, including the OTP flow."""
 
 import logging
 from dataclasses import dataclass
@@ -37,9 +37,23 @@ def _ambiguous_http_status(status_code: int) -> bool:
 class ConsoleSmsBackend:
     """Local-only backend. Production selection is rejected in settings.py."""
 
-    def send_otp(self, phone: str, code: str) -> SmsDeliveryResult:
-        logger.warning("Development OTP for %s: %s", _masked_phone(phone), code)
+    def send_pattern(
+        self, phone: str, pattern_code: str, params: dict[str, str]
+    ) -> SmsDeliveryResult:
+        logger.warning(
+            "Development SMS pattern %s for %s: %s",
+            pattern_code,
+            _masked_phone(phone),
+            params,
+        )
         return SmsDeliveryResult()
+
+    def send_otp(self, phone: str, code: str) -> SmsDeliveryResult:
+        return self.send_pattern(
+            phone,
+            settings.IPPANEL["PATTERN_CODE"],
+            {settings.IPPANEL["OTP_PARAMETER"]: code},
+        )
 
 
 class IPPanelSmsBackend:
@@ -48,14 +62,16 @@ class IPPanelSmsBackend:
     def __init__(self, config: dict | None = None):
         self.config = config or settings.IPPANEL
 
-    def send_otp(self, phone: str, code: str) -> SmsDeliveryResult:
+    def send_pattern(
+        self, phone: str, pattern_code: str, params: dict[str, str]
+    ) -> SmsDeliveryResult:
         url = f"{self.config['BASE_URL'].rstrip('/')}/api/send"
         payload = {
             "sending_type": "pattern",
             "from_number": self.config["FROM_NUMBER"],
-            "code": self.config["PATTERN_CODE"],
+            "code": pattern_code,
             "recipients": [iran_mobile_to_e164(phone)],
-            "params": {self.config["OTP_PARAMETER"]: code},
+            "params": params,
         }
 
         try:
@@ -114,7 +130,7 @@ class IPPanelSmsBackend:
 
         message_code = meta.get("message_code") if isinstance(meta, dict) else None
         logger.warning(
-            "IPPanel did not confirm OTP send (status=%s, message_code=%s)",
+            "IPPanel did not confirm pattern send (status=%s, message_code=%s)",
             response.status_code,
             message_code or "unknown",
         )
@@ -128,6 +144,13 @@ class IPPanelSmsBackend:
         # A malformed HTTP-200 success might still represent an accepted send.
         raise SmsDeliveryUncertain("IPPanel delivery confirmation was malformed")
 
+    def send_otp(self, phone: str, code: str) -> SmsDeliveryResult:
+        return self.send_pattern(
+            phone,
+            self.config["PATTERN_CODE"],
+            {self.config["OTP_PARAMETER"]: code},
+        )
+
 
 def get_sms_backend():
     if settings.OTP_SMS_BACKEND == "console":
@@ -139,3 +162,9 @@ def get_sms_backend():
 
 def send_otp_sms(phone: str, code: str) -> SmsDeliveryResult:
     return get_sms_backend().send_otp(phone, code)
+
+
+def send_pattern_sms(
+    phone: str, pattern_code: str, params: dict[str, str]
+) -> SmsDeliveryResult:
+    return get_sms_backend().send_pattern(phone, pattern_code, params)

@@ -42,6 +42,7 @@ from .sms import (
     SmsDeliveryError,
     SmsDeliveryResult,
     SmsDeliveryUncertain,
+    send_pattern_sms,
 )
 from .throttles import OtpSendIpThrottle
 
@@ -107,6 +108,34 @@ class IPPanelSmsBackendTests(SimpleTestCase):
         )
 
     @patch("accounts.sms.requests.post")
+    def test_sends_a_generic_pattern_and_normalizes_the_recipient(self, post):
+        post.return_value = accepted_response(message_id=73)
+
+        result = IPPanelSmsBackend(IPPANEL_CONFIG).send_pattern(
+            "+۹۸ ۹۱۲ ۱۲۳ ۴۵۶۷",
+            "order-status-pattern",
+            {"order_code": "GS-42", "status": "ارسال شده"},
+        )
+
+        self.assertEqual(result.provider_message_id, "73")
+        post.assert_called_once_with(
+            "https://edge.ippanel.com/v1/api/send",
+            headers={
+                "Authorization": "test-api-key",
+                "Content-Type": "application/json",
+            },
+            json={
+                "sending_type": "pattern",
+                "from_number": "+983000505",
+                "code": "order-status-pattern",
+                "recipients": ["+989121234567"],
+                "params": {"order_code": "GS-42", "status": "ارسال شده"},
+            },
+            allow_redirects=False,
+            timeout=(3.0, 10.0),
+        )
+
+    @patch("accounts.sms.requests.post")
     def test_rejects_an_unsuccessful_provider_envelope(self, post):
         response = Mock(status_code=422)
         response.json.return_value = {
@@ -151,6 +180,20 @@ class IPPanelSmsBackendTests(SimpleTestCase):
             IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
         self.assertNotIsInstance(caught.exception, SmsDeliveryUncertain)
         self.assertEqual(post.call_count, 1)
+
+
+class SmsFacadeTests(SimpleTestCase):
+    @patch("accounts.sms.get_sms_backend")
+    def test_send_pattern_sms_delegates_to_the_configured_backend(self, get_backend):
+        get_backend.return_value.send_pattern.return_value = SmsDeliveryResult("81")
+        params = {"order_code": "GS-81"}
+
+        result = send_pattern_sms("09121234567", "new-order-pattern", params)
+
+        self.assertEqual(result.provider_message_id, "81")
+        get_backend.return_value.send_pattern.assert_called_once_with(
+            "09121234567", "new-order-pattern", params
+        )
 
 
 class PhoneNormalizationTests(SimpleTestCase):
