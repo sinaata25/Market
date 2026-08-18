@@ -125,6 +125,7 @@ INSTALLED_APPS = [
     "adminapi",
     "seo",
     "blog",
+    "staticpages",
 ]
 
 MIDDLEWARE = [

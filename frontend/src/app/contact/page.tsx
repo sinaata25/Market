@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import StaticPageUnavailable from "@/components/static-pages/StaticPageUnavailable";
+import { getStaticPage } from "@/lib/static-pages";
 
 export const metadata: Metadata = {
   title: "تماس با ما | گروه صنعتی توانا",
@@ -7,55 +9,16 @@ export const metadata: Metadata = {
     "راه‌های ارتباط با گروه صنعتی توانا برای مشاوره خرید، پیگیری سفارش و دریافت پشتیبانی.",
 };
 
-const contactWays = [
-  {
-    icon: "phone",
-    eyebrow: "پاسخ‌گویی مستقیم",
-    title: "تماس با پشتیبانی",
-    description: "برای راهنمایی خرید و سوال‌های فوری، با تیم پشتیبانی صحبت کنید.",
-    label: "۰۲۱-۰۰۰۰ ۰۰۰۰",
-    href: "tel:02100000000",
-    external: true,
-  },
-  {
-    icon: "order",
-    eyebrow: "سفارش‌های ثبت‌شده",
-    title: "پیگیری سفارش",
-    description: "وضعیت آماده‌سازی و ارسال سفارش را از حساب کاربری خود ببینید.",
-    label: "مشاهده سفارش‌های من",
-    href: "/profile/orders",
-    external: false,
-  },
-  {
-    icon: "help",
-    eyebrow: "پاسخ‌های آماده",
-    title: "مرکز راهنما",
-    description: "پاسخ سوال‌های پرتکرار درباره خرید، پرداخت، ارسال و بازگشت کالا.",
-    label: "مشاهده پرسش‌های متداول",
-    href: "/support",
-    external: false,
-  },
-] as const;
+export const dynamic = "force-dynamic";
 
-const topics = [
-  {
-    number: "۰۱",
-    title: "مشاوره پیش از خرید",
-    text: "برای مقایسه محصولات و پیدا کردن ابزار مناسب نوع کارتان.",
-  },
-  {
-    number: "۰۲",
-    title: "پیگیری ارسال",
-    text: "برای بررسی وضعیت سفارش، ابتدا شماره سفارش را آماده داشته باشید.",
-  },
-  {
-    number: "۰۳",
-    title: "خدمات پس از خرید",
-    text: "برای راهنمایی استفاده، گارانتی یا بررسی شرایط بازگشت کالا.",
-  },
+const contactWayRoutes = [
+  { icon: "phone", href: null, external: true },
+  { icon: "order", href: "/profile/orders", external: false },
+  { icon: "help", href: "/support", external: false },
 ] as const;
+const topicNumbers = ["۰۱", "۰۲", "۰۳"] as const;
 
-function ContactIcon({ name }: { name: (typeof contactWays)[number]["icon"] }) {
+function ContactIcon({ name }: { name: (typeof contactWayRoutes)[number]["icon"] }) {
   if (name === "phone") {
     return (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-7 w-7">
@@ -80,7 +43,10 @@ function ContactIcon({ name }: { name: (typeof contactWays)[number]["icon"] }) {
   );
 }
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const content = await getStaticPage("contact");
+  if (!content) return <StaticPageUnavailable />;
+
   return (
     <div className="overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:pt-8">
@@ -103,15 +69,17 @@ export default function ContactPage() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-300 opacity-60" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent-400" />
                 </span>
-                آماده شنیدن صدای شما هستیم
+                {content.hero.badge}
               </span>
               <h1 className="text-3xl font-bold leading-[1.55] sm:text-4xl lg:text-5xl">
-                یک گفت‌وگوی خوب، شروع یک
-                <span className="text-accent-300"> انتخاب مطمئن</span> است
+                {content.hero.title}
+                {" "}
+                <span className="text-accent-300">{content.hero.accent}</span>
+                {" "}
+                {content.hero.suffix}
               </h1>
               <p className="mt-5 max-w-xl text-sm leading-8 text-brand-50/90 sm:text-base sm:leading-9">
-                برای مشاوره خرید، پیگیری سفارش یا خدمات پس از خرید، نزدیک‌ترین
-                مسیر ارتباطی را انتخاب کنید؛ تیم توانا همراه شماست.
+                {content.hero.intro}
               </p>
             </div>
 
@@ -126,33 +94,35 @@ export default function ContactPage() {
         </section>
 
         <section className="relative z-10 -mt-6 grid gap-4 px-3 md:grid-cols-3 sm:px-6 lg:px-10">
-          {contactWays.map((way) => {
+          {content.ways.map((way, index) => {
+            const route = contactWayRoutes[index];
+            const href = route.href ?? `tel:${content.ways[0].phoneNumber}`;
             const className =
               "group flex min-h-72 flex-col rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_18px_50px_-35px_rgba(20,36,79,0.55)] transition hover:-translate-y-1 hover:border-brand-200 sm:p-7";
-            const content = (
+            const cardContent = (
               <>
                 <div className="mb-8 flex items-start justify-between">
                   <span className="grid h-13 w-13 place-items-center rounded-2xl bg-brand-50 text-brand-700 transition group-hover:bg-brand-600 group-hover:text-white">
-                    <ContactIcon name={way.icon} />
+                    <ContactIcon name={route.icon} />
                   </span>
                   <span className="text-[11px] font-medium text-slate-400">{way.eyebrow}</span>
                 </div>
                 <h2 className="text-lg font-bold text-secondary-900">{way.title}</h2>
                 <p className="mt-3 flex-1 text-sm leading-7 text-slate-500">{way.description}</p>
                 <span className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5 text-sm font-bold text-brand-700">
-                  <span dir={way.external ? "ltr" : "rtl"}>{way.label}</span>
+                  <span dir={route.external ? "ltr" : "rtl"}>{way.label}</span>
                   <span className="text-lg transition group-hover:-translate-x-1">←</span>
                 </span>
               </>
             );
 
-            return way.external ? (
-              <a key={way.title} href={way.href} className={className}>
-                {content}
+            return route.external ? (
+              <a key={index} href={href} className={className}>
+                {cardContent}
               </a>
             ) : (
-              <Link key={way.title} href={way.href} className={className}>
-                {content}
+              <Link key={index} href={href} className={className}>
+                {cardContent}
               </Link>
             );
           })}
@@ -160,19 +130,18 @@ export default function ContactPage() {
 
         <section className="grid gap-10 py-16 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20 lg:py-24">
           <div>
-            <p className="mb-3 text-sm font-bold text-brand-600">پیش از تماس</p>
+            <p className="mb-3 text-sm font-bold text-brand-600">{content.topics.eyebrow}</p>
             <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">
-              موضوع گفت‌وگو را مشخص کنید
+              {content.topics.title}
             </h2>
             <p className="mt-4 max-w-md text-sm leading-8 text-slate-500">
-              چند نکته کوتاه کمک می‌کند تا کارشناسان ما سریع‌تر و دقیق‌تر
-              راهنمایی‌تان کنند.
+              {content.topics.description}
             </p>
           </div>
           <ol className="divide-y divide-slate-100 overflow-hidden rounded-3xl border border-slate-100 bg-white">
-            {topics.map((topic) => (
-              <li key={topic.number} className="grid gap-3 p-6 sm:grid-cols-[3.5rem_1fr] sm:gap-5 sm:p-7">
-                <span className="font-num text-xl font-bold text-accent-600">{topic.number}</span>
+            {content.topics.items.map((topic, index) => (
+              <li key={topicNumbers[index]} className="grid gap-3 p-6 sm:grid-cols-[3.5rem_1fr] sm:gap-5 sm:p-7">
+                <span className="font-num text-xl font-bold text-accent-600">{topicNumbers[index]}</span>
                 <div>
                   <h3 className="font-bold text-secondary-900">{topic.title}</h3>
                   <p className="mt-2 text-sm leading-7 text-slate-500">{topic.text}</p>
@@ -185,14 +154,13 @@ export default function ContactPage() {
         <section className="grid overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_70px_-50px_rgba(31,61,137,0.7)] lg:grid-cols-[1fr_0.95fr]">
           <div className="p-7 sm:p-10 lg:p-12">
             <span className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-accent-50 text-2xl">🌱</span>
-            <p className="mb-2 text-sm font-bold text-brand-600">پاسخ شما شاید همین‌جا باشد</p>
-            <h2 className="text-2xl font-bold leading-10 text-secondary-900">سریع‌تر از تماس، جواب سوالتان را پیدا کنید</h2>
+            <p className="mb-2 text-sm font-bold text-brand-600">{content.faqPromo.eyebrow}</p>
+            <h2 className="text-2xl font-bold leading-10 text-secondary-900">{content.faqPromo.title}</h2>
             <p className="mt-4 max-w-lg text-sm leading-8 text-slate-500">
-              پاسخ پرسش‌های رایج درباره روش ثبت سفارش، پرداخت، ارسال، گارانتی و
-              بازگشت کالا در مرکز راهنمای توانا گردآوری شده است.
+              {content.faqPromo.description}
             </p>
             <Link href="/support" className="mt-7 inline-flex items-center gap-3 rounded-xl bg-secondary-900 px-6 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-secondary-800">
-              رفتن به مرکز راهنما
+              {content.faqPromo.buttonLabel}
               <span>←</span>
             </Link>
           </div>
@@ -203,8 +171,8 @@ export default function ContactPage() {
               dir="rtl"
               className="relative mr-0 ml-auto mt-5 w-full max-w-sm space-y-3 text-right"
             >
-              {["سفارش من چه زمانی ارسال می‌شود؟", "چطور محصول مناسب را انتخاب کنم؟", "شرایط بازگشت کالا چیست؟"].map((question, index) => (
-                <div key={question} className={`rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm ${index === 1 ? "ml-6" : index === 2 ? "ml-12" : ""}`}>
+              {content.faqPromo.questions.map((question, index) => (
+                <div key={index} className={`rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm ${index === 1 ? "ml-6" : index === 2 ? "ml-12" : ""}`}>
                   <span className="ml-2 font-bold text-brand-600">؟</span>
                   {question}
                 </div>

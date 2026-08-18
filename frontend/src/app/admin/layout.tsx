@@ -27,6 +27,7 @@ const SHOP_NAV = [
   { href: "/admin/users", icon: "👥", label: "کاربران" },
   { href: "/admin/comments", icon: "💬", label: "دیدگاه‌ها و پرسش‌ها" },
   { href: "/admin/blog", icon: "📝", label: "وبلاگ" },
+  { href: "/admin/content", icon: "📄", label: "محتوای صفحات" },
 ];
 
 // منوی سئو (staff و مدیر سئو)
@@ -206,6 +207,7 @@ export default function AdminLayout({
             </Link>
             <button
               onClick={logout}
+              data-admin-navigation
               className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-red-400 transition hover:bg-secondary-800"
             >
               <span>⏻</span> خروج
