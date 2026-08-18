@@ -27,7 +27,9 @@ export async function generateMetadata({ params }: GuidePageProps): Promise<Meta
   if (!route) return {};
   const pages = await getStaticPages(helpPageKeys);
   if (!pages) return {};
-  const guide = pages[route.key];
+  const page = pages[route.key];
+  if (!page.isVisible) return { robots: { index: false, follow: false } };
+  const guide = page.content;
 
   return {
     title: `${guide.title} | گروه صنعتی توانا`,
@@ -42,8 +44,15 @@ export default async function GuidePage({ params }: GuidePageProps) {
 
   const pages = await getStaticPages(helpPageKeys);
   if (!pages) return <StaticPageUnavailable />;
-  const guide = pages[route.key];
-  const relatedGuides = helpGuideRoutes.filter((item) => item.key !== route.key);
+  const page = pages[route.key];
+  if (!page.isVisible) notFound();
+  const guide = page.content;
+  const sections = page.sections;
+  const hasMainContent =
+    sections.steps || sections.checklist || sections.faqs || sections.cta;
+  const relatedGuides = helpGuideRoutes.filter(
+    (item) => item.key !== route.key && pages[item.key].isVisible
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:pt-8">
@@ -62,7 +71,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
         <span className="font-medium text-brand-700">{guide.title}</span>
       </nav>
 
-      <section className="relative isolate overflow-hidden rounded-[2rem] bg-secondary-900 px-6 py-10 text-white sm:px-10 sm:py-14 lg:px-16 lg:py-16">
+      {sections.hero && <section className="relative isolate overflow-hidden rounded-[2rem] bg-secondary-900 px-6 py-10 text-white sm:px-10 sm:py-14 lg:px-16 lg:py-16">
         <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_12%_0%,rgba(228,176,40,0.23),transparent_28%),radial-gradient(circle_at_88%_100%,rgba(90,131,73,0.38),transparent_36%)]" />
         <div className="absolute -left-16 top-1/2 -z-10 h-56 w-56 -translate-y-1/2 rounded-full border-[36px] border-white/5" />
         <div className="grid items-center gap-8 lg:grid-cols-[1fr_auto]">
@@ -84,11 +93,11 @@ export default async function GuidePage({ params }: GuidePageProps) {
               {route.icon}
           </div>
         </div>
-      </section>
+      </section>}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_18rem] lg:items-start">
-        <main className="min-w-0 space-y-8">
-          <section className="rounded-[2rem] border border-slate-100 bg-white p-5 sm:p-8">
+      {(hasMainContent || sections.aside) && <div className={`mt-8 grid gap-8 lg:items-start ${hasMainContent && sections.aside ? "lg:grid-cols-[1fr_18rem]" : "lg:grid-cols-1"}`}>
+        {hasMainContent && <main className="min-w-0 space-y-8">
+          {sections.steps && <section className="rounded-[2rem] border border-slate-100 bg-white p-5 sm:p-8">
             <div className="mb-7">
               <p className="mb-2 text-sm font-bold text-brand-600">{guide.sectionLabels.stepsEyebrow}</p>
               <h2 className="text-xl font-bold text-secondary-900 sm:text-2xl">
@@ -126,9 +135,9 @@ export default async function GuidePage({ params }: GuidePageProps) {
                 );
               })}
             </ol>
-          </section>
+          </section>}
 
-          <section className="overflow-hidden rounded-[2rem] border border-brand-100 bg-brand-50/60">
+          {sections.checklist && <section className="overflow-hidden rounded-[2rem] border border-brand-100 bg-brand-50/60">
             <div className="border-b border-brand-100 bg-white/70 px-6 py-5 sm:px-8">
               <h2 className="text-lg font-bold text-secondary-900">
                 {guide.checklist.title}
@@ -152,9 +161,9 @@ export default async function GuidePage({ params }: GuidePageProps) {
                 </li>
               ))}
             </ul>
-          </section>
+          </section>}
 
-          <section>
+          {sections.faqs && <section>
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <p className="mb-1 text-sm font-bold text-brand-600">{guide.sectionLabels.faqEyebrow}</p>
@@ -187,9 +196,9 @@ export default async function GuidePage({ params }: GuidePageProps) {
                 </details>
               ))}
             </div>
-          </section>
+          </section>}
 
-          <section className="relative overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-9 text-white sm:px-9">
+          {sections.cta && <section className="relative overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-9 text-white sm:px-9">
             <div className="absolute -bottom-16 -left-10 h-44 w-44 rounded-full border-[30px] border-white/5" />
             <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -205,10 +214,10 @@ export default async function GuidePage({ params }: GuidePageProps) {
                 {guide.cta.label}
               </Link>
             </div>
-          </section>
-        </main>
+          </section>}
+        </main>}
 
-        <aside className="space-y-4 lg:sticky lg:top-32">
+        {sections.aside && <aside className="space-y-4 lg:sticky lg:top-32">
           <div className="rounded-2xl border border-slate-100 bg-white p-3">
             <h2 className="px-3 pb-3 pt-2 text-xs font-bold text-slate-400">
               {guide.aside.relatedTitle}
@@ -221,7 +230,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
                   className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
                 >
                   <span aria-hidden="true">{item.icon}</span>
-                  <span className="flex-1">{pages[item.key].shortTitle}</span>
+                  <span className="flex-1">{pages[item.key].content.shortTitle}</span>
                   <span className="text-slate-300">←</span>
                 </Link>
               ))}
@@ -248,8 +257,8 @@ export default async function GuidePage({ params }: GuidePageProps) {
               {guide.aside.supportLabel} <span>←</span>
             </Link>
           </div>
-        </aside>
-      </div>
+        </aside>}
+      </div>}
     </div>
   );
 }

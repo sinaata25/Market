@@ -7,7 +7,9 @@ from .definitions import (
     PAGE_DEFINITIONS,
     SUPPORTED_PAGE_KEYS,
     default_content,
+    default_section_visibility,
     fields_for_page,
+    sections_for_page,
 )
 from .models import StaticPage
 
@@ -25,10 +27,22 @@ class StaticPageDefaultsTests(TestCase):
         for key in SUPPORTED_PAGE_KEYS:
             with self.subTest(key=key):
                 self.assertEqual(pages[key].content, default_content(key))
+                self.assertTrue(pages[key].is_visible)
+                self.assertEqual(
+                    pages[key].section_visibility,
+                    default_section_visibility(key),
+                )
                 self.assertIsNone(pages[key].updated_by)
 
     def test_model_rejects_an_arbitrary_page_key(self):
         page = StaticPage(key="arbitrary", content={})
+
+        with self.assertRaises(ValidationError):
+            page.save()
+
+    def test_model_rejects_visibility_outside_the_fixed_section_schema(self):
+        page = StaticPage.objects.get(key="about")
+        page.section_visibility = {"hero": True, "arbitrary": False}
 
         with self.assertRaises(ValidationError):
             page.save()
@@ -45,7 +59,12 @@ class PublicStaticPageApiTests(TestCase):
         self.assertTrue(response.data["ok"])
         self.assertEqual(
             response.data["data"]["page"],
-            {"key": "about", "content": default_content("about")},
+            {
+                "key": "about",
+                "isVisible": True,
+                "sections": default_section_visibility("about"),
+                "content": default_content("about"),
+            },
         )
 
     def test_public_list_without_filter_returns_all_pages_in_canonical_order(self):
@@ -67,6 +86,26 @@ class PublicStaticPageApiTests(TestCase):
         self.assertEqual([page["key"] for page in pages], ["support", "contact"])
         self.assertEqual(pages[0]["content"], default_content("support"))
 
+    def test_visibility_endpoint_returns_every_page_without_content(self):
+        StaticPage.objects.filter(key="contact").update(is_visible=False)
+
+        with self.assertNumQueries(1):
+            response = self.client.get("/api/content/pages/visibility")
+
+        self.assertEqual(response.status_code, 200)
+        pages = response.data["data"]["pages"]
+        self.assertEqual(
+            [page["key"] for page in pages], list(SUPPORTED_PAGE_KEYS)
+        )
+        self.assertFalse(
+            next(page for page in pages if page["key"] == "contact")[
+                "isVisible"
+            ]
+        )
+        self.assertTrue(
+            all(set(page) == {"key", "isVisible"} for page in pages)
+        )
+
     def test_missing_database_row_uses_the_controlled_default(self):
         StaticPage.objects.filter(key="shipping").delete()
 
@@ -76,6 +115,11 @@ class PublicStaticPageApiTests(TestCase):
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(
             response_page(detail)["content"], default_content("shipping")
+        )
+        self.assertTrue(response_page(detail)["isVisible"])
+        self.assertEqual(
+            response_page(detail)["sections"],
+            default_section_visibility("shipping"),
         )
         self.assertEqual(
             batch.data["data"]["pages"][0]["content"],
@@ -91,6 +135,21 @@ class PublicStaticPageApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response_page(response)["content"], default_content("returns"))
+
+    def test_invalid_stored_section_visibility_uses_safe_section_defaults(self):
+        StaticPage.objects.filter(key="support").update(
+            is_visible=False,
+            section_visibility={"unknown": True},
+        )
+
+        response = self.client.get("/api/content/pages/support")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response_page(response)["isVisible"])
+        self.assertEqual(
+            response_page(response)["sections"],
+            default_section_visibility("support"),
+        )
 
     def test_invalid_public_keys_are_controlled(self):
         detail = self.client.get("/api/content/pages/not-supported")
@@ -125,8 +184,10 @@ class AdminStaticPageApiTests(TestCase):
         client.force_authenticate(user)
         return client
 
-    def patch(self, key: str, fields, **extra):
-        payload = {"fields": fields, **extra}
+    def patch(self, key: str, fields=None, **extra):
+        payload = {**extra}
+        if fields is not None:
+            payload["fields"] = fields
         return self.staff_client.patch(
             f"/api/admin/content/pages/{key}", payload, format="json"
         )
@@ -143,6 +204,7 @@ class AdminStaticPageApiTests(TestCase):
             "seo-manager": self.authenticated_client(self.seo_manager),
         }
         original = StaticPage.objects.get(key="about").content["hero"]["title"]
+        original_visibility = StaticPage.objects.get(key="about").is_visible
 
         for role, client in clients.items():
             with self.subTest(role=role, method="list"):
@@ -157,7 +219,11 @@ class AdminStaticPageApiTests(TestCase):
             with self.subTest(role=role, method="patch"):
                 response = client.patch(
                     "/api/admin/content/pages/about",
-                    {"fields": {"hero.title": "تغییر غیرمجاز"}},
+                    {
+                        "fields": {"hero.title": "تغییر غیرمجاز"},
+                        "isVisible": False,
+                        "sections": {"hero": False},
+                    },
                     format="json",
                 )
                 self.assertEqual(response.status_code, 403)
@@ -165,6 +231,10 @@ class AdminStaticPageApiTests(TestCase):
         self.assertEqual(
             StaticPage.objects.get(key="about").content["hero"]["title"],
             original,
+        )
+        self.assertEqual(
+            StaticPage.objects.get(key="about").is_visible,
+            original_visibility,
         )
 
     def test_staff_list_uses_fixed_page_inventory_and_metadata_contract(self):
@@ -175,8 +245,9 @@ class AdminStaticPageApiTests(TestCase):
         self.assertEqual([page["key"] for page in pages], list(SUPPORTED_PAGE_KEYS))
         self.assertEqual(
             set(pages[0]),
-            {"key", "label", "path", "updatedAt", "updatedBy"},
+            {"key", "label", "path", "isVisible", "updatedAt", "updatedBy"},
         )
+        self.assertTrue(pages[0]["isVisible"])
         self.assertIsNotNone(pages[0]["updatedAt"])
         self.assertIsNone(pages[0]["updatedBy"])
 
@@ -188,8 +259,23 @@ class AdminStaticPageApiTests(TestCase):
         self.assertNotIn("content", page)
         self.assertEqual(
             set(page),
-            {"key", "label", "path", "updatedAt", "updatedBy", "fields"},
+            {
+                "key",
+                "label",
+                "path",
+                "isVisible",
+                "updatedAt",
+                "updatedBy",
+                "sections",
+                "fields",
+            },
         )
+        self.assertTrue(page["isVisible"])
+        self.assertEqual(
+            [section["id"] for section in page["sections"]],
+            [section.id for section in sections_for_page("contact")],
+        )
+        self.assertTrue(all(section["visible"] for section in page["sections"]))
         self.assertEqual(
             [field["id"] for field in page["fields"]],
             [field.id for field in fields_for_page("contact")],
@@ -248,6 +334,74 @@ class AdminStaticPageApiTests(TestCase):
         self.assertEqual(summary["updatedBy"], self.staff.name)
         self.assertEqual(summary["updatedAt"], stored.updated_at.isoformat())
 
+    def test_staff_can_hide_page_and_individual_sections(self):
+        response = self.patch(
+            "about",
+            isVisible=False,
+            sections={"story": False, "closing": False},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        page = response_page(response)
+        self.assertFalse(page["isVisible"])
+        sections = {
+            section["id"]: section["visible"]
+            for section in page["sections"]
+        }
+        self.assertFalse(sections["story"])
+        self.assertFalse(sections["closing"])
+        self.assertTrue(sections["hero"])
+
+        stored = StaticPage.objects.get(key="about")
+        self.assertFalse(stored.is_visible)
+        self.assertFalse(stored.section_visibility["story"])
+        self.assertEqual(stored.updated_by, self.staff)
+
+        public = APIClient().get("/api/content/pages/about")
+        self.assertFalse(response_page(public)["isVisible"])
+        self.assertFalse(response_page(public)["sections"]["story"])
+
+    def test_every_page_exposes_its_fixed_visibility_sections(self):
+        for key in SUPPORTED_PAGE_KEYS:
+            with self.subTest(key=key):
+                expected_ids = [
+                    section.id for section in sections_for_page(key)
+                ]
+                response = self.staff_client.get(
+                    f"/api/admin/content/pages/{key}"
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    [
+                        section["id"]
+                        for section in response_page(response)["sections"]
+                    ],
+                    expected_ids,
+                )
+
+                updated = self.patch(
+                    key,
+                    isVisible=False,
+                    sections={section_id: False for section_id in expected_ids},
+                )
+                self.assertEqual(updated.status_code, 200)
+                self.assertFalse(response_page(updated)["isVisible"])
+                self.assertTrue(
+                    all(
+                        not section["visible"]
+                        for section in response_page(updated)["sections"]
+                    )
+                )
+
+    def test_visibility_patch_rejects_unknown_sections_and_non_booleans(self):
+        unknown = self.patch("about", sections={"new-layout": False})
+        invalid_section = self.patch("about", sections={"hero": []})
+        invalid_page = self.patch("about", isVisible={"value": False})
+
+        self.assert_field_error(unknown, "sections.new-layout")
+        self.assert_field_error(invalid_section, "sections.hero")
+        self.assert_field_error(invalid_page, "isVisible")
+
     def test_staff_can_edit_each_supported_page_without_changing_its_shape(self):
         for key in SUPPORTED_PAGE_KEYS:
             with self.subTest(key=key):
@@ -300,7 +454,7 @@ class AdminStaticPageApiTests(TestCase):
             "about", {"hero.title": "عنوان"}, content={"hero": {}}
         )
 
-        self.assert_field_error(missing, "fields")
+        self.assert_field_error(missing, "non_field_errors")
         self.assert_field_error(empty, "fields")
         self.assert_field_error(not_object, "fields")
         self.assert_field_error(extra, "content")

@@ -6,7 +6,12 @@ from urllib.parse import urlsplit
 
 from django.core.exceptions import ValidationError
 
-from .definitions import default_content, field_value, fields_for_page
+from .definitions import (
+    default_content,
+    default_section_visibility,
+    field_value,
+    fields_for_page,
+)
 
 
 PHONE_RE = re.compile(r"^\+?[0-9][0-9() \-]{5,24}$")
@@ -122,5 +127,43 @@ def content_errors(key: str, content: Any) -> dict[str, str]:
 
 def validate_content(key: str, content: Any) -> None:
     errors = content_errors(key, content)
+    if errors:
+        raise ValidationError(errors)
+
+
+def visibility_errors(
+    key: str, is_visible: Any, section_visibility: Any
+) -> dict[str, str]:
+    try:
+        expected = default_section_visibility(key)
+    except KeyError:
+        return {"key": "شناسه صفحه پشتیبانی نمی‌شود"}
+
+    errors: dict[str, str] = {}
+    if type(is_visible) is not bool:
+        errors["isVisible"] = "وضعیت نمایش صفحه باید درست یا نادرست باشد"
+    if not isinstance(section_visibility, dict):
+        errors["sections"] = "وضعیت بخش‌ها باید یک شیء باشد"
+        return errors
+    if set(section_visibility) != set(expected):
+        errors["sections"] = "فهرست بخش‌ها با ساختار ثابت صفحه مطابقت ندارد"
+        return errors
+    invalid = next(
+        (
+            section_id
+            for section_id, visible in section_visibility.items()
+            if type(visible) is not bool
+        ),
+        None,
+    )
+    if invalid is not None:
+        errors[f"sections.{invalid}"] = "وضعیت نمایش بخش باید درست یا نادرست باشد"
+    return errors
+
+
+def validate_visibility(
+    key: str, is_visible: Any, section_visibility: Any
+) -> None:
+    errors = visibility_errors(key, is_visible, section_visibility)
     if errors:
         raise ValidationError(errors)

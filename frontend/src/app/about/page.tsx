@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import StaticPageUnavailable from "@/components/static-pages/StaticPageUnavailable";
 import { getStaticPage } from "@/lib/static-pages";
 
@@ -42,8 +43,10 @@ function LineIcon({ name }: { name: (typeof valueIcons)[number] }) {
 }
 
 export default async function AboutPage() {
-  const content = await getStaticPage("about");
-  if (!content) return <StaticPageUnavailable />;
+  const page = await getStaticPage("about");
+  if (!page) return <StaticPageUnavailable />;
+  if (!page.isVisible) notFound();
+  const { content, sections } = page;
 
   return (
     <div className="overflow-hidden">
@@ -56,7 +59,7 @@ export default async function AboutPage() {
           <span className="font-medium text-brand-700">درباره ما</span>
         </nav>
 
-        <section className="relative isolate overflow-hidden rounded-[2rem] bg-secondary-900 px-6 py-10 text-white shadow-[0_24px_80px_-45px_rgba(20,36,79,0.8)] sm:px-10 sm:py-14 lg:px-16 lg:py-20">
+        {sections.hero && <section className="relative isolate overflow-hidden rounded-[2rem] bg-secondary-900 px-6 py-10 text-white shadow-[0_24px_80px_-45px_rgba(20,36,79,0.8)] sm:px-10 sm:py-14 lg:px-16 lg:py-20">
           <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_10%_0%,rgba(228,176,40,0.24),transparent_30%),radial-gradient(circle_at_90%_100%,rgba(117,153,102,0.35),transparent_38%)]" />
           <div className="absolute -left-20 top-10 -z-10 h-72 w-72 rounded-full border border-white/10" />
           <div className="absolute -left-10 top-20 -z-10 h-52 w-52 rounded-full border border-white/10" />
@@ -97,9 +100,9 @@ export default async function AboutPage() {
               </div>
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className="grid gap-8 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-20 lg:py-24">
+        {sections.story && <section className="grid gap-8 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-20 lg:py-24">
           <div>
             <p className="mb-3 text-sm font-bold text-brand-600">{content.story.eyebrow}</p>
             <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">
@@ -111,9 +114,9 @@ export default async function AboutPage() {
               <p key={index}>{paragraph}</p>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section className="rounded-[2rem] border border-brand-100 bg-white p-5 sm:p-8 lg:p-10">
+        {sections.values && <section className="rounded-[2rem] border border-brand-100 bg-white p-5 sm:p-8 lg:p-10">
           <div className="mb-8 max-w-xl">
             <p className="mb-2 text-sm font-bold text-brand-600">{content.values.eyebrow}</p>
             <h2 className="text-2xl font-bold text-secondary-900">{content.values.title}</h2>
@@ -136,9 +139,9 @@ export default async function AboutPage() {
               </article>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section className="py-16 lg:py-24">
+        {sections.journey && <section className="py-16 lg:py-24">
           <div className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16">
             <div>
               <p className="mb-3 text-sm font-bold text-brand-600">{content.journey.eyebrow}</p>
@@ -161,9 +164,9 @@ export default async function AboutPage() {
               ))}
             </ol>
           </div>
-        </section>
+        </section>}
 
-        <section className="relative overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-10 text-center text-white sm:px-10 sm:py-12">
+        {sections.closing && <section className="relative overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-10 text-center text-white sm:px-10 sm:py-12">
           <div className="absolute -right-12 -top-20 h-52 w-52 rounded-full border-[35px] border-white/5" />
           <div className="relative mx-auto max-w-2xl">
             <p className="mb-3 text-sm font-bold text-brand-100">{content.closing.eyebrow}</p>
@@ -176,7 +179,7 @@ export default async function AboutPage() {
               <Link href="/support" className="rounded-xl border border-white/20 px-6 py-3 text-sm font-medium transition hover:bg-white/10">{content.closing.secondaryLabel}</Link>
             </div>
           </div>
-        </section>
+        </section>}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import StaticPageUnavailable from "@/components/static-pages/StaticPageUnavailable";
 import { getStaticPage } from "@/lib/static-pages";
 
@@ -44,8 +45,10 @@ function ContactIcon({ name }: { name: (typeof contactWayRoutes)[number]["icon"]
 }
 
 export default async function ContactPage() {
-  const content = await getStaticPage("contact");
-  if (!content) return <StaticPageUnavailable />;
+  const page = await getStaticPage("contact");
+  if (!page) return <StaticPageUnavailable />;
+  if (!page.isVisible) notFound();
+  const { content, sections } = page;
 
   return (
     <div className="overflow-hidden">
@@ -58,7 +61,7 @@ export default async function ContactPage() {
           <span className="font-medium text-brand-700">تماس با ما</span>
         </nav>
 
-        <section className="relative isolate overflow-hidden rounded-[2rem] bg-gradient-to-l from-brand-800 via-brand-700 to-secondary-800 px-6 py-12 text-white shadow-[0_24px_80px_-45px_rgba(20,36,79,0.8)] sm:px-10 sm:py-16 lg:px-16 lg:py-20">
+        {sections.hero && <section className="relative isolate overflow-hidden rounded-[2rem] bg-gradient-to-l from-brand-800 via-brand-700 to-secondary-800 px-6 py-12 text-white shadow-[0_24px_80px_-45px_rgba(20,36,79,0.8)] sm:px-10 sm:py-16 lg:px-16 lg:py-20">
           <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_15%_15%,rgba(228,176,40,0.25),transparent_27%),radial-gradient(circle_at_85%_100%,rgba(255,255,255,0.12),transparent_32%)]" />
           <div className="absolute -left-20 -top-24 -z-10 h-80 w-80 rounded-full border-[55px] border-white/5" />
 
@@ -91,9 +94,9 @@ export default async function ContactPage() {
               </div>
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className="relative z-10 -mt-6 grid gap-4 px-3 md:grid-cols-3 sm:px-6 lg:px-10">
+        {sections.ways && <section className={`relative z-10 grid gap-4 px-3 md:grid-cols-3 sm:px-6 lg:px-10 ${sections.hero ? "-mt-6" : "mt-4"}`}>
           {content.ways.map((way, index) => {
             const route = contactWayRoutes[index];
             const href = route.href ?? `tel:${content.ways[0].phoneNumber}`;
@@ -126,9 +129,9 @@ export default async function ContactPage() {
               </Link>
             );
           })}
-        </section>
+        </section>}
 
-        <section className="grid gap-10 py-16 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20 lg:py-24">
+        {sections.topics && <section className="grid gap-10 py-16 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20 lg:py-24">
           <div>
             <p className="mb-3 text-sm font-bold text-brand-600">{content.topics.eyebrow}</p>
             <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">
@@ -149,9 +152,9 @@ export default async function ContactPage() {
               </li>
             ))}
           </ol>
-        </section>
+        </section>}
 
-        <section className="grid overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_70px_-50px_rgba(31,61,137,0.7)] lg:grid-cols-[1fr_0.95fr]">
+        {sections["faq-promo"] && <section className="grid overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_70px_-50px_rgba(31,61,137,0.7)] lg:grid-cols-[1fr_0.95fr]">
           <div className="p-7 sm:p-10 lg:p-12">
             <span className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-accent-50 text-2xl">🌱</span>
             <p className="mb-2 text-sm font-bold text-brand-600">{content.faqPromo.eyebrow}</p>
@@ -179,7 +182,7 @@ export default async function ContactPage() {
               ))}
             </div>
           </div>
-        </section>
+        </section>}
       </div>
     </div>
   );

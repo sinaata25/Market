@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { faDateTime } from "@/components/admin/ui";
 import { api } from "@/lib/client-api";
 
@@ -8,8 +9,15 @@ type PageSummary = {
   key: string;
   label: string;
   path: string;
+  isVisible: boolean;
   updatedAt: string | null;
   updatedBy: string | null;
+};
+
+type ContentSection = {
+  id: string;
+  label: string;
+  visible: boolean;
 };
 
 type ContentField = {
@@ -26,6 +34,7 @@ type ContentField = {
 };
 
 type ContentPage = PageSummary & {
+  sections: ContentSection[];
   fields: ContentField[];
 };
 
@@ -43,7 +52,16 @@ function fieldValues(fields: ContentField[]): FieldValues {
   return Object.fromEntries(fields.map((field) => [field.id, field.value]));
 }
 
-function sameValues(left: FieldValues, right: FieldValues): boolean {
+function sectionValues(sections: ContentSection[]): Record<string, boolean> {
+  return Object.fromEntries(
+    sections.map((section) => [section.id, section.visible])
+  );
+}
+
+function sameValues<T extends string | boolean>(
+  left: Record<string, T>,
+  right: Record<string, T>
+): boolean {
   const leftKeys = Object.keys(left);
   const rightKeys = Object.keys(right);
   return (
@@ -62,11 +80,20 @@ function safeControl(control: ContentField["control"]): ContentField["control"] 
 }
 
 export default function AdminContentPage() {
+  const router = useRouter();
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [page, setPage] = useState<ContentPage | null>(null);
   const [values, setValues] = useState<FieldValues>({});
   const [initialValues, setInitialValues] = useState<FieldValues>({});
+  const [pageVisible, setPageVisible] = useState(true);
+  const [initialPageVisible, setInitialPageVisible] = useState(true);
+  const [sectionVisibility, setSectionVisibility] = useState<
+    Record<string, boolean>
+  >({});
+  const [initialSectionVisibility, setInitialSectionVisibility] = useState<
+    Record<string, boolean>
+  >({});
   const [listLoading, setListLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -79,8 +106,20 @@ export default function AdminContentPage() {
   const pageRequest = useRef(0);
 
   const dirty = useMemo(
-    () => Boolean(page) && !sameValues(values, initialValues),
-    [initialValues, page, values]
+    () =>
+      Boolean(page) &&
+      (pageVisible !== initialPageVisible ||
+        !sameValues(values, initialValues) ||
+        !sameValues(sectionVisibility, initialSectionVisibility)),
+    [
+      initialPageVisible,
+      initialSectionVisibility,
+      initialValues,
+      page,
+      pageVisible,
+      sectionVisibility,
+      values,
+    ]
   );
 
   const groups = useMemo(() => {
@@ -159,9 +198,14 @@ export default function AdminContentPage() {
 
         const nextPage = result.data.page;
         const nextValues = fieldValues(nextPage.fields);
+        const nextSections = sectionValues(nextPage.sections);
         setPage(nextPage);
         setValues(nextValues);
         setInitialValues(nextValues);
+        setPageVisible(nextPage.isVisible);
+        setInitialPageVisible(nextPage.isVisible);
+        setSectionVisibility(nextSections);
+        setInitialSectionVisibility(nextSections);
         setFieldErrors({});
         setPageLoading(false);
       });
@@ -251,6 +295,8 @@ export default function AdminContentPage() {
     setPage(null);
     setValues({});
     setInitialValues({});
+    setSectionVisibility({});
+    setInitialSectionVisibility({});
     setPageLoading(true);
     setPageError("");
     setFieldErrors({});
@@ -265,8 +311,24 @@ export default function AdminContentPage() {
     setFieldErrors({});
   }
 
+  function updatePageVisibility(visible: boolean) {
+    setPageVisible(visible);
+    setMessage("");
+    setPageError("");
+    setFieldErrors({});
+  }
+
+  function updateSectionVisibility(id: string, visible: boolean) {
+    setSectionVisibility((current) => ({ ...current, [id]: visible }));
+    setMessage("");
+    setPageError("");
+    setFieldErrors({});
+  }
+
   function resetChanges() {
     setValues(initialValues);
+    setPageVisible(initialPageVisible);
+    setSectionVisibility(initialSectionVisibility);
     setMessage("");
     setPageError("");
     setFieldErrors({});
@@ -286,9 +348,22 @@ export default function AdminContentPage() {
         ([id, value]) => initialValues[id] !== value
       )
     );
+    const changedSections = Object.fromEntries(
+      Object.entries(sectionVisibility).filter(
+        ([id, visible]) => initialSectionVisibility[id] !== visible
+      )
+    );
+    const payload: {
+      fields?: FieldValues;
+      isVisible?: boolean;
+      sections?: Record<string, boolean>;
+    } = {};
+    if (Object.keys(changedFields).length) payload.fields = changedFields;
+    if (pageVisible !== initialPageVisible) payload.isVisible = pageVisible;
+    if (Object.keys(changedSections).length) payload.sections = changedSections;
     const result = await api.patch<{ page: ContentPage }, ContentErrorData>(
       `/api/admin/content/pages/${encodeURIComponent(pageKey)}`,
-      { fields: changedFields }
+      payload
     );
     setSaving(false);
 
@@ -300,9 +375,14 @@ export default function AdminContentPage() {
 
     const savedPage = result.data.page;
     const savedValues = fieldValues(savedPage.fields);
+    const savedSections = sectionValues(savedPage.sections);
     setPage(savedPage);
     setValues(savedValues);
     setInitialValues(savedValues);
+    setPageVisible(savedPage.isVisible);
+    setInitialPageVisible(savedPage.isVisible);
+    setSectionVisibility(savedSections);
+    setInitialSectionVisibility(savedSections);
     setPages((current) =>
       current.map((item) =>
         item.key === savedPage.key
@@ -310,6 +390,7 @@ export default function AdminContentPage() {
               key: savedPage.key,
               label: savedPage.label,
               path: savedPage.path,
+              isVisible: savedPage.isVisible,
               updatedAt: savedPage.updatedAt,
               updatedBy: savedPage.updatedBy,
             }
@@ -318,6 +399,7 @@ export default function AdminContentPage() {
     );
     setMessage("محتوای صفحه ذخیره شد ✅");
     await loadPages();
+    router.refresh();
   }
 
   function reloadSelectedPage() {
@@ -389,7 +471,18 @@ export default function AdminContentPage() {
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <span className="block text-sm font-medium">{item.label}</span>
+                    <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                      <span>{item.label}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[9px] ${
+                          item.isVisible
+                            ? "bg-emerald-50 text-emerald-600"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {item.isVisible ? "نمایش" : "مخفی"}
+                      </span>
+                    </span>
                     <code
                       dir="ltr"
                       className={`mt-1 block truncate text-left text-[10px] ${
@@ -451,6 +544,92 @@ export default function AdminContentPage() {
                   )}
                 </div>
               </div>
+
+              <fieldset className="rounded-2xl border border-slate-100 bg-white p-5">
+                <legend className="px-2 text-sm font-bold text-slate-700">
+                  وضعیت نمایش
+                </legend>
+                <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-slate-50 px-4 py-3">
+                  <span>
+                    <span className="block text-sm font-bold text-slate-700">
+                      نمایش کامل صفحه
+                    </span>
+                    <span className="mt-1 block text-[11px] leading-5 text-slate-400">
+                      در حالت مخفی، آدرس صفحه پاسخ ۴۰۴ نمایش می‌دهد.
+                    </span>
+                  </span>
+                  <input
+                    id="content-field-isVisible"
+                    type="checkbox"
+                    checked={pageVisible}
+                    disabled={saving}
+                    aria-invalid={Boolean(fieldErrors.isVisible)}
+                    onChange={(event) =>
+                      updatePageVisibility(event.target.checked)
+                    }
+                    className="h-5 w-5 shrink-0 accent-brand-600"
+                  />
+                </label>
+                {fieldErrors.isVisible && (
+                  <p className="mt-2 text-[11px] text-red-500">
+                    {fieldErrors.isVisible}
+                  </p>
+                )}
+
+                <div className="mt-5">
+                  <h3 className="text-xs font-bold text-slate-500">
+                    بخش‌های صفحه
+                  </h3>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-400">
+                    هر بخش را مستقل از سایر بخش‌ها نمایش یا مخفی کنید.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {page.sections.map((section) => {
+                      const errorKey = `sections.${section.id}`;
+                      return (
+                        <label
+                          key={section.id}
+                          className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-3 text-xs text-slate-600"
+                        >
+                          <span>{section.label}</span>
+                          <span className="flex items-center gap-2">
+                            <span
+                              className={
+                                sectionVisibility[section.id]
+                                  ? "text-emerald-600"
+                                  : "text-slate-400"
+                              }
+                            >
+                              {sectionVisibility[section.id]
+                                ? "نمایش"
+                                : "مخفی"}
+                            </span>
+                            <input
+                              id={`content-field-${errorKey}`}
+                              type="checkbox"
+                              checked={sectionVisibility[section.id] ?? true}
+                              disabled={saving}
+                              aria-invalid={Boolean(fieldErrors[errorKey])}
+                              onChange={(event) =>
+                                updateSectionVisibility(
+                                  section.id,
+                                  event.target.checked
+                                )
+                              }
+                              className="h-4 w-4 accent-brand-600"
+                            />
+                          </span>
+                          {fieldErrors[errorKey] && (
+                            <span className="sr-only">
+                              {fieldErrors[errorKey]}
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </fieldset>
 
               {groups.length === 0 ? (
                 <div className="rounded-2xl border border-amber-100 bg-amber-50 p-8 text-center text-sm text-amber-700">

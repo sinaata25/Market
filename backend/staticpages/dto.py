@@ -6,17 +6,21 @@ from .definitions import (
     field_value,
     fields_for_page,
     get_page_definition,
+    sections_for_page,
 )
-from .models import StaticPage
+from .services import ResolvedStaticPage
 
 
-def _editor_name(page: StaticPage | None) -> str | None:
+def _editor_name(resolved: ResolvedStaticPage) -> str | None:
+    page = resolved.page
     if page is None or page.updated_by is None:
         return None
     return page.updated_by.name or page.updated_by.phone
 
 
-def page_summary_dto(key: str, page: StaticPage | None) -> dict[str, Any]:
+def page_summary_dto(
+    key: str, resolved: ResolvedStaticPage
+) -> dict[str, Any]:
     definition = get_page_definition(key)
     if definition is None:
         raise KeyError(key)
@@ -24,13 +28,23 @@ def page_summary_dto(key: str, page: StaticPage | None) -> dict[str, Any]:
         "key": definition.key,
         "label": definition.label,
         "path": definition.path,
-        "updatedAt": page.updated_at.isoformat() if page else None,
-        "updatedBy": _editor_name(page),
+        "isVisible": resolved.is_visible,
+        "updatedAt": (
+            resolved.page.updated_at.isoformat() if resolved.page else None
+        ),
+        "updatedBy": _editor_name(resolved),
     }
 
 
-def public_page_dto(key: str, content: dict[str, Any]) -> dict[str, Any]:
-    return {"key": key, "content": content}
+def public_page_dto(
+    key: str, resolved: ResolvedStaticPage
+) -> dict[str, Any]:
+    return {
+        "key": key,
+        "isVisible": resolved.is_visible,
+        "sections": resolved.section_visibility,
+        "content": resolved.content,
+    }
 
 
 def _field_dto(field, content: dict[str, Any]) -> dict[str, Any]:
@@ -53,11 +67,19 @@ def _field_dto(field, content: dict[str, Any]) -> dict[str, Any]:
 
 
 def admin_page_dto(
-    key: str, content: dict[str, Any], page: StaticPage | None
+    key: str, resolved: ResolvedStaticPage
 ) -> dict[str, Any]:
     return {
-        **page_summary_dto(key, page),
+        **page_summary_dto(key, resolved),
+        "sections": [
+            {
+                "id": section.id,
+                "label": section.label,
+                "visible": resolved.section_visibility[section.id],
+            }
+            for section in sections_for_page(key)
+        ],
         "fields": [
-            _field_dto(field, content) for field in fields_for_page(key)
+            _field_dto(field, resolved.content) for field in fields_for_page(key)
         ],
     }

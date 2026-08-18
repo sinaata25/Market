@@ -2,14 +2,17 @@ import "server-only";
 
 import { cache } from "react";
 import type {
-  StaticPageContentMap,
   StaticPageKey,
+  StaticPageRecordMap,
 } from "@/lib/static-page-types";
+import { STATIC_PAGE_KEYS } from "@/lib/static-page-types";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
 type PublicPageRecord = {
   key: StaticPageKey;
+  isVisible: boolean;
+  sections: unknown;
   content: unknown;
 };
 
@@ -19,6 +22,10 @@ type PublicPagesResponse = {
 
 type PublicPageResponse = {
   page: PublicPageRecord;
+};
+
+type PublicPageVisibilityResponse = {
+  pages: { key: StaticPageKey; isVisible: boolean }[];
 };
 
 const fetchPageRecord = cache(
@@ -58,29 +65,77 @@ const fetchPageRecords = cache(
 
 export async function getStaticPages<K extends StaticPageKey>(
   keys: readonly K[]
-): Promise<Pick<StaticPageContentMap, K> | null> {
+): Promise<Pick<StaticPageRecordMap, K> | null> {
   const uniqueKeys = [...new Set(keys)];
   const records = await fetchPageRecords(uniqueKeys.join(","));
   if (!records) return null;
 
-  const result: Partial<StaticPageContentMap> = {};
+  const result: Partial<StaticPageRecordMap> = {};
   for (const key of uniqueKeys) {
     const record = records.find((item) => item.key === key);
-    if (!record || !record.content || typeof record.content !== "object") {
+    if (
+      !record ||
+      typeof record.isVisible !== "boolean" ||
+      !record.sections ||
+      typeof record.sections !== "object" ||
+      !record.content ||
+      typeof record.content !== "object"
+    ) {
       return null;
     }
-    result[key] = record.content as never;
+    result[key] = record as never;
   }
 
-  return result as Pick<StaticPageContentMap, K>;
+  return result as Pick<StaticPageRecordMap, K>;
 }
 
 export async function getStaticPage<K extends StaticPageKey>(
   key: K
-): Promise<StaticPageContentMap[K] | null> {
+): Promise<StaticPageRecordMap[K] | null> {
   const page = await fetchPageRecord(key);
-  if (page?.key !== key || !page.content || typeof page.content !== "object") {
+  if (
+    page?.key !== key ||
+    typeof page.isVisible !== "boolean" ||
+    !page.sections ||
+    typeof page.sections !== "object" ||
+    !page.content ||
+    typeof page.content !== "object"
+  ) {
     return null;
   }
-  return page.content as StaticPageContentMap[K];
+  return page as StaticPageRecordMap[K];
+}
+
+export async function getStaticPageVisibility(): Promise<
+  Record<StaticPageKey, boolean> | null
+> {
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/api/content/pages/visibility`,
+      { cache: "no-store" }
+    );
+    const json = await response.json().catch(() => null);
+    if (!response.ok || !json?.ok || !Array.isArray(json.data?.pages)) {
+      return null;
+    }
+
+    const pages = (json.data as PublicPageVisibilityResponse).pages;
+    const result = Object.fromEntries(
+      pages.map((page) => [page.key, page.isVisible])
+    ) as Partial<Record<StaticPageKey, boolean>>;
+    if (
+      pages.length !== STATIC_PAGE_KEYS.length ||
+      pages.some(
+        (page) =>
+          !STATIC_PAGE_KEYS.includes(page.key) ||
+          typeof page.isVisible !== "boolean"
+      ) ||
+      STATIC_PAGE_KEYS.some((key) => typeof result[key] !== "boolean")
+    ) {
+      return null;
+    }
+    return result as Record<StaticPageKey, boolean>;
+  } catch {
+    return null;
+  }
 }

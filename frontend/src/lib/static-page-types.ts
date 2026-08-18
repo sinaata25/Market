@@ -184,6 +184,48 @@ export type StaticPageContentMap = {
   warranty: WarrantyPageContent;
 };
 
+export type StaticPageSectionMap = {
+  about: "hero" | "story" | "values" | "journey" | "closing";
+  contact: "hero" | "ways" | "topics" | "faq-promo";
+  support:
+    | "hero"
+    | "faq-order"
+    | "faq-payment"
+    | "faq-shipping"
+    | "faq-return"
+    | "faq-warranty"
+    | "faq-account"
+    | "contact";
+  shipping: "hero" | "steps" | "checklist" | "faqs" | "cta" | "aside";
+  returns: "hero" | "steps" | "checklist" | "faqs" | "cta" | "aside";
+  "how-to-order":
+    | "hero"
+    | "steps"
+    | "checklist"
+    | "faqs"
+    | "cta"
+    | "aside";
+  "track-order":
+    | "hero"
+    | "steps"
+    | "checklist"
+    | "faqs"
+    | "cta"
+    | "aside";
+  warranty: "hero" | "steps" | "checklist" | "faqs" | "cta" | "aside";
+};
+
+export type ManagedStaticPage<K extends StaticPageKey> = {
+  key: K;
+  isVisible: boolean;
+  sections: Record<StaticPageSectionMap[K], boolean>;
+  content: StaticPageContentMap[K];
+};
+
+export type StaticPageRecordMap = {
+  [K in StaticPageKey]: ManagedStaticPage<K>;
+};
+
 export type HelpPageKey = Exclude<
   StaticPageKey,
   "about" | "contact" | "support"

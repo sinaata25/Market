@@ -773,41 +773,100 @@ RETURNS_CONTENT = {
 
 
 @dataclass(frozen=True)
+class SectionDefinition:
+    id: str
+    label: str
+
+
+@dataclass(frozen=True)
 class PageDefinition:
     key: str
     label: str
     path: str
     default_content: dict[str, Any]
+    sections: tuple[SectionDefinition, ...]
+
+
+ABOUT_SECTIONS = (
+    SectionDefinition("hero", "سربرگ اصلی"),
+    SectionDefinition("story", "داستان و ریشه‌ها"),
+    SectionDefinition("values", "ارزش‌ها"),
+    SectionDefinition("journey", "مسیر همراهی"),
+    SectionDefinition("closing", "دعوت پایانی"),
+)
+
+CONTACT_SECTIONS = (
+    SectionDefinition("hero", "سربرگ اصلی"),
+    SectionDefinition("ways", "راه‌های ارتباط"),
+    SectionDefinition("topics", "موضوعات تماس"),
+    SectionDefinition("faq-promo", "معرفی مرکز راهنما"),
+)
+
+SUPPORT_SECTIONS = (
+    SectionDefinition("hero", "سربرگ و جستجو"),
+    SectionDefinition("faq-order", "پرسش‌ها — ثبت سفارش و خرید"),
+    SectionDefinition("faq-payment", "پرسش‌ها — پرداخت"),
+    SectionDefinition("faq-shipping", "پرسش‌ها — ارسال سفارش"),
+    SectionDefinition("faq-return", "پرسش‌ها — بازگشت کالا"),
+    SectionDefinition("faq-warranty", "پرسش‌ها — گارانتی و اصالت"),
+    SectionDefinition("faq-account", "پرسش‌ها — حساب کاربری"),
+    SectionDefinition("contact", "دعوت به تماس"),
+)
+
+HELP_SECTIONS = (
+    SectionDefinition("hero", "سربرگ اصلی"),
+    SectionDefinition("steps", "مراحل راهنما"),
+    SectionDefinition("checklist", "فهرست نکات"),
+    SectionDefinition("faqs", "پرسش‌های رایج"),
+    SectionDefinition("cta", "دعوت پایانی"),
+    SectionDefinition("aside", "ستون سایر راهنماها"),
+)
 
 
 PAGE_DEFINITIONS = {
-    "about": PageDefinition("about", "درباره ما", "/about", ABOUT_CONTENT),
+    "about": PageDefinition(
+        "about", "درباره ما", "/about", ABOUT_CONTENT, ABOUT_SECTIONS
+    ),
     "contact": PageDefinition(
-        "contact", "تماس با ما", "/contact", CONTACT_CONTENT
+        "contact", "تماس با ما", "/contact", CONTACT_CONTENT, CONTACT_SECTIONS
     ),
     "support": PageDefinition(
-        "support", "پاسخ به پرسش‌ها", "/support", SUPPORT_CONTENT
+        "support", "پاسخ به پرسش‌ها", "/support", SUPPORT_CONTENT, SUPPORT_SECTIONS
     ),
     "shipping": PageDefinition(
-        "shipping", "رویه ارسال سفارش", "/help/shipping", SHIPPING_CONTENT
+        "shipping",
+        "رویه ارسال سفارش",
+        "/help/shipping",
+        SHIPPING_CONTENT,
+        HELP_SECTIONS,
     ),
     "returns": PageDefinition(
-        "returns", "شرایط بازگشت کالا", "/help/returns", RETURNS_CONTENT
+        "returns",
+        "شرایط بازگشت کالا",
+        "/help/returns",
+        RETURNS_CONTENT,
+        HELP_SECTIONS,
     ),
     "how-to-order": PageDefinition(
         "how-to-order",
         "نحوه ثبت سفارش",
         "/help/how-to-order",
         HOW_TO_ORDER_CONTENT,
+        HELP_SECTIONS,
     ),
     "track-order": PageDefinition(
         "track-order",
         "رهگیری سفارش",
         "/help/track-order",
         TRACK_ORDER_CONTENT,
+        HELP_SECTIONS,
     ),
     "warranty": PageDefinition(
-        "warranty", "گارانتی محصولات", "/help/warranty", WARRANTY_CONTENT
+        "warranty",
+        "گارانتی محصولات",
+        "/help/warranty",
+        WARRANTY_CONTENT,
+        HELP_SECTIONS,
     ),
 }
 
@@ -906,6 +965,15 @@ def get_page_definition(key: str) -> PageDefinition | None:
 def default_content(key: str) -> dict[str, Any]:
     definition = PAGE_DEFINITIONS[key]
     return deepcopy(definition.default_content)
+
+
+def default_section_visibility(key: str) -> dict[str, bool]:
+    definition = PAGE_DEFINITIONS[key]
+    return {section.id: True for section in definition.sections}
+
+
+def sections_for_page(key: str) -> tuple[SectionDefinition, ...]:
+    return PAGE_DEFINITIONS[key].sections
 
 
 def _value_at(content: Any, path: tuple[str | int, ...]) -> str:

@@ -8,9 +8,10 @@ from .dto import public_page_dto
 from .serializers import (
     PublicStaticPageDetailEnvelopeSerializer,
     PublicStaticPageListEnvelopeSerializer,
+    PublicStaticPageVisibilityEnvelopeSerializer,
     StaticPageErrorEnvelopeSerializer,
 )
-from .services import page_content, page_contents
+from .services import page_content, page_contents, page_visibilities
 
 
 def _requested_keys(raw_keys: str | None) -> tuple[str, ...] | None:
@@ -53,10 +54,29 @@ class PublicStaticPageListView(APIView):
 
         resolved = page_contents(keys)
         pages = [
-            public_page_dto(key, resolved[key][0])
+            public_page_dto(key, resolved[key])
             for key in keys
         ]
         return ok({"pages": pages})
+
+
+class PublicStaticPageVisibilityView(APIView):
+    authentication_classes: list = []
+
+    @extend_schema(
+        operation_id="content_static_pages_visibility",
+        responses={200: PublicStaticPageVisibilityEnvelopeSerializer},
+    )
+    def get(self, request):
+        visibility = page_visibilities(SUPPORTED_PAGE_KEYS)
+        return ok(
+            {
+                "pages": [
+                    {"key": key, "isVisible": visibility[key]}
+                    for key in SUPPORTED_PAGE_KEYS
+                ]
+            }
+        )
 
 
 class PublicStaticPageDetailView(APIView):
@@ -72,5 +92,5 @@ class PublicStaticPageDetailView(APIView):
     def get(self, request, key: str):
         if get_page_definition(key) is None:
             return fail("صفحه محتوایی یافت نشد", 404)
-        content, _page = page_content(key)
-        return ok({"page": public_page_dto(key, content)})
+        resolved = page_content(key)
+        return ok({"page": public_page_dto(key, resolved)})

@@ -5,6 +5,10 @@ from . import views_admin, views_public
 
 public_urlpatterns = [
     path("pages", views_public.PublicStaticPageListView.as_view()),
+    path(
+        "pages/visibility",
+        views_public.PublicStaticPageVisibilityView.as_view(),
+    ),
     path("pages/<str:key>", views_public.PublicStaticPageDetailView.as_view()),
 ]
 

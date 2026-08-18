@@ -8,17 +8,17 @@ from common.responses import fail, first_error_message, ok
 
 from .definitions import SUPPORTED_PAGE_KEYS, get_page_definition
 from .dto import admin_page_dto, page_summary_dto
-from .selectors import static_pages_by_key
 from .serializers import (
     AdminStaticPageDetailEnvelopeSerializer,
     AdminStaticPageListEnvelopeSerializer,
     StaticPageErrorEnvelopeSerializer,
-    StaticPageFieldsPatchSerializer,
+    StaticPagePatchSerializer,
 )
 from .services import (
     PageContentValidationError,
     page_content,
-    update_page_fields,
+    page_contents,
+    update_page,
 )
 
 
@@ -26,7 +26,10 @@ def _flatten_errors(detail, prefix: str = "request") -> dict[str, str]:
     if isinstance(detail, Mapping):
         flattened: dict[str, str] = {}
         for key, value in detail.items():
-            flattened.update(_flatten_errors(value, str(key)))
+            nested_prefix = (
+                str(key) if prefix == "request" else f"{prefix}.{key}"
+            )
+            flattened.update(_flatten_errors(value, nested_prefix))
         return flattened
     if isinstance(detail, (list, tuple)):
         if not detail:
@@ -50,11 +53,11 @@ class AdminStaticPageListView(StaffRequiredMixin, APIView):
         },
     )
     def get(self, request):
-        stored = static_pages_by_key(SUPPORTED_PAGE_KEYS)
+        resolved = page_contents(SUPPORTED_PAGE_KEYS)
         return ok(
             {
                 "pages": [
-                    page_summary_dto(key, stored.get(key))
+                    page_summary_dto(key, resolved[key])
                     for key in SUPPORTED_PAGE_KEYS
                 ]
             }
@@ -76,12 +79,12 @@ class AdminStaticPageDetailView(StaffRequiredMixin, APIView):
     def get(self, request, key: str):
         if not self._definition_exists(key):
             return fail("صفحه محتوایی یافت نشد", 404)
-        content, page = page_content(key)
-        return ok({"page": admin_page_dto(key, content, page)})
+        resolved = page_content(key)
+        return ok({"page": admin_page_dto(key, resolved)})
 
     @extend_schema(
         operation_id="admin_content_static_pages_update",
-        request=StaticPageFieldsPatchSerializer,
+        request=StaticPagePatchSerializer,
         responses={
             200: AdminStaticPageDetailEnvelopeSerializer,
             403: StaticPageErrorEnvelopeSerializer,
@@ -93,17 +96,21 @@ class AdminStaticPageDetailView(StaffRequiredMixin, APIView):
         if not self._definition_exists(key):
             return fail("صفحه محتوایی یافت نشد", 404)
 
-        serializer = StaticPageFieldsPatchSerializer(data=request.data)
+        serializer = StaticPagePatchSerializer(data=request.data)
         if not serializer.is_valid():
             return _validation_failure(serializer.errors)
 
+        changes = dict(serializer.validated_data)
+        if "isVisible" in changes:
+            changes["is_visible"] = changes.pop("isVisible")
         try:
-            page = update_page_fields(
+            update_page(
                 key=key,
-                fields=serializer.validated_data["fields"],
                 user=request.user,
+                **changes,
             )
         except PageContentValidationError as exc:
             return _validation_failure(exc.errors)
 
-        return ok({"page": admin_page_dto(key, page.content, page)})
+        resolved = page_content(key)
+        return ok({"page": admin_page_dto(key, resolved)})
