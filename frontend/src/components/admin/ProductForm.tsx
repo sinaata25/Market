@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client-api";
 import type { Brand, Category, Product } from "@/lib/products";
+import SpecificationEditor from "@/components/admin/SpecificationEditor";
+import {
+  draftsFromProduct,
+  type AdminProductSpecification,
+  type SpecificationDraft,
+  type SpecificationDraftError,
+} from "@/components/admin/specification-types";
 
 type FormState = {
   title: string;
@@ -38,7 +45,50 @@ function inputCls(hasError = false) {
 }
 
 type ImageItem = { id: number; url: string };
-type AdminProduct = Product & { imageItems?: ImageItem[] };
+type AdminProduct = Omit<Product, "specifications"> & {
+  imageItems?: ImageItem[];
+  specifications?: AdminProductSpecification[];
+};
+
+function validateSpecifications(rows: SpecificationDraft[]) {
+  const errors: Record<string, SpecificationDraftError> = {};
+  const selectedKeys = new Map<number, string>();
+
+  for (const row of rows) {
+    const rowErrors: SpecificationDraftError = {};
+    if (!row.key) rowErrors.key = "یک مشخصه انتخاب کنید.";
+    const value = row.value.trim();
+    if (!value) rowErrors.value = "مقدار مشخصه را وارد کنید.";
+    else if (value.length > 500) {
+      rowErrors.value = "مقدار مشخصه حداکثر ۵۰۰ نویسه باشد.";
+    }
+    if (Object.keys(rowErrors).length > 0) errors[row.clientId] = rowErrors;
+
+    if (row.key) {
+      const firstRowId = selectedKeys.get(row.key.id);
+      if (firstRowId) {
+        errors[firstRowId] = {
+          ...errors[firstRowId],
+          key: "این مشخصه بیش از یک بار انتخاب شده است.",
+        };
+        errors[row.clientId] = {
+          ...errors[row.clientId],
+          key: "این مشخصه بیش از یک بار انتخاب شده است.",
+        };
+      } else {
+        selectedKeys.set(row.key.id, row.clientId);
+      }
+    }
+  }
+
+  const firstInvalidRow = rows.find((row) => errors[row.clientId]);
+  return {
+    errors,
+    firstInvalidRow,
+    firstInvalidField:
+      firstInvalidRow && errors[firstInvalidRow.clientId].key ? "key" : "value",
+  } as const;
+}
 
 export default function ProductForm({ productId }: { productId?: number }) {
   const router = useRouter();
@@ -47,6 +97,10 @@ export default function ProductForm({ productId }: { productId?: number }) {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [specifications, setSpecifications] = useState<SpecificationDraft[]>([]);
+  const [specificationErrors, setSpecificationErrors] = useState<
+    Record<string, SpecificationDraftError>
+  >({});
   const [images, setImages] = useState<ImageItem[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [createdProductId, setCreatedProductId] = useState<number>();
@@ -105,6 +159,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               description: p.description ?? "",
               warranty: p.warranty ?? "",
             });
+            setSpecifications(draftsFromProduct(p.specifications));
             setImages(p.imageItems ?? []);
             setIsActive(p.isActive !== false);
           }
@@ -128,6 +183,21 @@ export default function ProductForm({ productId }: { productId?: number }) {
       setMessage({ ok: false, text: "حداقل یک دسته‌بندی انتخاب کنید" });
       return;
     }
+    const specificationValidation = validateSpecifications(specifications);
+    if (specificationValidation.firstInvalidRow) {
+      setSpecificationErrors(specificationValidation.errors);
+      setMessage({
+        ok: false,
+        text: "مشخصات محصول را کامل کنید و موارد تکراری را برطرف کنید.",
+      });
+      const rowId = specificationValidation.firstInvalidRow.clientId;
+      const fieldId =
+        specificationValidation.firstInvalidField === "key"
+          ? `specification-key-${rowId}`
+          : `specification-value-${rowId}`;
+      window.requestAnimationFrame(() => document.getElementById(fieldId)?.focus());
+      return;
+    }
     setSaving(true);
     setMessage(null);
 
@@ -142,19 +212,32 @@ export default function ProductForm({ productId }: { productId?: number }) {
       badge: form.badge.trim(),
       description: form.description.trim(),
       warranty: form.warranty.trim(),
+      specifications: specifications.map((specification, position) => ({
+        keyId: specification.key!.id,
+        value: specification.value.trim(),
+        position,
+      })),
     };
 
     const res = isEdit
-      ? await api.patch<{ product: Product }>(
+      ? await api.patch<{ product: AdminProduct }>(
           `/api/admin/products/${activeProductId}`,
           payload
         )
-      : await api.post<{ product: Product }>("/api/admin/products", payload);
+      : await api.post<{ product: AdminProduct }>(
+          "/api/admin/products",
+          payload
+        );
 
     if (!res.ok || !res.data) {
       setSaving(false);
       setMessage({ ok: false, text: res.error ?? "خطا در ذخیره" });
       return;
+    }
+
+    if (res.data.product.specifications) {
+      setSpecifications(draftsFromProduct(res.data.product.specifications));
+      setSpecificationErrors({});
     }
     if (!isEdit) {
       const newProductId = res.data.product.id;
@@ -342,6 +425,15 @@ export default function ProductForm({ productId }: { productId?: number }) {
               />
             </div>
           </div>
+          <SpecificationEditor
+            rows={specifications}
+            errors={specificationErrors}
+            onChange={(nextRows) => {
+              setSpecifications(nextRows);
+              setSpecificationErrors({});
+            }}
+            disabled={saving}
+          />
         </div>
 
         {/* ستون کناری */}

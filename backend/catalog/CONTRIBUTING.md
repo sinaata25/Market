@@ -8,13 +8,15 @@ brand/category/product response DTOs reused by the cart, profile, and admin APIs
 
 ## Module map
 
-- `models.py`: `Brand`, `Category`, `Product`, `ProductImage`, `ProductRating`, and
-  `ProductComment`.
+- `models.py`: catalog entities, including reusable `SpecificationKey` definitions
+  and ordered `ProductSpecification` values.
 - `dto.py`: stable camelCase public representations for brands/categories/products.
 - `brand_pricing.py`: transactional brand-wide percentage price adjustments.
 - `brand_files.py`: transaction-aware cleanup of replaced/deleted brand logos.
 - `feedback.py`: purchase verification, rating aggregation, comment DTOs, and
   visible conversation selection.
+- `specifications.py`: Persian key normalization, specification prefetching, and
+  atomic product/specification writes.
 - `views.py`: category, product, rating, and comment endpoints.
 - `validators.py`: strict PNG and SVG category-icon validation.
 - `icon_files.py`: transaction-aware cleanup of replaced/deleted icon files.
@@ -47,11 +49,16 @@ assigned category (including the primary one); write APIs keep both relations in
 sync and require at least one category. `Product.brand` is a nullable protected
 foreign key, so a product has zero or one brand independently of all category
 assignments. Monetary values are integer toman amounts.
-`old_price` is nullable and represents the pre-discount display price. `colors`,
-`features`, and `specs` are JSON UI content. Rating and rating count are denormalized
+`old_price` is nullable and represents the pre-discount display price. `colors` and
+`features` are JSON UI content. Rating and rating count are denormalized
 onto the product for fast listing/sorting and must be recomputed after rating
 creation/update/deletion. `is_active` controls storefront visibility without deleting the
 product or its history. Stock is mutated transactionally by the orders app.
+
+`SpecificationKey` is a globally reusable definition. Its `normalized_name` uses
+Unicode/Persian canonicalization and is unique, so visually equivalent key names
+cannot be duplicated. `ProductSpecification` holds one product-specific text value
+and position; `(product, key)` is unique and key deletion is protected while used.
 
 `ProductImage` provides an ordered one-to-many image gallery. Code returning a
 product should select `brand` and prefetch `categories` and `images`; otherwise
@@ -73,8 +80,10 @@ are derived from the author role and qualifying order data, never request boolea
 `brand_dto()`, `category_dto()`, and `product_dto()` deliberately separate the
 database schema from the frontend contract. They convert snake_case fields to camelCase, return
 relative media URLs (proxied by Next.js), include the full image gallery, and
-provide presentation defaults for missing features/specs/description/warranty.
-The product contract includes a brand object or `null`.
+provide presentation defaults for missing features/description/warranty. Product
+detail responses additionally contain ordered `specifications`; summary/list/card
+representations deliberately omit them. The product contract includes a brand
+object or `null`.
 
 Because `product_dto()` is shared across apps, changing it affects product lists,
 details, related products, carts, favorites, and admin responses. Update contract
@@ -126,8 +135,9 @@ passes moderation even when its parent was approved.
 ## Admin behavior
 
 `BrandAdmin` and `CategoryAdmin` preview validated image assets and manage file
-cleanup as described above. `ProductAdmin` embeds `ProductImage` rows as a tabular
-inline and exposes brand filtering. Search/list/filter configuration is operational convenience only; custom
+cleanup as described above. `ProductAdmin` embeds image and specification rows as
+tabular inlines, and reusable keys have their own protected management screen.
+Search/list/filter configuration is operational convenience only; custom
 storefront management endpoints live in `adminapi`.
 
 ## Seeding
@@ -141,10 +151,11 @@ production startup depend on demo assets.
 1. Treat `product_dto()` as a cross-app public contract.
 2. Add `select_related("category", "brand")` and `prefetch_related("categories", "images")`
    to bulk DTO calls.
-3. Keep rating uniqueness enforced at the database level.
-4. Recompute denormalized ratings after every rating mutation.
-5. Keep customer moderation, official-author identity, and purchase verification
-6. Never weaken SVG/PNG content validation to MIME/extension checks.
-7. Delete replaced files only after transaction commit and only if unreferenced.
-8. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.
-9. Keep the category graph acyclic in every write surface, including Django admin.
+3. Prefetch ordered specifications with their key only for detail DTO calls.
+4. Keep rating and product-specification uniqueness enforced at the database level.
+5. Recompute denormalized ratings after every rating mutation.
+6. Keep customer moderation, official-author identity, and purchase verification.
+7. Never weaken SVG/PNG content validation to MIME/extension checks.
+8. Delete replaced files only after transaction commit and only if unreferenced.
+9. Run `./.venv/bin/python manage.py test catalog --verbosity 2`.
+10. Keep the category graph acyclic in every write surface, including Django admin.

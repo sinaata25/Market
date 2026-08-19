@@ -1,3 +1,11 @@
+export type ProductSpecification = {
+  keyId: number;
+  name: string;
+  slug: string;
+  value: string;
+  position: number;
+};
+
 export type Product = {
   id: number;
   title: string;
@@ -16,7 +24,8 @@ export type Product = {
   badge?: string;
   colors?: { name: string; hex: string }[];
   features?: string[];
-  specs?: { label: string; value: string }[];
+  // Only product-detail responses include the normalized specification rows.
+  specifications?: ProductSpecification[];
   description?: string;
   warranty?: string;
   stock?: number;
@@ -125,13 +134,49 @@ export const products: Product[] = [
       "سیستم استارت آسان و کم‌مصرف",
       "دسته ضد لرزش برای کاهش خستگی",
     ],
-    specs: [
-      { label: "حجم موتور", value: "۵۲ سی‌سی" },
-      { label: "طول تیغه", value: "۵۰ سانتی‌متر" },
-      { label: "نوع موتور", value: "بنزینی دو زمانه" },
-      { label: "ظرفیت مخزن سوخت", value: "۵۵۰ میلی‌لیتر" },
-      { label: "وزن", value: "۵.۸ کیلوگرم" },
-      { label: "کشور سازنده", value: "آلمان" },
+    specifications: [
+      {
+        keyId: 1,
+        name: "حجم موتور",
+        slug: "حجم-موتور",
+        value: "۵۲ سی‌سی",
+        position: 0,
+      },
+      {
+        keyId: 2,
+        name: "طول تیغه",
+        slug: "طول-تیغه",
+        value: "۵۰ سانتی‌متر",
+        position: 1,
+      },
+      {
+        keyId: 3,
+        name: "نوع موتور",
+        slug: "نوع-موتور",
+        value: "بنزینی دو زمانه",
+        position: 2,
+      },
+      {
+        keyId: 4,
+        name: "ظرفیت مخزن سوخت",
+        slug: "ظرفیت-مخزن-سوخت",
+        value: "۵۵۰ میلی‌لیتر",
+        position: 3,
+      },
+      {
+        keyId: 5,
+        name: "وزن",
+        slug: "وزن",
+        value: "۵.۸ کیلوگرم",
+        position: 4,
+      },
+      {
+        keyId: 6,
+        name: "کشور سازنده",
+        slug: "کشور-سازنده",
+        value: "آلمان",
+        position: 5,
+      },
     ],
     description:
       "اره موتوری حرفه‌ای با موتور پرقدرت ۵۲ سی‌سی، مناسب برای هرس و برش درختان باغ و کارهای سنگین کشاورزی. طراحی ارگونومیک و سیستم ضد لرزش، استفاده طولانی‌مدت را راحت‌تر می‌کند.",

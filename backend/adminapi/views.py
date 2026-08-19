@@ -7,7 +7,7 @@ from decimal import Decimal
 from PIL import Image, UnidentifiedImageError
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.db.models import Avg, Count, F, IntegerField, Q, Sum
 from django.db.models.functions import TruncDate
@@ -31,6 +31,14 @@ from catalog.models import (
     ProductComment,
     ProductImage,
     ProductRating,
+    SpecificationKey,
+)
+from catalog.specifications import (
+    MAX_SPECIFICATION_POSITION,
+    normalize_specification_name,
+    product_specification_prefetch,
+    save_product_with_specifications,
+    validate_specification_inputs,
 )
 from catalog.validators import validate_category_icon
 from common.responses import fail, ok
@@ -69,11 +77,30 @@ class StaffRequiredMixin:
 
 def admin_product_dto(product: Product) -> dict:
     """DTO محصول برای ادمین + شناسه تصاویر (برای حذف)"""
-    data = product_dto(product)
+    data = product_dto(product, include_specifications=True)
     data["imageItems"] = [
         {"id": img.id, "url": img.image.url} for img in product.images.all()
     ]
     return data
+
+
+def specification_key_dto(key: SpecificationKey) -> dict:
+    return {
+        "id": key.id,
+        "name": key.name,
+        "slug": key.slug,
+        "productCount": (
+            key.product_count
+            if hasattr(key, "product_count")
+            else key.product_specifications.values("product_id").distinct().count()
+        ),
+    }
+
+
+def specification_keys_queryset():
+    return SpecificationKey.objects.annotate(
+        product_count=Count("product_specifications__product", distinct=True)
+    )
 
 
 def admin_brand_dto(brand: Brand) -> dict:
@@ -641,6 +668,147 @@ class AdminBrandPriceAdjustmentView(StaffRequiredMixin, APIView):
 # ─── محصولات ─────────────────────────────────────────────────
 
 
+class SpecificationKeyWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100, trim_whitespace=False, required=False)
+    slug = serializers.SlugField(
+        max_length=120, allow_unicode=True, allow_blank=True, required=False
+    )
+
+    def validate(self, data):
+        instance = self.context.get("instance")
+        if not data:
+            raise serializers.ValidationError("حداقل یک فیلد را ارسال کنید")
+        if instance is None and "name" not in data:
+            raise serializers.ValidationError({"name": "نام مشخصه الزامی است"})
+
+        if "name" in data:
+            try:
+                name, normalized_name = normalize_specification_name(data["name"])
+            except ValueError as exc:
+                raise serializers.ValidationError({"name": str(exc)}) from exc
+            duplicates = SpecificationKey.objects.filter(
+                normalized_name=normalized_name
+            )
+            if instance is not None:
+                duplicates = duplicates.exclude(pk=instance.pk)
+            if duplicates.exists():
+                raise serializers.ValidationError(
+                    {"name": "مشخصه‌ای با این نام از قبل وجود دارد"}
+                )
+            data["name"] = name
+            data["normalized_name"] = normalized_name
+
+        if "slug" in data and data["slug"]:
+            duplicates = SpecificationKey.objects.filter(slug=data["slug"])
+            if instance is not None:
+                duplicates = duplicates.exclude(pk=instance.pk)
+            if duplicates.exists():
+                raise serializers.ValidationError(
+                    {"slug": "مشخصه‌ای با این نامک از قبل وجود دارد"}
+                )
+        return data
+
+
+def save_specification_key(
+    *, serializer: SpecificationKeyWriteSerializer, instance: SpecificationKey | None = None
+) -> SpecificationKey:
+    data = dict(serializer.validated_data)
+    normalized_name = data.pop("normalized_name", None)
+    key = instance or SpecificationKey()
+    if "name" in data:
+        key.name = data["name"]
+        key.normalized_name = normalized_name
+    if "slug" in data:
+        key.slug = data["slug"]
+    try:
+        key.save()
+    except (DjangoValidationError, IntegrityError) as exc:
+        raise serializers.ValidationError(
+            "نام یا نامک مشخصه تکراری است"
+        ) from exc
+    return key
+
+
+class AdminSpecificationKeyListView(StaffRequiredMixin, APIView):
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        queryset = specification_keys_queryset()
+        search = request.query_params.get("search", "").strip()
+        if search:
+            try:
+                _, normalized_search = normalize_specification_name(search)
+            except ValueError:
+                queryset = queryset.none()
+            else:
+                queryset = queryset.filter(
+                    Q(normalized_name__icontains=normalized_search)
+                    | Q(slug__icontains=search)
+                )
+        return ok(
+            {"specifications": [specification_key_dto(key) for key in queryset]}
+        )
+
+    @extend_schema(
+        request=SpecificationKeyWriteSerializer, responses={201: OpenApiTypes.OBJECT}
+    )
+    def post(self, request):
+        serializer = SpecificationKeyWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        key = save_specification_key(serializer=serializer)
+        return ok(
+            {
+                "specification": specification_key_dto(
+                    specification_keys_queryset().get(pk=key.pk)
+                )
+            },
+            status=201,
+        )
+
+
+class AdminSpecificationKeyDetailView(StaffRequiredMixin, APIView):
+    @extend_schema(
+        request=SpecificationKeyWriteSerializer, responses={200: OpenApiTypes.OBJECT}
+    )
+    def patch(self, request, pk: int):
+        key = SpecificationKey.objects.filter(pk=pk).first()
+        if key is None:
+            return fail("مشخصه یافت نشد", 404)
+        serializer = SpecificationKeyWriteSerializer(
+            data=request.data, partial=True, context={"instance": key}
+        )
+        serializer.is_valid(raise_exception=True)
+        key = save_specification_key(serializer=serializer, instance=key)
+        return ok(
+            {
+                "specification": specification_key_dto(
+                    specification_keys_queryset().get(pk=key.pk)
+                )
+            }
+        )
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def delete(self, request, pk: int):
+        key = SpecificationKey.objects.filter(pk=pk).first()
+        if key is None:
+            return fail("مشخصه یافت نشد", 404)
+        error = "این مشخصه در محصولات استفاده شده و قابل حذف نیست"
+        if key.product_specifications.exists():
+            return fail(error, 409)
+        try:
+            key.delete()
+        except ProtectedError:
+            return fail(error, 409)
+        return ok({"deleted": True})
+
+
+class ProductSpecificationWriteSerializer(serializers.Serializer):
+    keyId = serializers.IntegerField(min_value=1)
+    value = serializers.CharField(max_length=500, trim_whitespace=True)
+    position = serializers.IntegerField(
+        min_value=0, max_value=MAX_SPECIFICATION_POSITION
+    )
+
+
 class ProductWriteSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255)
     titleEn = serializers.CharField(
@@ -663,8 +831,17 @@ class ProductWriteSerializer(serializers.Serializer):
     warranty = serializers.CharField(
         max_length=100, required=False, allow_blank=True, default=""
     )
+    specifications = ProductSpecificationWriteSerializer(
+        many=True, required=False, allow_empty=True, max_length=100
+    )
 
     def validate(self, data):
+        raw_specifications = data.pop("specifications", None)
+        data["specification_items"] = (
+            validate_specification_inputs(raw_specifications)
+            if raw_specifications is not None
+            else None
+        )
         slugs = data.pop("categorySlugs", None)
         legacy_slug = data.pop("categorySlug", None)
         if slugs is None:
@@ -697,23 +874,6 @@ class ProductWriteSerializer(serializers.Serializer):
         return data
 
 
-def apply_product_data(product: Product, data: dict) -> Product:
-    categories = data["categories"]
-    product.title = data["title"]
-    product.title_en = data.get("titleEn", "")
-    product.category = categories[0]
-    product.brand = data["brand"]
-    product.price = data["price"]
-    product.old_price = data.get("oldPrice")
-    product.stock = data["stock"]
-    product.badge = data.get("badge", "")
-    product.description = data.get("description", "")
-    product.warranty = data.get("warranty", "")
-    product.save()
-    product.categories.set(categories)
-    return product
-
-
 class AdminProductListView(StaffRequiredMixin, APIView):
     def get(self, request):
         qs = (
@@ -744,15 +904,30 @@ class AdminProductListView(StaffRequiredMixin, APIView):
     def post(self, request):
         ser = ProductWriteSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        product = apply_product_data(Product(), ser.validated_data)
-        return ok({"product": product_dto(product)}, status=201)
+        data = dict(ser.validated_data)
+        specification_items = data.pop("specification_items")
+        product = save_product_with_specifications(
+            product=Product(), data=data, specification_items=specification_items
+        )
+        product = (
+            Product.objects.select_related("category", "brand")
+            .prefetch_related(
+                "categories", "images", product_specification_prefetch()
+            )
+            .get(pk=product.pk)
+        )
+        return ok(
+            {"product": product_dto(product, include_specifications=True)}, status=201
+        )
 
 
 class AdminProductDetailView(StaffRequiredMixin, APIView):
     def _get(self, pk: int) -> Product | None:
         return (
             Product.objects.select_related("category", "brand")
-            .prefetch_related("categories", "images")
+            .prefetch_related(
+                "categories", "images", product_specification_prefetch()
+            )
             .filter(pk=pk)
             .first()
         )
@@ -769,7 +944,11 @@ class AdminProductDetailView(StaffRequiredMixin, APIView):
             return fail("محصول یافت نشد", 404)
         ser = ProductWriteSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        apply_product_data(product, ser.validated_data)
+        data = dict(ser.validated_data)
+        specification_items = data.pop("specification_items")
+        save_product_with_specifications(
+            product=product, data=data, specification_items=specification_items
+        )
         return ok({"product": admin_product_dto(self._get(pk))})
 
     def delete(self, request, pk: int):
@@ -798,7 +977,9 @@ class AdminProductVisibilityView(StaffRequiredMixin, APIView):
         serializer.is_valid(raise_exception=True)
         product = (
             Product.objects.select_related("category", "brand")
-            .prefetch_related("categories", "images")
+            .prefetch_related(
+                "categories", "images", product_specification_prefetch()
+            )
             .filter(pk=pk)
             .first()
         )
@@ -835,7 +1016,9 @@ class AdminProductImageView(StaffRequiredMixin, APIView):
             {
                 "product": admin_product_dto(
                     Product.objects.select_related("category", "brand")
-                    .prefetch_related("categories", "images")
+                    .prefetch_related(
+                        "categories", "images", product_specification_prefetch()
+                    )
                     .get(pk=pk)
                 )
             },

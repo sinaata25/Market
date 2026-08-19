@@ -84,7 +84,10 @@ the first becomes the backward-compatible primary category and all values popula
 the many-to-many relation. The legacy singular `categorySlug` input remains
 accepted. Optional `brandSlug` maps separately to `Product.brand`. Cross-field
 validation enforces price-related rules. `apply_product_data()`
-centralizes mapping from API names to model fields so create and update cannot drift.
+has been replaced by catalog's transactional `save_product_with_specifications()`
+service so core fields, categories, and optional ordered specification replacement
+commit or roll back together. Omitting `specifications` preserves current rows;
+sending an empty list removes them.
 
 - `GET/POST products`: filtered/paginated list and creation.
 - `GET/PATCH/DELETE products/<id>`: detail mutation.
@@ -95,9 +98,13 @@ centralizes mapping from API names to model fields so create and update cannot d
 - `PATCH/DELETE brands/<id>`: update or safely delete an unused brand.
 - `POST/DELETE brands/<id>/logo`: replace or remove a validated logo.
 - `POST brands/<id>/price-adjustment`: atomic staff-only bulk price adjustment.
+- `GET/POST specifications`: searchable reusable-key list and creation.
+- `PATCH/DELETE specifications/<id>`: rename or safely delete an unused key.
 
-List responses use `product_dto()`; detail responses use `admin_product_dto()`.
-Bulk queries select category and brand and prefetch images. Uploaded image IDs are
+List responses use `product_dto()` and omit specifications; detail responses use
+`admin_product_dto()` and include ordered specifications. Bulk queries select
+category and brand and prefetch images. Detail queries additionally prefetch
+specification values with their keys. Uploaded image IDs are
 scoped to the URL product to prevent deleting another product's asset. Product deletion may
 be blocked by protected order history; return a controlled conflict rather than
 destroying historical integrity.

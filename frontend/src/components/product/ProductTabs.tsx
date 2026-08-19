@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import type { Product } from "@/lib/products";
 import { api } from "@/lib/client-api";
 
@@ -167,7 +167,17 @@ function CommentCard({
 }
 
 export default function ProductTabs({ product }: { product: Product }) {
-  const [active, setActive] = useState<TabKey>("specs");
+  const specifications = product.specifications ?? [];
+  const hasSpecifications = specifications.length > 0;
+  const availableTabs = hasSpecifications
+    ? tabs
+    : tabs.filter((tab) => tab.key !== "specs");
+  const [active, setActive] = useState<TabKey>(
+    hasSpecifications ? "specs" : "intro"
+  );
+  const activeTab = availableTabs.some((tab) => tab.key === active)
+    ? active
+    : "intro";
   const [ratingData, setRatingData] = useState<RatingData>({
     average: product.rating,
     count: product.ratingCount,
@@ -190,7 +200,7 @@ export default function ProductTabs({ product }: { product: Product }) {
   const [replyText, setReplyText] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
 
-  const loadRating = useCallback(async () => {
+  async function loadRating() {
     const result = await api.get<{ rating: RatingData }>(
       `/api/products/${product.id}/rating`
     );
@@ -201,16 +211,16 @@ export default function ProductTabs({ product }: { product: Product }) {
       setRatingMessage(result.error ?? "خطا در دریافت امتیازها");
     }
     setRatingLoading(false);
-  }, [product.id]);
+  }
 
-  const loadComments = useCallback(async () => {
+  async function loadComments() {
     const result = await api.get<{ comments: ProductComment[] }>(
       `/api/products/${product.id}/comments`
     );
     if (result.ok && result.data) setComments(result.data.comments);
     else setCommentMessage(result.error ?? "خطا در دریافت دیدگاه‌ها");
     setCommentsLoading(false);
-  }, [product.id]);
+  }
 
   async function submitRating() {
     setRatingSubmitting(true);
@@ -283,28 +293,30 @@ export default function ProductTabs({ product }: { product: Product }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-white">
       <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2">
-        {tabs.map((tab) => (
+        {availableTabs.map((tab) => (
           <button
             key={tab.key}
+            type="button"
+            aria-pressed={activeTab === tab.key}
             onClick={() => {
-              if (tab.key === "ratings" && tab.key !== active) {
+              if (tab.key === "ratings" && tab.key !== activeTab) {
                 setRatingLoading(true);
                 void loadRating();
               }
-              if (tab.key === "comments" && tab.key !== active) {
+              if (tab.key === "comments" && tab.key !== activeTab) {
                 setCommentsLoading(true);
                 void loadComments();
               }
               setActive(tab.key);
             }}
             className={`relative shrink-0 px-4 py-3 text-sm font-medium transition ${
-              active === tab.key
+              activeTab === tab.key
                 ? "text-brand-700"
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
             {tab.label}
-            {active === tab.key && (
+            {activeTab === tab.key && (
               <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-600" />
             )}
           </button>
@@ -312,28 +324,39 @@ export default function ProductTabs({ product }: { product: Product }) {
       </div>
 
       <div className="p-5">
-        {active === "specs" && (
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-slate-100">
-              {product.specs?.map((spec) => (
-                <tr key={spec.label}>
-                  <td className="w-40 py-3 align-top text-slate-400">
-                    {spec.label}
-                  </td>
-                  <td className="py-3 text-slate-700">{spec.value}</td>
-                </tr>
+        {activeTab === "specs" && hasSpecifications && (
+          <section aria-labelledby="product-specifications-heading">
+            <h2
+              id="product-specifications-heading"
+              className="mb-3 text-base font-bold text-slate-800 sm:mb-4"
+            >
+              مشخصات محصول
+            </h2>
+            <dl className="divide-y divide-slate-100">
+              {specifications.map((specification) => (
+                <div
+                  key={specification.keyId}
+                  className="grid min-w-0 grid-cols-1 gap-1.5 py-4 first:pt-0 last:pb-0 sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)] sm:gap-6"
+                >
+                  <dt className="min-w-0 break-words text-sm font-medium text-slate-500">
+                    {specification.name}
+                  </dt>
+                  <dd className="min-w-0 whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
+                    <bdi dir="auto">{specification.value}</bdi>
+                  </dd>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </dl>
+          </section>
         )}
 
-        {active === "intro" && (
+        {activeTab === "intro" && (
           <p className="text-sm leading-8 text-slate-600">
             {product.description}
           </p>
         )}
 
-        {active === "ratings" && (
+        {activeTab === "ratings" && (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-6 rounded-xl bg-slate-50 p-5">
               <div className="text-center">
@@ -394,7 +417,7 @@ export default function ProductTabs({ product }: { product: Product }) {
           </div>
         )}
 
-        {active === "comments" && (
+        {activeTab === "comments" && (
           <div className="space-y-5">
             <form
               onSubmit={submitComment}
