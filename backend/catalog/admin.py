@@ -14,12 +14,21 @@ from .models import (
     ProductComment,
     ProductImage,
     ProductRating,
+    ProductSpecification,
+    SpecificationKey,
 )
 
 
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 1
+
+
+class ProductSpecificationInline(admin.TabularInline):
+    model = ProductSpecification
+    extra = 1
+    autocomplete_fields = ["key"]
+    ordering = ["position", "id"]
 
 
 class CategoryAdminForm(forms.ModelForm):
@@ -215,11 +224,33 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ["title", "title_en"]
     list_editable = ["price", "old_price", "stock", "is_active"]
     filter_horizontal = ["categories"]
-    inlines = [ProductImageInline]
+    inlines = [ProductImageInline, ProductSpecificationInline]
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         form.instance.categories.add(form.instance.category)
+
+
+@admin.register(SpecificationKey)
+class SpecificationKeyAdmin(admin.ModelAdmin):
+    list_display = ["name", "slug", "product_count", "updated_at"]
+    search_fields = ["name", "normalized_name", "slug"]
+    readonly_fields = ["normalized_name", "created_at", "updated_at"]
+
+    @admin.display(description="تعداد محصولات")
+    def product_count(self, obj):
+        return obj.product_specifications.values("product_id").distinct().count()
+
+    def has_delete_permission(self, request, obj=None):
+        allowed = super().has_delete_permission(request, obj)
+        if not allowed or obj is None:
+            return allowed
+        return not obj.product_specifications.exists()
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
 
 
 @admin.register(ProductRating)

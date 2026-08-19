@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import StaticPageUnavailable from "@/components/static-pages/StaticPageUnavailable";
+import { getStaticPage } from "@/lib/static-pages";
 
 export const metadata: Metadata = {
   title: "درباره ما | گروه صنعتی توانا",
@@ -8,46 +11,12 @@ export const metadata: Metadata = {
     "با گروه صنعتی توانا، مسیر انتخاب و خرید مطمئن ابزارآلات و ادوات کشاورزی، بیشتر آشنا شوید.",
 };
 
-const values = [
-  {
-    icon: "shield",
-    title: "اصالت، پیش از هر چیز",
-    description:
-      "کالاها با دقت انتخاب می‌شوند تا با خیال آسوده، ابزار مناسب کارتان را تهیه کنید.",
-  },
-  {
-    icon: "sprout",
-    title: "کنار اهل زمین",
-    description:
-      "نیاز کشاورز و باغبان، نقطه شروع انتخاب محصولات و بهبود خدمات ماست.",
-  },
-  {
-    icon: "chat",
-    title: "راهنمایی صادقانه",
-    description:
-      "پیش از خرید و پس از آن، برای یک انتخاب روشن و کاربردی کنارتان هستیم.",
-  },
-] as const;
+export const dynamic = "force-dynamic";
 
-const journey = [
-  {
-    number: "۰۱",
-    title: "شناخت نیاز شما",
-    description: "محصولات را براساس کاربرد واقعی و نیازهای روزمره دسته‌بندی می‌کنیم.",
-  },
-  {
-    number: "۰۲",
-    title: "انتخاب مطمئن",
-    description: "اطلاعات شفاف و پشتیبانی تخصصی، تصمیم‌گیری را ساده‌تر می‌کند.",
-  },
-  {
-    number: "۰۳",
-    title: "رسیدن به دست شما",
-    description: "سفارش‌ها با دقت آماده می‌شوند و به سراسر کشور ارسال خواهند شد.",
-  },
-] as const;
+const valueIcons = ["shield", "sprout", "chat"] as const;
+const journeyNumbers = ["۰۱", "۰۲", "۰۳"] as const;
 
-function LineIcon({ name }: { name: (typeof values)[number]["icon"] }) {
+function LineIcon({ name }: { name: (typeof valueIcons)[number] }) {
   if (name === "shield") {
     return (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-7 w-7">
@@ -73,7 +42,12 @@ function LineIcon({ name }: { name: (typeof values)[number]["icon"] }) {
   );
 }
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const page = await getStaticPage("about");
+  if (!page) return <StaticPageUnavailable />;
+  if (!page.isVisible) notFound();
+  const { content, sections } = page;
+
   return (
     <div className="overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:pt-8">
@@ -85,7 +59,7 @@ export default function AboutPage() {
           <span className="font-medium text-brand-700">درباره ما</span>
         </nav>
 
-        <section className="relative isolate overflow-hidden rounded-[2rem] bg-secondary-900 px-6 py-10 text-white shadow-[0_24px_80px_-45px_rgba(20,36,79,0.8)] sm:px-10 sm:py-14 lg:px-16 lg:py-20">
+        {sections.hero && <section className="relative isolate overflow-hidden rounded-[2rem] bg-secondary-900 px-6 py-10 text-white shadow-[0_24px_80px_-45px_rgba(20,36,79,0.8)] sm:px-10 sm:py-14 lg:px-16 lg:py-20">
           <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_10%_0%,rgba(228,176,40,0.24),transparent_30%),radial-gradient(circle_at_90%_100%,rgba(117,153,102,0.35),transparent_38%)]" />
           <div className="absolute -left-20 top-10 -z-10 h-72 w-72 rounded-full border border-white/10" />
           <div className="absolute -left-10 top-20 -z-10 h-52 w-52 rounded-full border border-white/10" />
@@ -94,23 +68,22 @@ export default function AboutPage() {
             <div>
               <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs text-secondary-100 backdrop-blur-sm">
                 <span className="h-2 w-2 rounded-full bg-accent-400" />
-                داستان گروه صنعتی توانا
+                {content.hero.badge}
               </span>
               <h1 className="max-w-2xl text-3xl font-bold leading-[1.55] sm:text-4xl lg:text-5xl">
-                ابزار مطمئن، برای دستانی که
-                <span className="text-accent-300"> زندگی می‌کارند</span>
+                {content.hero.title}
+                {" "}
+                <span className="text-accent-300">{content.hero.accent}</span>
               </h1>
               <p className="mt-5 max-w-xl text-sm leading-8 text-secondary-100 sm:text-base sm:leading-9">
-                توانا با یک هدف روشن شکل گرفته است: دسترسی ساده‌تر کشاورزان،
-                باغداران و دوست‌داران طبیعت به ابزارآلاتی که می‌توان به کیفیتشان
-                اعتماد کرد.
+                {content.hero.intro}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/category/garden-tools" className="rounded-xl bg-accent-400 px-6 py-3 text-sm font-bold text-secondary-900 transition hover:-translate-y-0.5 hover:bg-accent-300">
-                  مشاهده محصولات
+                  {content.hero.primaryLabel}
                 </Link>
                 <Link href="/support" className="rounded-xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white transition hover:bg-white/10">
-                  گفتگو با پشتیبانی
+                  {content.hero.secondaryLabel}
                 </Link>
               </div>
             </div>
@@ -122,46 +95,38 @@ export default function AboutPage() {
                 <Image src="/brand/logo.png" alt="نشان گروه صنعتی توانا" width={160} height={160} priority className="h-36 w-36 object-contain sm:h-40 sm:w-40" />
               </div>
               <div className="absolute bottom-3 right-0 rounded-2xl border border-white/10 bg-white/95 px-4 py-3 text-secondary-900 shadow-xl sm:right-2">
-                <span className="block text-[10px] text-slate-400">همراه مسیر شما</span>
-                <span className="text-sm font-bold">از انتخاب تا استفاده</span>
+                <span className="block text-[10px] text-slate-400">{content.hero.captionEyebrow}</span>
+                <span className="text-sm font-bold">{content.hero.captionTitle}</span>
               </div>
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className="grid gap-8 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-20 lg:py-24">
+        {sections.story && <section className="grid gap-8 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-20 lg:py-24">
           <div>
-            <p className="mb-3 text-sm font-bold text-brand-600">ریشه‌های ما</p>
+            <p className="mb-3 text-sm font-bold text-brand-600">{content.story.eyebrow}</p>
             <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">
-              فروشگاهی برای یک انتخاب آگاهانه‌تر
+              {content.story.title}
             </h2>
           </div>
           <div className="space-y-5 text-sm leading-8 text-slate-600 sm:text-base sm:leading-9">
-            <p>
-              ما می‌دانیم انتخاب یک ابزار خوب فقط مقایسه چند قیمت نیست؛ دوام،
-              کارایی، دسترسی به راهنمای درست و خدمات پس از خرید همگی بخشی از این
-              انتخاب‌اند. به همین دلیل تلاش می‌کنیم مسیر خرید، شفاف و بدون
-              پیچیدگی باشد.
-            </p>
-            <p>
-              مجموعه توانا، از ابزارهای باغبانی تا ماشین‌آلات و تجهیزات تخصصی،
-              محصولاتی را کنار هم قرار می‌دهد که پاسخ‌گوی کار واقعی در مزرعه،
-              باغ و فضای سبز باشند.
-            </p>
+            {content.story.paragraphs.map((paragraph, index) => (
+              <p key={index}>{paragraph}</p>
+            ))}
           </div>
-        </section>
+        </section>}
 
-        <section className="rounded-[2rem] border border-brand-100 bg-white p-5 sm:p-8 lg:p-10">
+        {sections.values && <section className="rounded-[2rem] border border-brand-100 bg-white p-5 sm:p-8 lg:p-10">
           <div className="mb-8 max-w-xl">
-            <p className="mb-2 text-sm font-bold text-brand-600">چیزی که به آن پایبندیم</p>
-            <h2 className="text-2xl font-bold text-secondary-900">ارزش‌هایی که راه را نشان می‌دهند</h2>
+            <p className="mb-2 text-sm font-bold text-brand-600">{content.values.eyebrow}</p>
+            <h2 className="text-2xl font-bold text-secondary-900">{content.values.title}</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            {values.map((value, index) => (
-              <article key={value.title} className="group rounded-2xl border border-slate-100 bg-slate-50/70 p-6 transition hover:-translate-y-1 hover:border-brand-200 hover:bg-brand-50/50">
+            {content.values.items.map((value, index) => (
+              <article key={index} className="group rounded-2xl border border-slate-100 bg-slate-50/70 p-6 transition hover:-translate-y-1 hover:border-brand-200 hover:bg-brand-50/50">
                 <div className="mb-7 flex items-start justify-between">
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-100 text-brand-700 transition group-hover:bg-brand-600 group-hover:text-white">
-                    <LineIcon name={value.icon} />
+                    <LineIcon name={valueIcons[index]} />
                   </span>
                   <span className="font-num text-xs text-slate-300">
                     {(index + 1).toLocaleString("fa-IR", {
@@ -174,23 +139,23 @@ export default function AboutPage() {
               </article>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section className="py-16 lg:py-24">
+        {sections.journey && <section className="py-16 lg:py-24">
           <div className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16">
             <div>
-              <p className="mb-3 text-sm font-bold text-brand-600">مسیر همراهی</p>
+              <p className="mb-3 text-sm font-bold text-brand-600">{content.journey.eyebrow}</p>
               <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">
-                ساده، روشن و نزدیک به شما
+                {content.journey.title}
               </h2>
               <p className="mt-4 max-w-md text-sm leading-8 text-slate-500">
-                تجربه خرید خوب از شناخت درست آغاز می‌شود و با پشتیبانی مسئولانه ادامه پیدا می‌کند.
+                {content.journey.description}
               </p>
             </div>
             <ol className="space-y-3">
-              {journey.map((item) => (
-                <li key={item.number} className="grid grid-cols-[3rem_1fr] gap-4 rounded-2xl border border-slate-200/70 bg-white p-5 sm:grid-cols-[4rem_1fr] sm:p-6">
-                  <span className="font-num pt-0.5 text-xl font-bold text-accent-600">{item.number}</span>
+              {content.journey.items.map((item, index) => (
+                <li key={journeyNumbers[index]} className="grid grid-cols-[3rem_1fr] gap-4 rounded-2xl border border-slate-200/70 bg-white p-5 sm:grid-cols-[4rem_1fr] sm:p-6">
+                  <span className="font-num pt-0.5 text-xl font-bold text-accent-600">{journeyNumbers[index]}</span>
                   <div>
                     <h3 className="font-bold text-secondary-900">{item.title}</h3>
                     <p className="mt-2 text-sm leading-7 text-slate-500">{item.description}</p>
@@ -199,22 +164,22 @@ export default function AboutPage() {
               ))}
             </ol>
           </div>
-        </section>
+        </section>}
 
-        <section className="relative overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-10 text-center text-white sm:px-10 sm:py-12">
+        {sections.closing && <section className="relative overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-10 text-center text-white sm:px-10 sm:py-12">
           <div className="absolute -right-12 -top-20 h-52 w-52 rounded-full border-[35px] border-white/5" />
           <div className="relative mx-auto max-w-2xl">
-            <p className="mb-3 text-sm font-bold text-brand-100">توانا، همراه کارهای ماندگار</p>
-            <h2 className="text-2xl font-bold leading-10 sm:text-3xl">برای شروع، فقط کافی است ابزار مناسب را پیدا کنید</h2>
+            <p className="mb-3 text-sm font-bold text-brand-100">{content.closing.eyebrow}</p>
+            <h2 className="text-2xl font-bold leading-10 sm:text-3xl">{content.closing.title}</h2>
             <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-brand-100">
-              مجموعه محصولات را ببینید یا برای انتخاب بهتر، از کارشناسان ما راهنمایی بگیرید.
+              {content.closing.description}
             </p>
             <div className="mt-7 flex flex-wrap justify-center gap-3">
-              <Link href="/" className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-brand-700 transition hover:bg-brand-50">رفتن به فروشگاه</Link>
-              <Link href="/support" className="rounded-xl border border-white/20 px-6 py-3 text-sm font-medium transition hover:bg-white/10">پرسش‌های متداول</Link>
+              <Link href="/" className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-brand-700 transition hover:bg-brand-50">{content.closing.primaryLabel}</Link>
+              <Link href="/support" className="rounded-xl border border-white/20 px-6 py-3 text-sm font-medium transition hover:bg-white/10">{content.closing.secondaryLabel}</Link>
             </div>
           </div>
-        </section>
+        </section>}
       </div>
     </div>
   );

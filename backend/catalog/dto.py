@@ -42,7 +42,7 @@ def category_dto(
     }
 
 
-def product_dto(product: Product) -> dict:
+def product_dto(product: Product, *, include_specifications: bool = False) -> dict:
     assigned_categories = list(product.categories.all())
     categories = [product.category] + [
         category
@@ -52,7 +52,7 @@ def product_dto(product: Product) -> dict:
     category = categories[0]
     # آدرس‌های نسبی /media/… — فرانت آن‌ها را به جنگو پروکسی می‌کند
     images = [img.image.url for img in product.images.all()]
-    return {
+    data = {
         "image": images[0] if images else None,
         "images": images,
         "id": product.id,
@@ -72,15 +72,6 @@ def product_dto(product: Product) -> dict:
         "badge": product.badge or None,
         "colors": product.colors,
         "features": product.features or DEFAULT_FEATURES,
-        "specs": product.specs
-        or [
-            {
-                "label": "دسته‌بندی",
-                "value": "، ".join(item.title for item in categories),
-            },
-            {"label": "وضعیت کالا", "value": "نو و اصل"},
-            {"label": "ارسال", "value": "از انبار فروشگاه"},
-        ],
         "description": product.description
         or (
             f"{product.title} با کیفیت مناسب و قیمت رقابتی، یکی از محصولات "
@@ -90,3 +81,15 @@ def product_dto(product: Product) -> dict:
         "stock": product.stock,
         "isActive": product.is_active,
     }
+    if include_specifications:
+        data["specifications"] = [
+            {
+                "keyId": item.key_id,
+                "name": item.key.name,
+                "slug": item.key.slug,
+                "value": item.value,
+                "position": item.position,
+            }
+            for item in product.specifications.all()
+        ]
+    return data

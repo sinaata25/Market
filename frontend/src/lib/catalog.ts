@@ -1,7 +1,9 @@
 import "server-only";
+import { cache } from "react";
 import type {
   Brand as BrandDTO,
   Product as ProductDTO,
+  ProductSpecification,
   Category as CategoryDTO,
 } from "@/lib/products";
 
@@ -43,6 +45,15 @@ export type ProductListResult = {
   pages: number;
 };
 
+export type ProductDetail = ProductDTO & {
+  specifications: ProductSpecification[];
+};
+
+export type ProductDetailResult = {
+  product: ProductDetail;
+  related: ProductDTO[];
+};
+
 export async function getProducts(
   params: ProductListParams = {}
 ): Promise<ProductListResult> {
@@ -58,33 +69,25 @@ export async function getProducts(
   return apiGet<ProductListResult>(`/api/products${query ? `?${query}` : ""}`);
 }
 
-export async function getProductById(id: number): Promise<ProductDTO | null> {
+export const getProductDetailById = cache(async function getProductDetailById(
+  id: number
+): Promise<ProductDetailResult | null> {
   try {
-    const data = await apiGet<{ product: ProductDTO }>(`/api/products/${id}`);
-    return data.product;
+    return await apiGet<ProductDetailResult>(`/api/products/${id}`);
   } catch {
     return null;
   }
-}
+});
 
 // یافتن محصول با نامک سئو (تنظیم‌شده در پنل سئو)
-export async function getProductBySlug(
+export const getProductBySlug = cache(async function getProductBySlug(
   slug: string
-): Promise<{ product: ProductDTO; related: ProductDTO[] } | null> {
+): Promise<ProductDetailResult | null> {
   try {
-    return await apiGet<{ product: ProductDTO; related: ProductDTO[] }>(
+    return await apiGet<ProductDetailResult>(
       `/api/products/slug/${encodeURIComponent(slug)}`
     );
   } catch {
     return null;
   }
-}
-
-export async function getRelatedProducts(id: number): Promise<ProductDTO[]> {
-  try {
-    const data = await apiGet<{ related: ProductDTO[] }>(`/api/products/${id}`);
-    return data.related;
-  } catch {
-    return [];
-  }
-}
+});

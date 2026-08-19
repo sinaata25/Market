@@ -1,7 +1,13 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from .specifications import (
+    normalize_specification_name,
+    normalize_specification_value,
+    unique_specification_slug,
+)
 from .validators import validate_category_icon
 
 
@@ -58,6 +64,42 @@ class Category(models.Model):
         return self.title
 
 
+class SpecificationKey(models.Model):
+    name = models.CharField("نام", max_length=100)
+    normalized_name = models.CharField(
+        "نام یکتاشده", max_length=100, unique=True, editable=False
+    )
+    slug = models.SlugField(
+        "نامک", max_length=120, unique=True, allow_unicode=True, blank=True
+    )
+    created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+    updated_at = models.DateTimeField("به‌روزرسانی", auto_now=True)
+
+    class Meta:
+        verbose_name = "کلید مشخصه"
+        verbose_name_plural = "کلیدهای مشخصات"
+        ordering = ["name", "id"]
+
+    def clean(self):
+        super().clean()
+        try:
+            name, normalized_name = normalize_specification_name(self.name)
+        except ValueError as exc:
+            raise ValidationError({"name": str(exc)}) from exc
+        self.name = name
+        self.normalized_name = normalized_name
+        if not self.slug:
+            self.slug = unique_specification_slug(self, self.name)
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Product(models.Model):
     title = models.CharField("عنوان", max_length=255)
     title_en = models.CharField("عنوان انگلیسی", max_length=255, blank=True)
@@ -68,7 +110,6 @@ class Product(models.Model):
     badge = models.CharField("برچسب", max_length=50, blank=True)
     colors = models.JSONField("رنگ‌ها", null=True, blank=True)  # [{name, hex}]
     features = models.JSONField("ویژگی‌ها", null=True, blank=True)  # [str]
-    specs = models.JSONField("مشخصات", null=True, blank=True)  # [{label, value}]
     description = models.TextField("توضیحات", blank=True)
     warranty = models.CharField("گارانتی", max_length=100, blank=True)
     stock = models.PositiveIntegerField("موجودی", default=10)
@@ -102,6 +143,53 @@ class Product(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class ProductSpecification(models.Model):
+    product = models.ForeignKey(
+        Product,
+        verbose_name="محصول",
+        on_delete=models.CASCADE,
+        related_name="specifications",
+    )
+    key = models.ForeignKey(
+        SpecificationKey,
+        verbose_name="کلید مشخصه",
+        on_delete=models.PROTECT,
+        related_name="product_specifications",
+    )
+    value = models.CharField("مقدار", max_length=500)
+    position = models.PositiveIntegerField("ترتیب", default=0)
+
+    class Meta:
+        verbose_name = "مشخصه محصول"
+        verbose_name_plural = "مشخصات محصول"
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "key"], name="catalog_unique_product_spec_key"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(value=""), name="catalog_product_spec_value_nonempty"
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        try:
+            self.value = normalize_specification_value(self.value)
+        except ValueError as exc:
+            raise ValidationError({"value": str(exc)}) from exc
+        if self.position is None or self.position < 0:
+            raise ValidationError({"position": "ترتیب نمی‌تواند منفی باشد"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.product} — {self.key}: {self.value}"
 
 
 class ProductImage(models.Model):

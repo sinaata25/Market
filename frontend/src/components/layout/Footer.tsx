@@ -1,12 +1,21 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Suspense } from "react";
+import type { StaticPageKey } from "@/lib/static-page-types";
+import { getStaticPageVisibility } from "@/lib/static-pages";
 
-const columns = [
+type FooterLink = {
+  label: string;
+  href: string;
+  pageKey?: StaticPageKey;
+};
+
+const columns: { title: string; links: FooterLink[] }[] = [
   {
     title: "گروه صنعتی توانا",
     links: [
-      { label: "درباره ما", href: "/about" },
-      { label: "تماس با ما", href: "/contact" },
+      { label: "درباره ما", href: "/about", pageKey: "about" },
+      { label: "تماس با ما", href: "/contact", pageKey: "contact" },
       // { label: "فرصت‌های شغلی", href: "#" },
       { label: "وبلاگ کشاورزی", href: "/blog" },
     ],
@@ -14,22 +23,56 @@ const columns = [
   {
     title: "خدمات مشتریان",
     links: [
-      { label: "پاسخ به پرسش‌ها", href: "/support" },
-      { label: "رویه ارسال سفارش", href: "/help/shipping" },
-      { label: "شرایط بازگشت کالا", href: "/help/returns" },
+      { label: "پاسخ به پرسش‌ها", href: "/support", pageKey: "support" },
+      { label: "رویه ارسال سفارش", href: "/help/shipping", pageKey: "shipping" },
+      { label: "شرایط بازگشت کالا", href: "/help/returns", pageKey: "returns" },
       // "حریم خصوصی"
     ],
   },
   {
     title: "راهنمای خرید",
     links: [
-      { label: "نحوه ثبت سفارش", href: "/help/how-to-order" },
+      { label: "نحوه ثبت سفارش", href: "/help/how-to-order", pageKey: "how-to-order" },
       // "شیوه‌های پرداخت",
-      { label: "رهگیری سفارش", href: "/help/track-order" },
-      { label: "گارانتی محصولات", href: "/help/warranty" },
+      { label: "رهگیری سفارش", href: "/help/track-order", pageKey: "track-order" },
+      { label: "گارانتی محصولات", href: "/help/warranty", pageKey: "warranty" },
     ],
   },
 ];
+
+function FooterColumns({
+  visibility,
+}: {
+  visibility: Record<StaticPageKey, boolean> | null;
+}) {
+  return columns.map((col) => (
+    <div key={col.title}>
+      <h3 className="mb-3 font-bold text-slate-700">{col.title}</h3>
+      <ul className="space-y-2 text-sm text-slate-500">
+        {col.links
+          .filter(
+            (link) =>
+              !link.pageKey || visibility?.[link.pageKey] === true
+          )
+          .map((link) => (
+            <li key={link.label}>
+              <Link
+                href={link.href}
+                className="transition hover:text-brand-700"
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+      </ul>
+    </div>
+  ));
+}
+
+async function ManagedFooterColumns() {
+  const visibility = await getStaticPageVisibility();
+  return <FooterColumns visibility={visibility} />;
+}
 
 export default function Footer() {
   return (
@@ -70,20 +113,9 @@ export default function Footer() {
               باغبانی، سمپاش و ماشین‌آلات با بهترین قیمت و ضمانت اصالت کالا.
             </p>
           </div>
-          {columns.map((col) => (
-            <div key={col.title}>
-              <h3 className="mb-3 font-bold text-slate-700">{col.title}</h3>
-              <ul className="space-y-2 text-sm text-slate-500">
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="transition hover:text-brand-700">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <Suspense fallback={<FooterColumns visibility={null} />}>
+            <ManagedFooterColumns />
+          </Suspense>
         </div>
 
         <div className="border-t border-slate-100 pt-6 text-center text-xs text-slate-400">

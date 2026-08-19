@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  getProductById,
+  getProductDetailById,
   getProductBySlug,
-  getRelatedProducts,
   getCategories,
 } from "@/lib/catalog";
+import type { ProductDetail } from "@/lib/catalog";
 import { breadcrumbSchema, fetchSeo, toMetadata } from "@/lib/seo";
 import type { Product } from "@/lib/products";
 import ProductGallery from "@/components/product/ProductGallery";
@@ -21,12 +21,10 @@ export const dynamic = "force-dynamic";
 // پارامتر می‌تواند شناسه عددی یا نامک سئو باشد
 async function resolveProduct(
   idOrSlug: string
-): Promise<{ product: Product; related: Product[] } | null> {
+): Promise<{ product: ProductDetail; related: Product[] } | null> {
   const numeric = Number(idOrSlug);
   if (Number.isInteger(numeric) && numeric > 0) {
-    const product = await getProductById(numeric);
-    if (!product) return null;
-    return { product, related: await getRelatedProducts(numeric) };
+    return getProductDetailById(numeric);
   }
   return getProductBySlug(idOrSlug);
 }
@@ -232,7 +230,7 @@ export default async function ProductPage({
 
       {/* تب‌های مشخصات / معرفی / امتیاز / گفتگو */}
       <div className="mt-6">
-        <ProductTabs product={product} />
+        <ProductTabs key={product.id} product={product} />
       </div>
 
       {/* محصولات مرتبط */}

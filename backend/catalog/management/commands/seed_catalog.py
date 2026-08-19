@@ -4,7 +4,8 @@
 from django.core.management.base import BaseCommand
 
 from catalog.feedback import recompute_product_rating
-from catalog.models import Category, Product
+from catalog.models import Category, Product, ProductSpecification, SpecificationKey
+from catalog.specifications import normalize_specification_name
 
 CATEGORIES = [
     {
@@ -204,7 +205,6 @@ class Command(BaseCommand):
                     "badge": data.get("badge", ""),
                     "colors": data.get("colors"),
                     "features": data.get("features"),
-                    "specs": data.get("specs"),
                     "description": data.get("description", ""),
                     "warranty": data.get("warranty", ""),
                     "stock": 25,
@@ -217,6 +217,20 @@ class Command(BaseCommand):
                 for title in data.get("subcategories", [])
             )
             product.categories.set(assigned_categories)
+            product.specifications.all().delete()
+            for position, specification in enumerate(data.get("specs", [])):
+                name, normalized_name = normalize_specification_name(
+                    specification["label"]
+                )
+                key, _ = SpecificationKey.objects.get_or_create(
+                    normalized_name=normalized_name, defaults={"name": name}
+                )
+                ProductSpecification.objects.create(
+                    product=product,
+                    key=key,
+                    value=specification["value"],
+                    position=position,
+                )
             recompute_product_rating(product.id)
         self.stdout.write(self.style.SUCCESS(f"✅ {len(PRODUCTS)} محصول"))
         self.stdout.write("🌱 seed تمام شد.")

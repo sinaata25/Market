@@ -16,6 +16,10 @@ urlpatterns = [
         "brands/<int:pk>/price-adjustment",
         views.AdminBrandPriceAdjustmentView.as_view(),
     ),
+    path("specifications", views.AdminSpecificationKeyListView.as_view()),
+    path(
+        "specifications/<int:pk>", views.AdminSpecificationKeyDetailView.as_view()
+    ),
     path("products", views.AdminProductListView.as_view()),
     path("products/<int:pk>", views.AdminProductDetailView.as_view()),
     path(

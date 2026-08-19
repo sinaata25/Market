@@ -25,7 +25,6 @@ PRODUCT_RESPONSE_KEYS = {
     "badge",
     "colors",
     "features",
-    "specs",
     "description",
     "warranty",
     "stock",
@@ -58,7 +57,10 @@ class ProductApiContractTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         data = response.data["data"]
-        self.assertEqual(set(data["product"]), PRODUCT_RESPONSE_KEYS)
+        self.assertEqual(
+            set(data["product"]), PRODUCT_RESPONSE_KEYS | {"specifications"}
+        )
+        self.assertEqual(data["product"]["specifications"], [])
         self.assertEqual(len(data["related"]), 1)
         self.assertEqual(set(data["related"][0]), PRODUCT_RESPONSE_KEYS)
 

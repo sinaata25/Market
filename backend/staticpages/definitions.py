@@ -1,0 +1,1088 @@
+"""Canonical identities, default copy, and editable fields for storefront pages.
+
+Only text values live in these definitions. Routes, icons, links, ordering, and
+component structure remain application code and cannot be changed through the
+content API.
+"""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Any
+
+
+ABOUT_CONTENT = {
+    "hero": {
+        "badge": "داستان گروه صنعتی توانا",
+        "title": "ابزار مطمئن، برای دستانی که",
+        "accent": "زندگی می‌کارند",
+        "intro": (
+            "توانا با یک هدف روشن شکل گرفته است: دسترسی ساده‌تر کشاورزان، "
+            "باغداران و دوست‌داران طبیعت به ابزارآلاتی که می‌توان به کیفیتشان "
+            "اعتماد کرد."
+        ),
+        "primaryLabel": "مشاهده محصولات",
+        "secondaryLabel": "گفتگو با پشتیبانی",
+        "captionEyebrow": "همراه مسیر شما",
+        "captionTitle": "از انتخاب تا استفاده",
+    },
+    "story": {
+        "eyebrow": "ریشه‌های ما",
+        "title": "فروشگاهی برای یک انتخاب آگاهانه‌تر",
+        "paragraphs": [
+            (
+                "ما می‌دانیم انتخاب یک ابزار خوب فقط مقایسه چند قیمت نیست؛ دوام، "
+                "کارایی، دسترسی به راهنمای درست و خدمات پس از خرید همگی بخشی از "
+                "این انتخاب‌اند. به همین دلیل تلاش می‌کنیم مسیر خرید، شفاف و بدون "
+                "پیچیدگی باشد."
+            ),
+            (
+                "مجموعه توانا، از ابزارهای باغبانی تا ماشین‌آلات و تجهیزات تخصصی، "
+                "محصولاتی را کنار هم قرار می‌دهد که پاسخ‌گوی کار واقعی در مزرعه، "
+                "باغ و فضای سبز باشند."
+            ),
+        ],
+    },
+    "values": {
+        "eyebrow": "چیزی که به آن پایبندیم",
+        "title": "ارزش‌هایی که راه را نشان می‌دهند",
+        "items": [
+            {
+                "title": "اصالت، پیش از هر چیز",
+                "description": (
+                    "کالاها با دقت انتخاب می‌شوند تا با خیال آسوده، ابزار مناسب "
+                    "کارتان را تهیه کنید."
+                ),
+            },
+            {
+                "title": "کنار اهل زمین",
+                "description": (
+                    "نیاز کشاورز و باغبان، نقطه شروع انتخاب محصولات و بهبود خدمات "
+                    "ماست."
+                ),
+            },
+            {
+                "title": "راهنمایی صادقانه",
+                "description": (
+                    "پیش از خرید و پس از آن، برای یک انتخاب روشن و کاربردی "
+                    "کنارتان هستیم."
+                ),
+            },
+        ],
+    },
+    "journey": {
+        "eyebrow": "مسیر همراهی",
+        "title": "ساده، روشن و نزدیک به شما",
+        "description": (
+            "تجربه خرید خوب از شناخت درست آغاز می‌شود و با پشتیبانی مسئولانه "
+            "ادامه پیدا می‌کند."
+        ),
+        "items": [
+            {
+                "title": "شناخت نیاز شما",
+                "description": (
+                    "محصولات را براساس کاربرد واقعی و نیازهای روزمره "
+                    "دسته‌بندی می‌کنیم."
+                ),
+            },
+            {
+                "title": "انتخاب مطمئن",
+                "description": (
+                    "اطلاعات شفاف و پشتیبانی تخصصی، تصمیم‌گیری را ساده‌تر می‌کند."
+                ),
+            },
+            {
+                "title": "رسیدن به دست شما",
+                "description": (
+                    "سفارش‌ها با دقت آماده می‌شوند و به سراسر کشور ارسال خواهند شد."
+                ),
+            },
+        ],
+    },
+    "closing": {
+        "eyebrow": "توانا، همراه کارهای ماندگار",
+        "title": "برای شروع، فقط کافی است ابزار مناسب را پیدا کنید",
+        "description": (
+            "مجموعه محصولات را ببینید یا برای انتخاب بهتر، از کارشناسان ما "
+            "راهنمایی بگیرید."
+        ),
+        "primaryLabel": "رفتن به فروشگاه",
+        "secondaryLabel": "پرسش‌های متداول",
+    },
+}
+
+
+CONTACT_CONTENT = {
+    "hero": {
+        "badge": "آماده شنیدن صدای شما هستیم",
+        "title": "یک گفت‌وگوی خوب، شروع یک",
+        "accent": "انتخاب مطمئن",
+        "suffix": "است",
+        "intro": (
+            "برای مشاوره خرید، پیگیری سفارش یا خدمات پس از خرید، نزدیک‌ترین "
+            "مسیر ارتباطی را انتخاب کنید؛ تیم توانا همراه شماست."
+        ),
+    },
+    "ways": [
+        {
+            "eyebrow": "پاسخ‌گویی مستقیم",
+            "title": "تماس با پشتیبانی",
+            "description": (
+                "برای راهنمایی خرید و سوال‌های فوری، با تیم پشتیبانی صحبت کنید."
+            ),
+            "label": "۰۲۱-۰۰۰۰ ۰۰۰۰",
+            "phoneNumber": "02100000000",
+        },
+        {
+            "eyebrow": "سفارش‌های ثبت‌شده",
+            "title": "پیگیری سفارش",
+            "description": (
+                "وضعیت آماده‌سازی و ارسال سفارش را از حساب کاربری خود ببینید."
+            ),
+            "label": "مشاهده سفارش‌های من",
+        },
+        {
+            "eyebrow": "پاسخ‌های آماده",
+            "title": "مرکز راهنما",
+            "description": (
+                "پاسخ سوال‌های پرتکرار درباره خرید، پرداخت، ارسال و بازگشت کالا."
+            ),
+            "label": "مشاهده پرسش‌های متداول",
+        },
+    ],
+    "topics": {
+        "eyebrow": "پیش از تماس",
+        "title": "موضوع گفت‌وگو را مشخص کنید",
+        "description": (
+            "چند نکته کوتاه کمک می‌کند تا کارشناسان ما سریع‌تر و دقیق‌تر "
+            "راهنمایی‌تان کنند."
+        ),
+        "items": [
+            {
+                "title": "مشاوره پیش از خرید",
+                "text": "برای مقایسه محصولات و پیدا کردن ابزار مناسب نوع کارتان.",
+            },
+            {
+                "title": "پیگیری ارسال",
+                "text": (
+                    "برای بررسی وضعیت سفارش، ابتدا شماره سفارش را آماده داشته باشید."
+                ),
+            },
+            {
+                "title": "خدمات پس از خرید",
+                "text": "برای راهنمایی استفاده، گارانتی یا بررسی شرایط بازگشت کالا.",
+            },
+        ],
+    },
+    "faqPromo": {
+        "eyebrow": "پاسخ شما شاید همین‌جا باشد",
+        "title": "سریع‌تر از تماس، جواب سوالتان را پیدا کنید",
+        "description": (
+            "پاسخ پرسش‌های رایج درباره روش ثبت سفارش، پرداخت، ارسال، گارانتی و "
+            "بازگشت کالا در مرکز راهنمای توانا گردآوری شده است."
+        ),
+        "buttonLabel": "رفتن به مرکز راهنما",
+        "questions": [
+            "سفارش من چه زمانی ارسال می‌شود؟",
+            "چطور محصول مناسب را انتخاب کنم؟",
+            "شرایط بازگشت کالا چیست؟",
+        ],
+    },
+}
+
+
+SUPPORT_CONTENT = {
+    "hero": {
+        "title": "سوالی دارید؟",
+        "description": (
+            "پاسخ پرسش‌های پرتکرار درباره خرید، پرداخت، ارسال و پشتیبانی را "
+            "اینجا پیدا کنید."
+        ),
+        "searchPlaceholder": "جستجوی سوال... (مثلاً ارسال، بازگشت کالا)",
+    },
+    "sidebarTitle": "دسته‌بندی موضوعات",
+    "groups": [
+        {
+            "title": "ثبت سفارش و خرید",
+            "items": [
+                {
+                    "question": "چگونه می‌توانم سفارش ثبت کنم؟",
+                    "answer": (
+                        "کافیست محصول مورد نظر را به سبد خرید اضافه کنید، وارد حساب "
+                        "کاربری خود شوید و پس از انتخاب آدرس و روش پرداخت، سفارش خود "
+                        "را نهایی کنید."
+                    ),
+                },
+                {
+                    "question": "آیا برای خرید باید ثبت‌نام کنم؟",
+                    "answer": (
+                        "بله، برای ثبت سفارش لازم است با شماره موبایل خود وارد شوید "
+                        "تا امکان پیگیری سفارش و اطلاع‌رسانی وضعیت آن فراهم باشد."
+                    ),
+                },
+                {
+                    "question": "حداقل مبلغ سفارش چقدر است؟",
+                    "answer": (
+                        "برای خرید آنلاین حداقل مبلغ سفارش وجود ندارد؛ اما هزینه "
+                        "ارسال بر اساس وزن و مقصد محاسبه می‌شود."
+                    ),
+                },
+            ],
+        },
+        {
+            "title": "پرداخت",
+            "items": [
+                {
+                    "question": "روش‌های پرداخت کدام‌اند؟",
+                    "answer": (
+                        "پرداخت اینترنتی از طریق درگاه بانکی با تمامی کارت‌های عضو "
+                        "شتاب و همچنین پرداخت در محل (برای شهرهای منتخب) امکان‌پذیر است."
+                    ),
+                },
+                {
+                    "question": "آیا پرداخت در محل امکان‌پذیر است؟",
+                    "answer": (
+                        "بله، برای برخی شهرها و محصولات گزینه پرداخت در محل هنگام "
+                        "تحویل کالا فعال است که در مرحله پرداخت نمایش داده می‌شود."
+                    ),
+                },
+                {
+                    "question": "مبلغ از حسابم کسر شد اما سفارش ثبت نشد، چه کنم؟",
+                    "answer": (
+                        "در صورت کسر وجه و عدم ثبت سفارش، مبلغ حداکثر تا ۷۲ ساعت "
+                        "کاری به‌صورت خودکار به حساب شما بازمی‌گردد. در غیر این صورت "
+                        "با پشتیبانی تماس بگیرید."
+                    ),
+                },
+            ],
+        },
+        {
+            "title": "ارسال و تحویل",
+            "items": [
+                {
+                    "question": "ارسال سفارش چقدر زمان می‌برد؟",
+                    "answer": (
+                        "سفارش‌های داخل شهر معمولاً ۱ تا ۲ روز کاری و سفارش‌های سایر "
+                        "شهرها بین ۳ تا ۵ روز کاری تحویل داده می‌شوند."
+                    ),
+                },
+                {
+                    "question": "هزینه ارسال چگونه محاسبه می‌شود؟",
+                    "answer": (
+                        "هزینه ارسال بر اساس وزن، حجم و مقصد سفارش در مرحله نهایی "
+                        "خرید به‌صورت شفاف نمایش داده می‌شود."
+                    ),
+                },
+                {
+                    "question": "آیا امکان ارسال ماشین‌آلات سنگین وجود دارد؟",
+                    "answer": (
+                        "بله، ماشین‌آلات سنگین با باربری مخصوص ارسال می‌شوند و "
+                        "هماهنگی زمان تحویل به‌صورت تلفنی انجام می‌گیرد."
+                    ),
+                },
+            ],
+        },
+        {
+            "title": "بازگشت و تعویض کالا",
+            "items": [
+                {
+                    "question": "شرایط بازگشت کالا چیست؟",
+                    "answer": (
+                        "تا ۷ روز پس از تحویل، در صورتی که کالا استفاده نشده و در "
+                        "بسته‌بندی اصلی باشد، امکان بازگشت یا تعویض وجود دارد."
+                    ),
+                },
+                {
+                    "question": "اگر کالا معیوب باشد چه کنم؟",
+                    "answer": (
+                        "در صورت دریافت کالای معیوب، از طریق بخش «سفارش‌های من» "
+                        "درخواست مرجوعی ثبت کنید تا کالا تعویض یا وجه آن بازگردانده شود."
+                    ),
+                },
+            ],
+        },
+        {
+            "title": "گارانتی و اصالت کالا",
+            "items": [
+                {
+                    "question": "آیا محصولات گارانتی دارند؟",
+                    "answer": (
+                        "بسیاری از ابزارهای موتوری و ماشین‌آلات دارای گارانتی معتبر "
+                        "هستند که در صفحه محصول مدت و شرایط آن ذکر شده است."
+                    ),
+                },
+                {
+                    "question": "اصالت کالاها چگونه تضمین می‌شود؟",
+                    "answer": (
+                        "تمامی محصولات از تأمین‌کنندگان معتبر تهیه می‌شوند و فروشگاه "
+                        "ضمانت اصالت کالا را ارائه می‌دهد."
+                    ),
+                },
+            ],
+        },
+        {
+            "title": "حساب کاربری",
+            "items": [
+                {
+                    "question": "چگونه رمز یا اطلاعات حسابم را تغییر دهم؟",
+                    "answer": (
+                        "از بخش «حساب کاربری» می‌توانید اطلاعات شخصی، آدرس‌ها و "
+                        "شماره تماس خود را ویرایش کنید."
+                    ),
+                },
+                {
+                    "question": "سفارش‌هایم را از کجا پیگیری کنم؟",
+                    "answer": (
+                        "در بخش «سفارش‌های من» وضعیت لحظه‌ای تمامی سفارش‌ها قابل "
+                        "مشاهده و پیگیری است."
+                    ),
+                },
+            ],
+        },
+    ],
+    "noResults": {
+        "beforeQuery": "نتیجه‌ای برای «",
+        "afterQuery": "» یافت نشد. عبارت دیگری را امتحان کنید.",
+    },
+    "contact": {
+        "title": "پاسخ سوال خود را پیدا نکردید؟",
+        "description": "کارشناسان ما ۷ روز هفته آماده پاسخگویی به شما هستند.",
+        "phoneLabel": "تماس با پشتیبانی",
+        "onlineLabel": "گفتگوی آنلاین",
+        "onlineUrl": "#",
+    },
+}
+
+
+HELP_SECTION_LABELS = {
+    "stepsEyebrow": "قدم‌به‌قدم",
+    "stepsTitle": "مسیر انجام کار",
+    "faqEyebrow": "سوال‌های رایج",
+    "faqTitle": "شاید برای شما هم پیش آمده باشد",
+    "allFaqsLabel": "همه پرسش‌ها",
+}
+
+HELP_ASIDE = {
+    "relatedTitle": "سایر راهنماها",
+    "faqLabel": "پاسخ به پرسش‌ها",
+    "supportTitle": "هنوز سوال دارید؟",
+    "supportDescription": "تیم پشتیبانی توانا برای راهنمایی بیشتر در کنار شماست.",
+    "supportLabel": "تماس با ما",
+}
+
+
+HOW_TO_ORDER_CONTENT = {
+    "title": "نحوه ثبت سفارش",
+    "shortTitle": "ثبت سفارش",
+    "eyebrow": "راهنمای خرید از توانا",
+    "description": (
+        "آموزش قدم‌به‌قدم انتخاب محصول، تکمیل سبد خرید و ثبت سفارش در فروشگاه توانا."
+    ),
+    "intro": (
+        "خرید از توانا تنها چند مرحله ساده دارد. محصول مناسب را پیدا کنید، "
+        "اطلاعات سفارش را بررسی کنید و پس از ورود به حساب کاربری، سفارش خود را "
+        "نهایی کنید."
+    ),
+    "sectionLabels": deepcopy(HELP_SECTION_LABELS),
+    "steps": [
+        {
+            "title": "محصول موردنظر را پیدا کنید",
+            "description": (
+                "از دسته‌بندی‌ها یا نوار جست‌وجو کمک بگیرید و در صفحه محصول، "
+                "مشخصات، موجودی و شرایط گارانتی را بررسی کنید."
+            ),
+            "linkLabel": "مشاهده فروشگاه",
+        },
+        {
+            "title": "کالا را به سبد خرید اضافه کنید",
+            "description": (
+                "تعداد موردنیاز را انتخاب کنید. در سبد خرید می‌توانید تعداد کالاها "
+                "را تغییر دهید یا محصولی را حذف کنید."
+            ),
+            "linkLabel": "رفتن به سبد خرید",
+        },
+        {
+            "title": "سبد و مبلغ نهایی را بررسی کنید",
+            "description": (
+                "قیمت کالاها، تخفیف و مبلغ قابل پرداخت را کنترل کرده و روی «ادامه "
+                "فرایند خرید» بزنید."
+            ),
+        },
+        {
+            "title": "وارد حساب شوید و آدرس را انتخاب کنید",
+            "description": (
+                "ثبت سفارش به ورود با شماره موبایل نیاز دارد. یک آدرس ذخیره‌شده "
+                "انتخاب کنید یا اطلاعات تحویل را وارد کنید."
+            ),
+            "linkLabel": "ورود به حساب",
+        },
+        {
+            "title": "سفارش را نهایی کنید",
+            "description": (
+                "پس از بررسی دوباره اطلاعات، سفارش را ثبت کنید. کد پیگیری همان لحظه "
+                "نمایش داده می‌شود و در حساب شما می‌ماند."
+            ),
+        },
+    ],
+    "checklist": {
+        "title": "پیش از ثبت نهایی بررسی کنید",
+        "items": [
+            "تعداد و مدل کالا با انتخاب شما یکسان باشد.",
+            "نام تحویل‌گیرنده، شماره تماس و نشانی دقیق وارد شده باشد.",
+            "کد پستی را برای تحویل سریع‌تر و دقیق‌تر ثبت کنید.",
+            "کد پیگیری سفارش را پس از ثبت نزد خود نگه دارید.",
+        ],
+    },
+    "faqs": [
+        {
+            "question": "آیا برای خرید باید حساب کاربری داشته باشم؟",
+            "answer": (
+                "بله؛ برای ثبت نهایی سفارش باید با شماره موبایل وارد شوید تا "
+                "سفارش به حساب شما متصل و قابل پیگیری باشد."
+            ),
+        },
+        {
+            "question": "آیا حداقل مبلغ خرید وجود دارد؟",
+            "answer": "خیر، برای خرید آنلاین حداقل مبلغ سفارش در نظر گرفته نشده است.",
+        },
+    ],
+    "cta": {
+        "title": "برای خرید آماده‌اید؟",
+        "description": (
+            "محصول موردنیازتان را پیدا کنید و سفارش را همین حالا آغاز کنید."
+        ),
+        "label": "مشاهده محصولات",
+    },
+    "aside": deepcopy(HELP_ASIDE),
+}
+
+
+TRACK_ORDER_CONTENT = {
+    "title": "رهگیری سفارش",
+    "shortTitle": "رهگیری سفارش",
+    "eyebrow": "از ثبت تا تحویل",
+    "description": (
+        "راهنمای مشاهده وضعیت سفارش و پیگیری مراحل آماده‌سازی، ارسال و تحویل در توانا."
+    ),
+    "intro": (
+        "هر سفارش پس از ثبت، یک کد پیگیری اختصاصی دارد. وضعیت آن را می‌توانید در "
+        "هر زمان از بخش سفارش‌های حساب کاربری مشاهده کنید."
+    ),
+    "sectionLabels": deepcopy(HELP_SECTION_LABELS),
+    "steps": [
+        {
+            "title": "وارد حساب کاربری شوید",
+            "description": (
+                "با همان شماره موبایلی وارد شوید که سفارش را با آن ثبت کرده‌اید."
+            ),
+            "linkLabel": "ورود به حساب",
+        },
+        {
+            "title": "سفارش‌های من را باز کنید",
+            "description": (
+                "در پروفایل، بخش «سفارش‌های من» فهرست همه خریدها، کد سفارش و "
+                "وضعیت فعلی را نشان می‌دهد."
+            ),
+            "linkLabel": "مشاهده سفارش‌ها",
+        },
+        {
+            "title": "جزئیات سفارش را ببینید",
+            "description": (
+                "با انتخاب هر سفارش، نوار پیشرفت، اقلام خرید، مبلغ پرداخت و "
+                "اطلاعات تحویل نمایش داده می‌شود."
+            ),
+        },
+    ],
+    "checklist": {
+        "title": "معنای وضعیت‌های سفارش",
+        "items": [
+            "ثبت سفارش: سفارش دریافت شده و در آغاز فرایند قرار دارد.",
+            "پرداخت: پرداخت سفارش تأیید شده است.",
+            "ارسال: بسته از فروشگاه خارج شده و در مسیر تحویل است.",
+            "تحویل: سفارش به گیرنده تحویل داده شده است.",
+            "لغوشده: سفارش متوقف شده و موجودی کالا به انبار بازگشته است.",
+        ],
+    },
+    "faqs": [
+        {
+            "question": "کد پیگیری سفارش را از کجا پیدا کنم؟",
+            "answer": (
+                "کد پس از ثبت سفارش نمایش داده می‌شود و بعداً نیز در فهرست "
+                "سفارش‌های حساب کاربری قابل مشاهده است."
+            ),
+        },
+        {
+            "question": "وضعیت سفارش تغییر نمی‌کند؛ چه کار کنم؟",
+            "answer": (
+                "اگر از بازه معمول آماده‌سازی گذشته است، کد سفارش را آماده کنید "
+                "و با پشتیبانی تماس بگیرید."
+            ),
+        },
+    ],
+    "cta": {
+        "title": "وضعیت سفارشتان را ببینید",
+        "description": (
+            "تمام مراحل سفارش در حساب کاربری شما ثبت و به‌روزرسانی می‌شود."
+        ),
+        "label": "رفتن به سفارش‌های من",
+    },
+    "aside": deepcopy(HELP_ASIDE),
+}
+
+
+WARRANTY_CONTENT = {
+    "title": "گارانتی محصولات",
+    "shortTitle": "گارانتی محصولات",
+    "eyebrow": "خرید با اطمینان",
+    "description": (
+        "اطلاعات ضمانت اصالت و نحوه بررسی شرایط گارانتی ابزارآلات و ماشین‌آلات توانا."
+    ),
+    "intro": (
+        "تمام کالاهای توانا با ضمانت اصالت عرضه می‌شوند. مدت و نوع گارانتی هر "
+        "کالا می‌تواند متفاوت باشد و اطلاعات دقیق آن در صفحه همان محصول درج شده است."
+    ),
+    "sectionLabels": deepcopy(HELP_SECTION_LABELS),
+    "steps": [
+        {
+            "title": "شرایط محصول را پیش از خرید ببینید",
+            "description": (
+                "در صفحه محصول، بخش گارانتی را بررسی کنید. مدت پوشش و شرکت "
+                "ارائه‌دهنده، در صورت وجود، همان‌جا نوشته شده است."
+            ),
+        },
+        {
+            "title": "مدارک و بسته‌بندی را نگه دارید",
+            "description": (
+                "فاکتور، کارت گارانتی، شماره سریال و بسته‌بندی کالا را تا پایان "
+                "دوره ضمانت حفظ کنید."
+            ),
+        },
+        {
+            "title": "مشکل را با پشتیبانی در میان بگذارید",
+            "description": (
+                "کد سفارش و شرح ایراد را آماده کنید تا مسیر استفاده از خدمات شرکت "
+                "گارانتی‌کننده به شما اعلام شود."
+            ),
+            "linkLabel": "تماس با پشتیبانی",
+        },
+    ],
+    "checklist": {
+        "title": "نکات مهم گارانتی",
+        "items": [
+            "شرایط و مدت گارانتی را در صفحه همان محصول ملاک قرار دهید.",
+            (
+                "آسیب ناشی از استفاده نادرست، مطابق شرایط شرکت گارانتی‌کننده "
+                "بررسی می‌شود."
+            ),
+            "شماره سریال یا برچسب ضمانت کالا را مخدوش نکنید.",
+            "پیش از ارسال کالا برای خدمات، حتماً با پشتیبانی هماهنگ کنید.",
+        ],
+    },
+    "faqs": [
+        {
+            "question": "آیا همه محصولات گارانتی یکسان دارند؟",
+            "answer": (
+                "خیر. نوع و مدت گارانتی به محصول و تأمین‌کننده بستگی دارد و در "
+                "صفحه هر کالا مشخص می‌شود."
+            ),
+        },
+        {
+            "question": "ضمانت اصالت کالا شامل چه چیزی است؟",
+            "answer": (
+                "محصولات از تأمین‌کنندگان معتبر تهیه می‌شوند و مشخصات کالای "
+                "تحویلی باید با اطلاعات درج‌شده در صفحه محصول مطابقت داشته باشد."
+            ),
+        },
+    ],
+    "cta": {
+        "title": "درباره گارانتی کالایی سوال دارید؟",
+        "description": (
+            "نام محصول یا کد سفارش را آماده کنید تا دقیق‌تر راهنمایی شوید."
+        ),
+        "label": "تماس با توانا",
+    },
+    "aside": deepcopy(HELP_ASIDE),
+}
+
+
+SHIPPING_CONTENT = {
+    "title": "رویه ارسال سفارش",
+    "shortTitle": "رویه ارسال",
+    "eyebrow": "ارسال به سراسر کشور",
+    "description": (
+        "زمان‌بندی، هزینه و نحوه ارسال سفارش‌های سبک و ماشین‌آلات سنگین فروشگاه توانا."
+    ),
+    "intro": (
+        "پس از ثبت و تأیید سفارش، کالاها با دقت آماده‌سازی می‌شوند. شیوه و هزینه "
+        "ارسال با توجه به وزن، حجم و مقصد سفارش تعیین خواهد شد."
+    ),
+    "sectionLabels": deepcopy(HELP_SECTION_LABELS),
+    "steps": [
+        {
+            "title": "بررسی و آماده‌سازی سفارش",
+            "description": (
+                "موجودی و اطلاعات سفارش بررسی شده و کالا برای بسته‌بندی آماده می‌شود."
+            ),
+        },
+        {
+            "title": "بسته‌بندی متناسب با کالا",
+            "description": (
+                "ابزارها و تجهیزات متناسب با ابعاد و حساسیتشان بسته‌بندی می‌شوند "
+                "تا در مسیر محافظت شوند."
+            ),
+        },
+        {
+            "title": "تحویل به روش حمل مناسب",
+            "description": (
+                "سفارش‌های معمولی با روش ارسال متناسب و ماشین‌آلات سنگین با "
+                "باربری مخصوص فرستاده می‌شوند."
+            ),
+        },
+        {
+            "title": "پیگیری تا زمان تحویل",
+            "description": (
+                "وضعیت سفارش از بخش سفارش‌های من قابل مشاهده است. برای بارهای "
+                "سنگین، زمان تحویل تلفنی هماهنگ می‌شود."
+            ),
+            "linkLabel": "رهگیری سفارش",
+        },
+    ],
+    "checklist": {
+        "title": "زمان و هزینه ارسال",
+        "description": (
+            "بازه‌ها تقریبی‌اند و ممکن است براساس مقصد یا نوع کالا تغییر کنند."
+        ),
+        "items": [
+            "سفارش‌های داخل شهر معمولاً طی ۱ تا ۲ روز کاری تحویل می‌شوند.",
+            "ارسال به سایر شهرها معمولاً بین ۳ تا ۵ روز کاری زمان می‌برد.",
+            (
+                "هزینه ارسال براساس وزن، حجم و مقصد در مرحله نهایی خرید نمایش "
+                "داده می‌شود."
+            ),
+            (
+                "ارسال ماشین‌آلات سنگین با باربری مخصوص و هماهنگی قبلی انجام می‌شود."
+            ),
+        ],
+    },
+    "faqs": [
+        {
+            "question": "آیا امکان ارسال به همه شهرها وجود دارد؟",
+            "answer": (
+                "بله، سفارش‌ها به سراسر کشور ارسال می‌شوند؛ روش حمل براساس مقصد "
+                "و نوع کالا انتخاب می‌شود."
+            ),
+        },
+        {
+            "question": "چرا هزینه ارسال سفارش‌ها متفاوت است؟",
+            "answer": (
+                "وزن، حجم، مقصد و شیوه حمل بر هزینه اثر می‌گذارند؛ مبلغ مربوط در "
+                "فرایند خرید نمایش داده می‌شود."
+            ),
+        },
+    ],
+    "cta": {
+        "title": "سفارشی در راه دارید؟",
+        "description": (
+            "آخرین وضعیت آماده‌سازی و ارسال را از حساب کاربری ببینید."
+        ),
+        "label": "پیگیری سفارش",
+    },
+    "aside": deepcopy(HELP_ASIDE),
+}
+
+
+RETURNS_CONTENT = {
+    "title": "شرایط بازگشت کالا",
+    "shortTitle": "بازگشت کالا",
+    "eyebrow": "فرایندی روشن و ساده",
+    "description": (
+        "شرایط، مهلت و مراحل هماهنگی برای بازگشت یا تعویض کالا در فروشگاه توانا."
+    ),
+    "intro": (
+        "تا ۷ روز پس از تحویل، اگر کالا استفاده نشده باشد و در بسته‌بندی اصلی "
+        "قرار داشته باشد، امکان بررسی درخواست بازگشت یا تعویض وجود دارد."
+    ),
+    "sectionLabels": deepcopy(HELP_SECTION_LABELS),
+    "steps": [
+        {
+            "title": "وضعیت کالا را بررسی کنید",
+            "description": (
+                "کالا، متعلقات، دفترچه‌ها و بسته‌بندی اصلی را کامل نگه دارید و "
+                "از استفاده بیشتر خودداری کنید."
+            ),
+        },
+        {
+            "title": "کد سفارش را آماده کنید",
+            "description": (
+                "کد سفارش در حساب کاربری و صفحه جزئیات سفارش شما در دسترس است."
+            ),
+            "linkLabel": "مشاهده سفارش‌ها",
+        },
+        {
+            "title": "با پشتیبانی هماهنگ کنید",
+            "description": (
+                "شرایط کالا و دلیل درخواست را توضیح دهید. در صورت وجود آسیب ظاهری، "
+                "تصویر واضح کالا و بسته‌بندی کمک‌کننده است."
+            ),
+            "linkLabel": "تماس با پشتیبانی",
+        },
+        {
+            "title": "کالا را طبق راهنما ارسال کنید",
+            "description": (
+                "پس از تأیید درخواست، کالا را فقط به روش و نشانی اعلام‌شده از طرف "
+                "پشتیبانی ارسال کنید."
+            ),
+        },
+    ],
+    "checklist": {
+        "title": "شرایط اولیه پذیرش درخواست",
+        "items": [
+            "درخواست حداکثر تا ۷ روز پس از تحویل مطرح شود.",
+            "کالا استفاده نشده و در وضعیت اولیه باشد.",
+            "بسته‌بندی، متعلقات و اقلام همراه کامل باشند.",
+            "پیش از هرگونه ارسال، هماهنگی با پشتیبانی انجام شده باشد.",
+        ],
+    },
+    "faqs": [
+        {
+            "question": "اگر کالا معیوب یا آسیب‌دیده به دستم رسید چه کنم؟",
+            "answer": (
+                "استفاده از کالا را متوقف کنید، از وضعیت آن و بسته‌بندی عکس بگیرید "
+                "و در اولین فرصت با کد سفارش به پشتیبانی اطلاع دهید."
+            ),
+        },
+        {
+            "question": "آیا می‌توانم بدون هماهنگی کالا را ارسال کنم؟",
+            "answer": (
+                "خیر. برای جلوگیری از تأخیر یا گم‌شدن مرسوله، ابتدا درخواست را با "
+                "پشتیبانی هماهنگ و سپس طبق راهنمای اعلام‌شده اقدام کنید."
+            ),
+        },
+    ],
+    "cta": {
+        "title": "برای بازگشت کالا نیاز به راهنمایی دارید؟",
+        "description": (
+            "کد سفارش و اطلاعات کالا را آماده کنید؛ تیم پشتیبانی همراه شماست."
+        ),
+        "label": "تماس با پشتیبانی",
+    },
+    "aside": deepcopy(HELP_ASIDE),
+}
+
+
+@dataclass(frozen=True)
+class SectionDefinition:
+    id: str
+    label: str
+
+
+@dataclass(frozen=True)
+class PageDefinition:
+    key: str
+    label: str
+    path: str
+    default_content: dict[str, Any]
+    sections: tuple[SectionDefinition, ...]
+
+
+ABOUT_SECTIONS = (
+    SectionDefinition("hero", "سربرگ اصلی"),
+    SectionDefinition("story", "داستان و ریشه‌ها"),
+    SectionDefinition("values", "ارزش‌ها"),
+    SectionDefinition("journey", "مسیر همراهی"),
+    SectionDefinition("closing", "دعوت پایانی"),
+)
+
+CONTACT_SECTIONS = (
+    SectionDefinition("hero", "سربرگ اصلی"),
+    SectionDefinition("ways", "راه‌های ارتباط"),
+    SectionDefinition("topics", "موضوعات تماس"),
+    SectionDefinition("faq-promo", "معرفی مرکز راهنما"),
+)
+
+SUPPORT_SECTIONS = (
+    SectionDefinition("hero", "سربرگ و جستجو"),
+    SectionDefinition("faq-order", "پرسش‌ها — ثبت سفارش و خرید"),
+    SectionDefinition("faq-payment", "پرسش‌ها — پرداخت"),
+    SectionDefinition("faq-shipping", "پرسش‌ها — ارسال سفارش"),
+    SectionDefinition("faq-return", "پرسش‌ها — بازگشت کالا"),
+    SectionDefinition("faq-warranty", "پرسش‌ها — گارانتی و اصالت"),
+    SectionDefinition("faq-account", "پرسش‌ها — حساب کاربری"),
+    SectionDefinition("contact", "دعوت به تماس"),
+)
+
+HELP_SECTIONS = (
+    SectionDefinition("hero", "سربرگ اصلی"),
+    SectionDefinition("steps", "مراحل راهنما"),
+    SectionDefinition("checklist", "فهرست نکات"),
+    SectionDefinition("faqs", "پرسش‌های رایج"),
+    SectionDefinition("cta", "دعوت پایانی"),
+    SectionDefinition("aside", "ستون سایر راهنماها"),
+)
+
+
+PAGE_DEFINITIONS = {
+    "about": PageDefinition(
+        "about", "درباره ما", "/about", ABOUT_CONTENT, ABOUT_SECTIONS
+    ),
+    "contact": PageDefinition(
+        "contact", "تماس با ما", "/contact", CONTACT_CONTENT, CONTACT_SECTIONS
+    ),
+    "support": PageDefinition(
+        "support", "پاسخ به پرسش‌ها", "/support", SUPPORT_CONTENT, SUPPORT_SECTIONS
+    ),
+    "shipping": PageDefinition(
+        "shipping",
+        "رویه ارسال سفارش",
+        "/help/shipping",
+        SHIPPING_CONTENT,
+        HELP_SECTIONS,
+    ),
+    "returns": PageDefinition(
+        "returns",
+        "شرایط بازگشت کالا",
+        "/help/returns",
+        RETURNS_CONTENT,
+        HELP_SECTIONS,
+    ),
+    "how-to-order": PageDefinition(
+        "how-to-order",
+        "نحوه ثبت سفارش",
+        "/help/how-to-order",
+        HOW_TO_ORDER_CONTENT,
+        HELP_SECTIONS,
+    ),
+    "track-order": PageDefinition(
+        "track-order",
+        "رهگیری سفارش",
+        "/help/track-order",
+        TRACK_ORDER_CONTENT,
+        HELP_SECTIONS,
+    ),
+    "warranty": PageDefinition(
+        "warranty",
+        "گارانتی محصولات",
+        "/help/warranty",
+        WARRANTY_CONTENT,
+        HELP_SECTIONS,
+    ),
+}
+
+SUPPORTED_PAGE_KEYS = tuple(PAGE_DEFINITIONS)
+PAGE_KEY_CHOICES = tuple(
+    (definition.key, definition.label) for definition in PAGE_DEFINITIONS.values()
+)
+
+
+@dataclass(frozen=True)
+class FieldDefinition:
+    id: str
+    path: tuple[str | int, ...]
+    label: str
+    group: str
+    control: str
+    required: bool
+    max_length: int
+    rows: int | None = None
+    direction: str | None = None
+    help_text: str | None = None
+
+
+LEAF_LABELS = {
+    "accent": "بخش برجسته عنوان",
+    "afterQuery": "متن بعد از عبارت جستجو",
+    "answer": "پاسخ",
+    "badge": "برچسب بالای عنوان",
+    "beforeQuery": "متن پیش از عبارت جستجو",
+    "buttonLabel": "متن دکمه",
+    "captionEyebrow": "برچسب کارت نشان",
+    "captionTitle": "عنوان کارت نشان",
+    "description": "توضیحات",
+    "eyebrow": "برچسب بخش",
+    "faqEyebrow": "برچسب بخش پرسش‌ها",
+    "faqLabel": "متن پیوند پاسخ به پرسش‌ها",
+    "faqTitle": "عنوان بخش پرسش‌ها",
+    "allFaqsLabel": "متن پیوند همه پرسش‌ها",
+    "intro": "متن معرفی",
+    "label": "متن دکمه یا پیوند",
+    "linkLabel": "متن پیوند",
+    "onlineLabel": "متن دکمه گفت‌وگوی آنلاین",
+    "onlineUrl": "پیوند گفت‌وگوی آنلاین",
+    "phoneLabel": "متن دکمه تماس",
+    "phoneNumber": "شماره قابل شماره‌گیری",
+    "primaryLabel": "متن دکمه اصلی",
+    "question": "پرسش",
+    "relatedTitle": "عنوان سایر راهنماها",
+    "searchPlaceholder": "متن راهنمای جستجو",
+    "secondaryLabel": "متن دکمه دوم",
+    "shortTitle": "عنوان کوتاه",
+    "sidebarTitle": "عنوان دسته‌بندی‌ها",
+    "stepsEyebrow": "برچسب بخش مراحل",
+    "stepsTitle": "عنوان بخش مراحل",
+    "suffix": "ادامه عنوان",
+    "supportDescription": "توضیح کارت پشتیبانی",
+    "supportLabel": "متن پیوند پشتیبانی",
+    "supportTitle": "عنوان کارت پشتیبانی",
+    "text": "متن",
+    "title": "عنوان",
+}
+
+TOP_LEVEL_GROUPS = {
+    "hero": "سربرگ اصلی",
+    "story": "داستان و ریشه‌ها",
+    "values": "ارزش‌ها",
+    "journey": "مسیر همراهی",
+    "closing": "دعوت پایانی",
+    "ways": "راه‌های ارتباط",
+    "topics": "موضوعات تماس",
+    "faqPromo": "معرفی مرکز راهنما",
+    "groups": "پرسش‌های متداول",
+    "noResults": "پیام نتیجه جستجو",
+    "contact": "دعوت به تماس",
+    "sectionLabels": "عنوان‌های بخش‌ها",
+    "steps": "مراحل راهنما",
+    "checklist": "فهرست نکات",
+    "faqs": "پرسش‌های راهنما",
+    "cta": "دعوت پایانی",
+    "aside": "ستون راهنما",
+}
+
+MULTILINE_KEYS = {
+    "answer",
+    "description",
+    "intro",
+    "supportDescription",
+    "text",
+}
+
+
+def get_page_definition(key: str) -> PageDefinition | None:
+    return PAGE_DEFINITIONS.get(key)
+
+
+def default_content(key: str) -> dict[str, Any]:
+    definition = PAGE_DEFINITIONS[key]
+    return deepcopy(definition.default_content)
+
+
+def default_section_visibility(key: str) -> dict[str, bool]:
+    definition = PAGE_DEFINITIONS[key]
+    return {section.id: True for section in definition.sections}
+
+
+def sections_for_page(key: str) -> tuple[SectionDefinition, ...]:
+    return PAGE_DEFINITIONS[key].sections
+
+
+def _value_at(content: Any, path: tuple[str | int, ...]) -> str:
+    current = content
+    for part in path:
+        current = current[part]
+    return current
+
+
+def _field_group(
+    definition: PageDefinition, path: tuple[str | int, ...]
+) -> str:
+    top = str(path[0])
+    base = TOP_LEVEL_GROUPS.get(top, definition.label)
+
+    for index, part in enumerate(path):
+        if not isinstance(part, int):
+            continue
+        parent_key = path[index - 1] if index else ""
+        if parent_key == "groups":
+            title = definition.default_content["groups"][part]["title"]
+            return f"پرسش‌های متداول — {title}"
+        labels = {
+            "ways": "راه ارتباط",
+            "topics": "موضوع تماس",
+            "items": "مورد",
+            "steps": "مرحله",
+            "faqs": "پرسش",
+            "paragraphs": "بند",
+            "questions": "پرسش نمونه",
+        }
+        noun = labels.get(str(parent_key), "مورد")
+        return f"{base} — {noun} {part + 1}"
+    return base
+
+
+def _field_label(path: tuple[str | int, ...]) -> str:
+    leaf = path[-1]
+    if isinstance(leaf, int):
+        parent = path[-2]
+        labels = {
+            "items": "متن مورد",
+            "paragraphs": "متن بند",
+            "questions": "متن پرسش",
+        }
+        return labels.get(str(parent), "متن")
+    return LEAF_LABELS.get(leaf, "متن")
+
+
+def _field_options(path: tuple[str | int, ...], value: str) -> dict[str, Any]:
+    leaf = path[-1]
+    control = "textarea" if leaf in MULTILINE_KEYS or len(value) > 160 else "text"
+    direction = None
+    help_text = None
+    max_length = 2000 if control == "textarea" else 240
+    rows = 4 if control == "textarea" else None
+    required = True
+
+    if leaf == "phoneNumber":
+        control = "tel"
+        direction = "ltr"
+        max_length = 25
+        help_text = "فقط رقم انگلیسی و در صورت نیاز +، فاصله، خط تیره یا پرانتز."
+    elif leaf == "onlineUrl":
+        direction = "ltr"
+        max_length = 500
+        help_text = "پیوند بیرونی http/https یا # وارد کنید؛ مسیر داخلی قابل تغییر نیست."
+
+    return {
+        "control": control,
+        "required": required,
+        "max_length": max_length,
+        "rows": rows,
+        "direction": direction,
+        "help_text": help_text,
+    }
+
+
+def _walk_strings(value: Any, path: tuple[str | int, ...] = ()):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from _walk_strings(child, (*path, key))
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from _walk_strings(child, (*path, index))
+        return
+    if not isinstance(value, str):
+        raise TypeError(f"Static page default at {path!r} must be a string")
+    yield path, value
+
+
+@lru_cache(maxsize=None)
+def fields_for_page(key: str) -> tuple[FieldDefinition, ...]:
+    definition = PAGE_DEFINITIONS[key]
+    fields: list[FieldDefinition] = []
+    for path, value in _walk_strings(definition.default_content):
+        options = _field_options(path, value)
+        fields.append(
+            FieldDefinition(
+                id=".".join(str(part) for part in path),
+                path=path,
+                label=_field_label(path),
+                group=_field_group(definition, path),
+                **options,
+            )
+        )
+    return tuple(fields)
+
+
+def field_value(content: dict[str, Any], field: FieldDefinition) -> str:
+    return _value_at(content, field.path)

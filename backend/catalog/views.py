@@ -17,6 +17,7 @@ from .feedback import (
     visible_comment_threads,
 )
 from .models import Brand, Category, Product, ProductComment, ProductRating
+from .specifications import product_specification_prefetch
 
 SORTS = {
     "newest": "-created_at",
@@ -189,7 +190,9 @@ class ProductDetailView(APIView):
         try:
             product = (
                 Product.objects.select_related("category", "brand")
-                .prefetch_related("categories", "images")
+                .prefetch_related(
+                    "categories", "images", product_specification_prefetch()
+                )
                 .get(pk=pk, is_active=True)
             )
         except Product.DoesNotExist:
@@ -227,7 +230,7 @@ class ProductDetailView(APIView):
 
         return ok(
             {
-                "product": product_dto(product),
+                "product": product_dto(product, include_specifications=True),
                 "related": [product_dto(p) for p in same],
             }
         )
