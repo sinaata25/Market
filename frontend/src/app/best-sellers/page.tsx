@@ -24,8 +24,10 @@ export default async function BestSellersPage({
 
   const [categories, { items }] = await Promise.all([
     getCategories(),
+    // «پرفروش‌ترین‌ها» انتخاب دستی مدیر فروشگاه است، نه صرفاً آمار فروش/امتیاز
     getProducts({
-      sort: "popular",
+      bestSeller: true,
+      sort: "featured",
       perPage: 50,
       categorySlug: activeCategory,
     }),
@@ -67,7 +69,7 @@ export default async function BestSellersPage({
               )}
             </h1>
             <p className="mt-1 text-xs text-white/90">
-              محبوب‌ترین کالاها بر اساس نظر و خرید مشتریان
+              منتخب فروشگاه؛ کالاهایی که تیم گروه صنعتی توانا برایتان برگزیده است
             </p>
           </div>
         </div>
@@ -112,14 +114,18 @@ export default async function BestSellersPage({
         <div className="rounded-3xl border border-slate-100 bg-white px-6 py-16 text-center">
           <span className="mb-4 block text-6xl">📦</span>
           <h2 className="mb-2 font-bold text-slate-700">
-            کالایی در این دسته یافت نشد
+            {activeCategory
+              ? "در این دسته هنوز محصولی به پرفروش‌ترین‌ها اضافه نشده است"
+              : "هنوز محصولی به پرفروش‌ترین‌ها اضافه نشده است"}
           </h2>
-          <Link
-            href={url()}
-            className="mt-4 inline-block rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-brand-700"
-          >
-            مشاهده همه پرفروش‌ها
-          </Link>
+          {activeCategory && (
+            <Link
+              href={url()}
+              className="mt-4 inline-block rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-brand-700"
+            >
+              مشاهده همه پرفروش‌ها
+            </Link>
+          )}
         </div>
       ) : (
         <>

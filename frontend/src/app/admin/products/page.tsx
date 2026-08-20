@@ -16,6 +16,9 @@ export default function AdminProducts() {
   const [changingVisibility, setChangingVisibility] = useState<number | null>(
     null
   );
+  const [changingBestSeller, setChangingBestSeller] = useState<number | null>(
+    null
+  );
   const [message, setMessage] = useState("");
 
   const load = useCallback(() => {
@@ -76,6 +79,31 @@ export default function AdminProducts() {
     setTimeout(() => setMessage(""), 4000);
   }
 
+  async function toggleBestSeller(product: Product) {
+    if (changingBestSeller !== null) return;
+    setChangingBestSeller(product.id);
+    const result = await api.patch<{ product: Product }>(
+      `/api/admin/products/${product.id}/best-seller`,
+      { isBestSeller: !product.isBestSeller }
+    );
+    if (result.ok && result.data) {
+      setProducts((current) =>
+        current.map((item) =>
+          item.id === product.id ? result.data!.product : item
+        )
+      );
+      setMessage(
+        product.isBestSeller
+          ? "محصول از پرفروش‌ترین‌ها حذف شد ✅"
+          : "محصول به پرفروش‌ترین‌ها اضافه شد ✅"
+      );
+    } else {
+      setMessage(result.error ?? "تغییر وضعیت پرفروش انجام نشد");
+    }
+    setChangingBestSeller(null);
+    setTimeout(() => setMessage(""), 4000);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -111,7 +139,7 @@ export default function AdminProducts() {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-        <table className="w-full min-w-[840px] text-sm">
+        <table className="w-full min-w-[940px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-right text-[11px] text-slate-400">
               <th className="px-5 py-3 font-medium">محصول</th>
@@ -121,14 +149,15 @@ export default function AdminProducts() {
               <th className="px-3 py-3 font-medium">موجودی</th>
               <th className="px-3 py-3 font-medium">امتیاز</th>
               <th className="px-3 py-3 font-medium">وضعیت نمایش</th>
+              <th className="px-3 py-3 font-medium">پرفروش‌ترین‌ها</th>
               <th className="px-5 py-3 font-medium">عملیات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={8} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={9} text="در حال بارگذاری..." />
             ) : products.length === 0 ? (
-              <EmptyRow colSpan={8} text="محصولی یافت نشد" />
+              <EmptyRow colSpan={9} text="محصولی یافت نشد" />
             ) : (
               products.map((p) => (
                 <tr
@@ -205,6 +234,21 @@ export default function AdminProducts() {
                     >
                       {p.isActive === false ? "پنهان است" : "نمایش داده می‌شود"}
                     </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <button
+                      type="button"
+                      disabled={changingBestSeller !== null}
+                      onClick={() => toggleBestSeller(p)}
+                      title="انتخاب دستی برای بخش پرفروش‌ترین‌ها — مستقل از امتیاز/فروش واقعی"
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        p.isBestSeller
+                          ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                    >
+                      {p.isBestSeller ? "⭐ پرفروش" : "☆ افزودن"}
+                    </button>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3 text-xs">

@@ -114,6 +114,14 @@ class Product(models.Model):
     warranty = models.CharField("گارانتی", max_length=100, blank=True)
     stock = models.PositiveIntegerField("موجودی", default=10)
     is_active = models.BooleanField("نمایش در فروشگاه", default=True)
+    is_best_seller = models.BooleanField(
+        "پرفروش ویژه (انتخاب مدیر)",
+        default=False,
+        help_text="نمایش در بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش واقعی",
+    )
+    best_seller_position = models.PositiveIntegerField(
+        "ترتیب در پرفروش‌ترین‌ها", default=0
+    )
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     category = models.ForeignKey(

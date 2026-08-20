@@ -31,10 +31,12 @@ export type ProductListParams = {
   categorySlug?: string;
   brandSlug?: string;
   search?: string;
-  sort?: "newest" | "cheapest" | "expensive" | "popular";
+  sort?: "newest" | "cheapest" | "expensive" | "popular" | "featured";
   page?: number;
   perPage?: number;
   onlyDiscounted?: boolean;
+  // فقط محصولاتی که مدیر برای بخش «پرفروش‌ترین‌ها» انتخاب کرده — نه آمار فروش واقعی
+  bestSeller?: boolean;
 };
 
 export type ProductListResult = {
@@ -65,6 +67,7 @@ export async function getProducts(
   if (params.page) qs.set("page", String(params.page));
   if (params.perPage) qs.set("perPage", String(params.perPage));
   if (params.onlyDiscounted) qs.set("discounted", "true");
+  if (params.bestSeller) qs.set("bestSeller", "true");
   const query = qs.toString();
   return apiGet<ProductListResult>(`/api/products${query ? `?${query}` : ""}`);
 }

@@ -13,6 +13,7 @@ import BuyBox from "@/components/product/BuyBox";
 import ProductTabs from "@/components/product/ProductTabs";
 import ProductCard from "@/components/product/ProductCard";
 import FavoriteButton from "@/components/product/FavoriteButton";
+import CompareButton from "@/components/product/CompareButton";
 import JsonLd from "@/components/seo/JsonLd";
 
 // موجودی و امتیاز لحظه‌ای از دیتابیس خوانده می‌شود
@@ -128,7 +129,10 @@ export default async function ProductPage({
             <h1 className="text-lg font-bold leading-8 text-slate-800">
               {product.title}
             </h1>
-            <FavoriteButton productId={product.id} />
+            <div className="flex shrink-0 items-center gap-1.5">
+              <CompareButton product={product} />
+              <FavoriteButton productId={product.id} />
+            </div>
           </div>
           {product.titleEn && (
             <p className="mb-3 text-xs text-slate-400" dir="ltr">

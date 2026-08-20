@@ -4,7 +4,14 @@ from rest_framework.test import APIClient
 
 from orders.models import Order, OrderItem
 
-from .models import Category, Product, ProductComment, ProductRating
+from .models import (
+    Category,
+    Product,
+    ProductComment,
+    ProductRating,
+    ProductSpecification,
+    SpecificationKey,
+)
 
 
 PRODUCT_RESPONSE_KEYS = {
@@ -29,6 +36,8 @@ PRODUCT_RESPONSE_KEYS = {
     "warranty",
     "stock",
     "isActive",
+    "isBestSeller",
+    "bestSellerPosition",
 }
 
 
@@ -317,3 +326,208 @@ class ProductFeedbackContractTests(TestCase):
         )
         self.assertEqual(deleted.status_code, 200)
         self.assertFalse(ProductComment.objects.filter(pk=comment.id).exists())
+
+
+class ProductCompareApiTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(slug="tools", title="ابزار")
+        self.other_category = Category.objects.create(
+            slug="seeds", title="بذر و نهال"
+        )
+        self.weight_key = SpecificationKey.objects.create(name="وزن")
+        self.power_key = SpecificationKey.objects.create(name="توان")
+        self.material_key = SpecificationKey.objects.create(name="جنس")
+        self.client = APIClient()
+
+    def make_product(self, title, *, category=None, price=100_000, is_active=True):
+        return Product.objects.create(
+            title=title,
+            category=category or self.category,
+            price=price,
+            is_active=is_active,
+        )
+
+    def add_spec(self, product, key, value, position=0):
+        ProductSpecification.objects.create(
+            product=product, key=key, value=value, position=position
+        )
+
+    def compare(self, product_ids):
+        return self.client.post(
+            "/api/products/compare", {"productIds": product_ids}, format="json"
+        )
+
+    def test_compares_two_products_from_same_category(self):
+        a = self.make_product("محصول الف")
+        b = self.make_product("محصول ب")
+
+        response = self.compare([a.id, b.id])
+
+        self.assertEqual(response.status_code, 200)
+        items = response.data["data"]["items"]
+        self.assertEqual([item["id"] for item in items], [a.id, b.id])
+
+    def test_compares_three_four_and_five_products(self):
+        products = [self.make_product(f"محصول {i}") for i in range(5)]
+
+        for count in (3, 4, 5):
+            ids = [p.id for p in products[:count]]
+            response = self.compare(ids)
+            self.assertEqual(response.status_code, 200, count)
+            self.assertEqual(len(response.data["data"]["items"]), count)
+
+    def test_rejects_a_sixth_product(self):
+        products = [self.make_product(f"محصول {i}") for i in range(6)]
+
+        response = self.compare([p.id for p in products])
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_rejects_single_product(self):
+        a = self.make_product("محصول تنها")
+
+        response = self.compare([a.id])
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_rejects_products_from_incompatible_categories(self):
+        a = self.make_product("محصول ابزار", category=self.category)
+        b = self.make_product("محصول بذر", category=self.other_category)
+
+        response = self.compare([a.id, b.id])
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(response.data["ok"])
+
+    def test_products_sharing_a_secondary_category_are_compatible(self):
+        a = self.make_product("محصول اول", category=self.category)
+        b = self.make_product("محصول دوم", category=self.other_category)
+        b.categories.add(self.category)
+
+        response = self.compare([a.id, b.id])
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_rejects_duplicate_product_ids(self):
+        a = self.make_product("محصول تکراری")
+
+        response = self.compare([a.id, a.id])
+
+        self.assertEqual(response.status_code, 409)
+
+    def test_rejects_nonexistent_product_id(self):
+        a = self.make_product("محصول موجود")
+
+        response = self.compare([a.id, 999999])
+
+        self.assertEqual(response.status_code, 409)
+
+    def test_rejects_inactive_product(self):
+        a = self.make_product("محصول فعال")
+        b = self.make_product("محصول غیرفعال", is_active=False)
+
+        response = self.compare([a.id, b.id])
+
+        self.assertEqual(response.status_code, 409)
+
+    def test_specification_union_and_missing_values(self):
+        a = self.make_product("محصول اول")
+        b = self.make_product("محصول دوم")
+        c = self.make_product("محصول سوم")
+        self.add_spec(a, self.weight_key, "۱ کیلوگرم", position=0)
+        self.add_spec(a, self.power_key, "۵۰۰ وات", position=1)
+        self.add_spec(b, self.weight_key, "۲ کیلوگرم", position=0)
+        self.add_spec(c, self.power_key, "۷۰۰ وات", position=0)
+        self.add_spec(c, self.material_key, "استیل", position=1)
+
+        response = self.compare([a.id, b.id, c.id])
+
+        items = response.data["data"]["items"]
+        specs_by_id = {
+            item["id"]: {spec["slug"]: spec["value"] for spec in item["specifications"]}
+            for item in items
+        }
+        union_keys = {
+            spec["slug"]
+            for item in items
+            for spec in item["specifications"]
+        }
+        self.assertEqual(
+            union_keys,
+            {self.weight_key.slug, self.power_key.slug, self.material_key.slug},
+        )
+        # محصول ب مقدار «توان» و «جنس» ندارد — باید غایب باشد نه خالی
+        self.assertNotIn(self.power_key.slug, specs_by_id[b.id])
+        self.assertNotIn(self.material_key.slug, specs_by_id[b.id])
+        self.assertEqual(specs_by_id[a.id][self.weight_key.slug], "۱ کیلوگرم")
+
+    def test_response_is_efficient(self):
+        products = [self.make_product(f"محصول {i}") for i in range(5)]
+        for product in products:
+            self.add_spec(product, self.weight_key, "۱ کیلوگرم")
+
+        # ثابت (مستقل از تعداد محصولات): محصول+دسته+برند، دسته‌های اضافه، تصاویر، مشخصات
+        with self.assertNumQueries(4):
+            response = self.compare([p.id for p in products])
+
+        self.assertEqual(response.status_code, 200)
+
+
+class BestSellerApiTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(slug="tools", title="ابزار")
+        self.client = APIClient()
+
+    def make_product(self, title, *, is_best_seller=False, position=0, is_active=True):
+        return Product.objects.create(
+            title=title,
+            category=self.category,
+            price=100_000,
+            is_active=is_active,
+            is_best_seller=is_best_seller,
+            best_seller_position=position,
+        )
+
+    def test_only_admin_selected_products_are_returned(self):
+        featured = self.make_product("محصول ویژه", is_best_seller=True)
+        self.make_product("محصول عادی")
+
+        response = self.client.get("/api/products?bestSeller=true")
+
+        self.assertEqual(response.status_code, 200)
+        items = response.data["data"]["items"]
+        self.assertEqual([item["id"] for item in items], [featured.id])
+
+    def test_inactive_best_seller_is_not_publicly_visible(self):
+        self.make_product("محصول غیرفعال", is_best_seller=True, is_active=False)
+
+        response = self.client.get("/api/products?bestSeller=true")
+
+        self.assertEqual(response.data["data"]["total"], 0)
+
+    def test_featured_sort_respects_admin_position(self):
+        third = self.make_product("سوم", is_best_seller=True, position=3)
+        first = self.make_product("اول", is_best_seller=True, position=1)
+        second = self.make_product("دوم", is_best_seller=True, position=2)
+
+        response = self.client.get(
+            "/api/products?bestSeller=true&sort=featured"
+        )
+
+        items = response.data["data"]["items"]
+        self.assertEqual(
+            [item["id"] for item in items], [first.id, second.id, third.id]
+        )
+
+    def test_best_seller_flag_does_not_affect_real_rating_data(self):
+        product = self.make_product("محصول با امتیاز")
+        product.rating = 4.5
+        product.rating_count = 20
+        product.save(update_fields=["rating", "rating_count"])
+
+        response = self.client.get(f"/api/products/{product.id}")
+        data = response.data["data"]["product"]
+
+        self.assertEqual(data["isBestSeller"], False)
+        self.assertEqual(data["rating"], 4.5)
+        self.assertEqual(data["ratingCount"], 20)

@@ -80,6 +80,9 @@ def product_dto(product: Product, *, include_specifications: bool = False) -> di
         "warranty": product.warranty or "۱۲ ماه ضمانت فروشگاه",
         "stock": product.stock,
         "isActive": product.is_active,
+        # انتخاب دستی مدیر برای بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش/امتیاز واقعی
+        "isBestSeller": product.is_best_seller,
+        "bestSellerPosition": product.best_seller_position,
     }
     if include_specifications:
         data["specifications"] = [

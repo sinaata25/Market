@@ -26,6 +26,10 @@ urlpatterns = [
         "products/<int:pk>/visibility",
         views.AdminProductVisibilityView.as_view(),
     ),
+    path(
+        "products/<int:pk>/best-seller",
+        views.AdminProductBestSellerView.as_view(),
+    ),
     path("products/<int:pk>/image", views.AdminProductImageView.as_view()),
     path(
         "products/<int:pk>/images/<int:image_id>",

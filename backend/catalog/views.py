@@ -1,5 +1,6 @@
 import math
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.types import OpenApiTypes
@@ -10,6 +11,7 @@ from rest_framework.views import APIView
 from common.responses import fail, ok
 
 from .category_tree import descendant_category_ids, visible_category_ids
+from .compare import MAX_COMPARE_PRODUCTS, MIN_COMPARE_PRODUCTS, compare_dto
 from .dto import brand_dto, category_dto, product_dto
 from .feedback import (
     has_purchased_product,
@@ -24,6 +26,8 @@ SORTS = {
     "cheapest": "price",
     "expensive": "-price",
     "popular": "-rating_count",
+    # ترتیب انتخاب مدیر برای پرفروش‌ترین‌ها — مستقل از آمار فروش/امتیاز واقعی
+    "featured": ("best_seller_position", "-created_at"),
 }
 
 
@@ -118,6 +122,12 @@ class ProductListView(APIView):
             OpenApiParameter(
                 "discounted", OpenApiTypes.BOOL, OpenApiParameter.QUERY
             ),
+            OpenApiParameter(
+                "bestSeller",
+                OpenApiTypes.BOOL,
+                OpenApiParameter.QUERY,
+                description="Only products the admin marked as best-selling.",
+            ),
             OpenApiParameter("sort", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter("page", OpenApiTypes.INT, OpenApiParameter.QUERY),
             OpenApiParameter(
@@ -159,8 +169,13 @@ class ProductListView(APIView):
         if request.query_params.get("discounted") in ("true", "1"):
             qs = qs.filter(old_price__isnull=False)
 
+        # پرفروش‌ترین‌ها انتخاب دستی مدیر است، نه آمار فروش/امتیاز واقعی
+        if request.query_params.get("bestSeller") in ("true", "1"):
+            qs = qs.filter(is_best_seller=True)
+
         sort = request.query_params.get("sort", "newest")
-        qs = qs.order_by(SORTS.get(sort, "-created_at"))
+        order = SORTS.get(sort, "-created_at")
+        qs = qs.order_by(*order) if isinstance(order, tuple) else qs.order_by(order)
 
         try:
             page = max(1, int(request.query_params.get("page", 1)))
@@ -251,6 +266,36 @@ class ProductBySlugView(APIView):
             return fail("محصول یافت نشد", 404)
         view = ProductDetailView()
         return view.get(request, pk=product_id)
+
+
+class CompareRequestSerializer(serializers.Serializer):
+    productIds = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=MIN_COMPARE_PRODUCTS,
+        max_length=MAX_COMPARE_PRODUCTS,
+        error_messages={
+            "required": "شناسه محصولات الزامی است",
+            "min_length": f"برای مقایسه حداقل {MIN_COMPARE_PRODUCTS} محصول لازم است",
+            "max_length": f"حداکثر {MAX_COMPARE_PRODUCTS} محصول را می‌توان هم‌زمان مقایسه کرد",
+        },
+    )
+
+
+class ProductCompareView(APIView):
+    """مقایسه‌ی ۲ تا ۵ محصول هم‌دسته — اعتبارسنجی سمت سرور، مستقل از فرانت"""
+
+    @extend_schema(
+        request=CompareRequestSerializer,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def post(self, request):
+        ser = CompareRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            data = compare_dto(ser.validated_data["productIds"])
+        except ValidationError as exc:
+            return fail(exc.messages[0], 409)
+        return ok(data)
 
 
 class RatingWriteSerializer(serializers.Serializer):

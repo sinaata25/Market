@@ -990,6 +990,36 @@ class AdminProductVisibilityView(StaffRequiredMixin, APIView):
         return ok({"product": admin_product_dto(product)})
 
 
+class ProductBestSellerSerializer(serializers.Serializer):
+    isBestSeller = serializers.BooleanField()
+    position = serializers.IntegerField(min_value=0, required=False)
+
+
+class AdminProductBestSellerView(StaffRequiredMixin, APIView):
+    """انتخاب/حذف دستی محصول از بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش واقعی"""
+
+    def patch(self, request, pk: int):
+        serializer = ProductBestSellerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = (
+            Product.objects.select_related("category", "brand")
+            .prefetch_related(
+                "categories", "images", product_specification_prefetch()
+            )
+            .filter(pk=pk)
+            .first()
+        )
+        if product is None:
+            return fail("محصول یافت نشد", 404)
+        product.is_best_seller = serializer.validated_data["isBestSeller"]
+        update_fields = ["is_best_seller"]
+        if "position" in serializer.validated_data:
+            product.best_seller_position = serializer.validated_data["position"]
+            update_fields.append("best_seller_position")
+        product.save(update_fields=update_fields)
+        return ok({"product": admin_product_dto(product)})
+
+
 class AdminProductImageView(StaffRequiredMixin, APIView):
     """آپلود تصویر محصول (multipart/form-data با فیلد file)"""
 

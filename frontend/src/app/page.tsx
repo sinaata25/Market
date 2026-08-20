@@ -14,10 +14,11 @@ export async function generateMetadata() {
 }
 
 export default async function Home() {
-  const [categories, { items: products }, { items: deals }, seo] =
+  const [categories, { items: bestSellers }, { items: deals }, seo] =
     await Promise.all([
       getCategories(),
-      getProducts({ sort: "popular", perPage: 8 }),
+      // «پرفروش‌ترین‌ها» انتخاب دستی مدیر فروشگاه است، نه صرفاً آمار فروش/امتیاز
+      getProducts({ bestSeller: true, sort: "featured", perPage: 8 }),
       getProducts({ onlyDiscounted: true, perPage: 6 }),
       fetchSeo("static", "/"),
     ]);
@@ -102,23 +103,25 @@ export default async function Home() {
         </section>
       )}
 
-      {/* پرفروش‌ترین‌ها */}
-      <section className="mt-10">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">🔥 پرفروش‌ترین‌ها</h2>
-          <Link
-            href="/best-sellers"
-            className="text-sm text-brand-600 transition hover:text-brand-700"
-          >
-            مشاهده همه ←
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {products.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      </section>
+      {/* پرفروش‌ترین‌ها — منتخب دستی مدیر فروشگاه */}
+      {bestSellers.length > 0 && (
+        <section className="mt-10">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800">🔥 پرفروش‌ترین‌ها</h2>
+            <Link
+              href="/best-sellers"
+              className="text-sm text-brand-600 transition hover:text-brand-700"
+            >
+              مشاهده همه ←
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {bestSellers.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

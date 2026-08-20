@@ -109,6 +109,9 @@ export default function ProductForm({ productId }: { productId?: number }) {
   const [uploading, setUploading] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [changingVisibility, setChangingVisibility] = useState(false);
+  const [isBestSeller, setIsBestSeller] = useState(false);
+  const [bestSellerPosition, setBestSellerPosition] = useState(0);
+  const [changingBestSeller, setChangingBestSeller] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
     null
   );
@@ -162,6 +165,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
             setSpecifications(draftsFromProduct(p.specifications));
             setImages(p.imageItems ?? []);
             setIsActive(p.isActive !== false);
+            setIsBestSeller(p.isBestSeller ?? false);
+            setBestSellerPosition(p.bestSellerPosition ?? 0);
           }
           setLoading(false);
         });
@@ -352,6 +357,48 @@ export default function ProductForm({ productId }: { productId?: number }) {
     }
   }
 
+  async function toggleBestSeller() {
+    if (activeProductId === undefined || changingBestSeller) return;
+    setChangingBestSeller(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/best-seller`,
+      { isBestSeller: !isBestSeller }
+    );
+    setChangingBestSeller(false);
+    if (result.ok && result.data) {
+      setIsBestSeller(result.data.product.isBestSeller ?? false);
+      setMessage({
+        ok: true,
+        text: result.data.product.isBestSeller
+          ? "محصول به پرفروش‌ترین‌ها اضافه شد ✅"
+          : "محصول از پرفروش‌ترین‌ها حذف شد ✅",
+      });
+    } else {
+      setMessage({
+        ok: false,
+        text: result.error ?? "تغییر وضعیت پرفروش انجام نشد",
+      });
+    }
+  }
+
+  async function saveBestSellerPosition() {
+    if (activeProductId === undefined || changingBestSeller) return;
+    setChangingBestSeller(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/best-seller`,
+      { isBestSeller, position: bestSellerPosition }
+    );
+    setChangingBestSeller(false);
+    if (result.ok && result.data) {
+      setBestSellerPosition(result.data.product.bestSellerPosition ?? 0);
+      setMessage({ ok: true, text: "ترتیب نمایش ذخیره شد ✅" });
+    } else {
+      setMessage({ ok: false, text: result.error ?? "ذخیره ترتیب انجام نشد" });
+    }
+  }
+
   if (loading) {
     return (
       <div className="grid min-h-[40vh] place-items-center text-sm text-slate-400">
@@ -475,6 +522,69 @@ export default function ProductForm({ productId }: { productId?: number }) {
               <p className="mt-3 text-[11px] leading-5 text-slate-400">
                 محصول پنهان در فروشگاه نمایش داده نمی‌شود، اما اطلاعات آن در پنل
                 مدیریت باقی می‌ماند.
+              </p>
+            </div>
+          )}
+
+          {isEdit && (
+            <div className="rounded-2xl border border-slate-100 bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-slate-600">
+                    بخش پرفروش‌ترین‌ها
+                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                      isBestSeller
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isBestSeller ? "⭐ پرفروش است" : "☆ پرفروش نیست"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={changingBestSeller}
+                  onClick={toggleBestSeller}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isBestSeller
+                      ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      : "border-amber-200 text-amber-700 hover:bg-amber-50"
+                  }`}
+                >
+                  {changingBestSeller
+                    ? "در حال تغییر..."
+                    : isBestSeller
+                      ? "حذف از پرفروش‌ترین‌ها"
+                      : "افزودن به پرفروش‌ترین‌ها"}
+                </button>
+              </div>
+              {isBestSeller && (
+                <div className="mt-3 flex items-center gap-2">
+                  <label
+                    htmlFor="best-seller-position"
+                    className="shrink-0 text-[11px] text-slate-500"
+                  >
+                    ترتیب نمایش (کوچک‌تر = زودتر)
+                  </label>
+                  <input
+                    id="best-seller-position"
+                    type="number"
+                    min={0}
+                    value={bestSellerPosition}
+                    onChange={(e) =>
+                      setBestSellerPosition(Number(e.target.value) || 0)
+                    }
+                    onBlur={saveBestSellerPosition}
+                    disabled={changingBestSeller}
+                    className={`${inputCls()} font-num w-24 py-1.5`}
+                  />
+                </div>
+              )}
+              <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                انتخابی دستی و مستقل از آمار فروش/امتیاز واقعی — برای تبلیغ یا
+                معرفی محصول در صفحه اصلی فروشگاه استفاده می‌شود.
               </p>
             </div>
           )}

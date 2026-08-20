@@ -30,6 +30,9 @@ export type Product = {
   warranty?: string;
   stock?: number;
   isActive?: boolean;
+  // انتخاب دستی مدیر برای بخش «پرفروش‌ترین‌ها» — مستقل از rating/ratingCount واقعی
+  isBestSeller?: boolean;
+  bestSellerPosition?: number;
 };
 
 export type Brand = {
