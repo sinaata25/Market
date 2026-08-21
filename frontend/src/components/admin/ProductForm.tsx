@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/client-api";
 import type { Brand, Category, Product } from "@/lib/products";
 import SpecificationEditor from "@/components/admin/SpecificationEditor";
+import ProductRecommendationPicker from "@/components/admin/ProductRecommendationPicker";
 import {
   draftsFromProduct,
   type AdminProductSpecification,
@@ -48,6 +49,7 @@ type ImageItem = { id: number; url: string };
 type AdminProduct = Omit<Product, "specifications"> & {
   imageItems?: ImageItem[];
   specifications?: AdminProductSpecification[];
+  recommendedProducts?: Product[];
 };
 
 function validateSpecifications(rows: SpecificationDraft[]) {
@@ -103,6 +105,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
   >({});
   const [images, setImages] = useState<ImageItem[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [createdProductId, setCreatedProductId] = useState<number>();
   const [loading, setLoading] = useState(editingExistingProduct);
   const [saving, setSaving] = useState(false);
@@ -163,6 +166,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               warranty: p.warranty ?? "",
             });
             setSpecifications(draftsFromProduct(p.specifications));
+            setRecommendedProducts(p.recommendedProducts ?? []);
             setImages(p.imageItems ?? []);
             setIsActive(p.isActive !== false);
             setIsBestSeller(p.isBestSeller ?? false);
@@ -222,6 +226,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
         value: specification.value.trim(),
         position,
       })),
+      recommendedProductIds: recommendedProducts.map((product) => product.id),
     };
 
     const res = isEdit
@@ -244,6 +249,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
       setSpecifications(draftsFromProduct(res.data.product.specifications));
       setSpecificationErrors({});
     }
+    setRecommendedProducts(res.data.product.recommendedProducts ?? []);
     if (!isEdit) {
       const newProductId = res.data.product.id;
       setCreatedProductId(newProductId);
@@ -479,6 +485,12 @@ export default function ProductForm({ productId }: { productId?: number }) {
               setSpecifications(nextRows);
               setSpecificationErrors({});
             }}
+            disabled={saving}
+          />
+          <ProductRecommendationPicker
+            sourceProductId={activeProductId}
+            selected={recommendedProducts}
+            onChange={setRecommendedProducts}
             disabled={saving}
           />
         </div>
