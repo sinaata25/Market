@@ -21,6 +21,7 @@ _TYPE_ALLOWED_FIELDS: dict[str, set[str]] = {
     "discounted_products": {"limit"},
     "new_products": {"limit"},
     "product_collection": {"category", "brand", "sort", "limit"},
+    "recently_viewed": {"limit"},
 }
 
 
@@ -82,6 +83,7 @@ class HomepageSection(models.Model):
         DISCOUNTED_PRODUCTS = "discounted_products", "تخفیف‌های ویژه"
         NEW_PRODUCTS = "new_products", "جدیدترین محصولات"
         PRODUCT_COLLECTION = "product_collection", "مجموعه محصولات سفارشی"
+        RECENTLY_VIEWED = "recently_viewed", "محصولات اخیراً مشاهده‌شده"
 
     section_type = models.CharField(
         "نوع بخش", max_length=32, choices=SectionType.choices

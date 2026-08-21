@@ -159,6 +159,44 @@ class ProductListView(APIView):
         )
 
 
+class ProductBulkView(APIView):
+    """Current public product DTOs for up to 15 IDs, preserving request order."""
+
+    MAX_IDS = 15
+
+    def get(self, request):
+        raw_ids = request.query_params.get("ids", "")
+        parts = [part.strip() for part in raw_ids.split(",") if part.strip()]
+        if not parts:
+            return ok({"items": []})
+        if len(parts) > self.MAX_IDS:
+            return fail("حداکثر ۱۵ محصول قابل دریافت است", 422)
+        try:
+            ids = [int(part) for part in parts]
+        except ValueError:
+            return fail("شناسه محصولات نامعتبر است", 422)
+        if any(product_id < 1 for product_id in ids):
+            return fail("شناسه محصولات نامعتبر است", 422)
+
+        # Deduplicate without changing the visitor's newest-first order.
+        ids = list(dict.fromkeys(ids))
+        products = (
+            Product.objects.select_related("category", "brand")
+            .prefetch_related("categories", "images")
+            .filter(pk__in=ids, is_active=True)
+        )
+        products_by_id = {product.id: product for product in products}
+        return ok(
+            {
+                "items": [
+                    product_dto(products_by_id[product_id])
+                    for product_id in ids
+                    if product_id in products_by_id
+                ]
+            }
+        )
+
+
 class ProductDetailView(APIView):
     """جزئیات یک محصول به‌همراه محصولات مرتبط"""
 

@@ -18,7 +18,8 @@ export type HomepageSectionType =
   | "best_sellers"
   | "discounted_products"
   | "new_products"
-  | "product_collection";
+  | "product_collection"
+  | "recently_viewed";
 
 export type HomepageBanner = {
   id: number;
@@ -36,6 +37,7 @@ export type HomepageSection = {
   type: HomepageSectionType | (string & {});
   position: number;
   title: string | null;
+  limit: number;
   data: {
     banner?: HomepageBanner;
     categories?: CategoryDTO[];

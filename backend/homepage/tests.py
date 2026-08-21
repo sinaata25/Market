@@ -197,6 +197,19 @@ class HomepageAdminApiTests(TestCase):
         self.assertEqual(response.data["data"]["section"]["sectionType"], "categories")
         self.assertEqual(response.data["data"]["section"]["position"], 0)
 
+    def test_create_recently_viewed_section(self):
+        response = self.client.post(
+            "/api/admin/home/sections",
+            {"sectionType": "recently_viewed", "limit": 12},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        section = response.data["data"]["section"]
+        self.assertEqual(section["sectionType"], "recently_viewed")
+        self.assertEqual(section["resolvedTitle"], "محصولات اخیراً مشاهده‌شده")
+        self.assertEqual(section["resolvedLimit"], 12)
+
     def test_create_banner_section_requires_banner_id(self):
         response = self.client.post(
             "/api/admin/home/sections", {"sectionType": "banner"}, format="json"
@@ -409,3 +422,18 @@ class HomepagePublicApiTests(TestCase):
         response = self.client.get("/api/home/sections")
 
         self.assertEqual(response.data["data"]["sections"][0]["id"], section.id)
+
+    def test_recently_viewed_section_exposes_config_without_server_history(self):
+        create_section(
+            section_type=HomepageSection.SectionType.RECENTLY_VIEWED,
+            limit=12,
+        )
+
+        response = self.client.get("/api/home/sections")
+
+        self.assertEqual(response.status_code, 200)
+        section = response.data["data"]["sections"][0]
+        self.assertEqual(section["type"], "recently_viewed")
+        self.assertEqual(section["title"], "محصولات اخیراً مشاهده‌شده")
+        self.assertEqual(section["limit"], 12)
+        self.assertEqual(section["data"], {})

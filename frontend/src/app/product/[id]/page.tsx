@@ -15,6 +15,7 @@ import ProductCard from "@/components/product/ProductCard";
 import FavoriteButton from "@/components/product/FavoriteButton";
 import CompareButton from "@/components/product/CompareButton";
 import JsonLd from "@/components/seo/JsonLd";
+import RecentlyViewedTracker from "@/components/product/RecentlyViewedTracker";
 
 // موجودی و امتیاز لحظه‌ای از دیتابیس خوانده می‌شود
 export const dynamic = "force-dynamic";
@@ -73,6 +74,7 @@ export default async function ProductPage({
 
   return (
     <div className="mx-auto max-w-[90rem] px-4 py-5 lg:px-6">
+      <RecentlyViewedTracker productId={product.id} />
       {/* اسکیمای JSON-LD (محصول + بردکرامب) از پنل سئو */}
       {seo?.schema && <JsonLd data={seo.schema} />}
       {seo?.site.breadcrumbsEnabled && (

@@ -42,6 +42,7 @@ DEFAULT_TITLES: dict[str, str] = {
     HomepageSection.SectionType.DISCOUNTED_PRODUCTS: "تخفیف‌های ویژه",
     HomepageSection.SectionType.NEW_PRODUCTS: "جدیدترین محصولات",
     HomepageSection.SectionType.PRODUCT_COLLECTION: "منتخب فروشگاه",
+    HomepageSection.SectionType.RECENTLY_VIEWED: "محصولات اخیراً مشاهده‌شده",
 }
 
 DEFAULT_LIMITS: dict[str, int] = {
@@ -51,6 +52,7 @@ DEFAULT_LIMITS: dict[str, int] = {
     HomepageSection.SectionType.DISCOUNTED_PRODUCTS: 6,
     HomepageSection.SectionType.NEW_PRODUCTS: 8,
     HomepageSection.SectionType.PRODUCT_COLLECTION: 8,
+    HomepageSection.SectionType.RECENTLY_VIEWED: 10,
 }
 
 # نوع بخش‌هایی که داده‌شان یک فهرست محصول است — پارامترهای انتخاب محصول هرکدام

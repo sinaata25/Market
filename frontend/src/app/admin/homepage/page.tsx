@@ -11,7 +11,8 @@ type SectionType =
   | "best_sellers"
   | "discounted_products"
   | "new_products"
-  | "product_collection";
+  | "product_collection"
+  | "recently_viewed";
 
 type Banner = {
   id: number;
@@ -68,6 +69,7 @@ const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "discounted_products", label: "تخفیف‌های ویژه" },
   { value: "new_products", label: "جدیدترین محصولات" },
   { value: "product_collection", label: "مجموعه محصولات سفارشی" },
+  { value: "recently_viewed", label: "محصولات اخیراً مشاهده‌شده" },
 ];
 
 const SECTION_LABELS = Object.fromEntries(

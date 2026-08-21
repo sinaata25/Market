@@ -62,6 +62,7 @@ def public_section_dto(section: HomepageSection) -> dict | None:
             "type": section_type,
             "position": section.position,
             "title": title,
+            "limit": resolved_limit(section),
             "data": {"banner": banner_dto(section.banner)},
         }
 
@@ -75,6 +76,7 @@ def public_section_dto(section: HomepageSection) -> dict | None:
             "type": section_type,
             "position": section.position,
             "title": title,
+            "limit": resolved_limit(section),
             "data": {
                 "categories": [
                     category_dto(category, visible_ids=visible_ids)
@@ -90,7 +92,19 @@ def public_section_dto(section: HomepageSection) -> dict | None:
             "type": section_type,
             "position": section.position,
             "title": title,
+            "limit": resolved_limit(section),
             "data": {"brands": [brand_dto(brand) for brand in brands]},
+        }
+
+    if section_type == HomepageSection.SectionType.RECENTLY_VIEWED:
+        return {
+            "id": section.id,
+            "type": section_type,
+            "position": section.position,
+            "title": title,
+            "limit": resolved_limit(section),
+            # Visitor-specific data is intentionally loaded from local history.
+            "data": {},
         }
 
     product_types = {
@@ -109,6 +123,7 @@ def public_section_dto(section: HomepageSection) -> dict | None:
         "type": section_type,
         "position": section.position,
         "title": title,
+        "limit": resolved_limit(section),
         "data": {"products": [product_dto(product) for product in products]},
     }
 

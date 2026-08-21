@@ -5,6 +5,7 @@ import type {
   HomepageSection,
   HomepageSectionType,
 } from "@/lib/homepage";
+import RecentlyViewedSection from "@/components/homepage/RecentlyViewedSection";
 
 const BANNER_THEMES: Record<HomepageBanner["theme"], string> = {
   brand: "from-secondary-700 to-brand-600",
@@ -190,6 +191,12 @@ const SECTION_RENDERERS: Partial<
   discounted_products: (section) => <ProductSection section={section} />,
   new_products: (section) => <ProductSection section={section} />,
   product_collection: (section) => <ProductSection section={section} />,
+  recently_viewed: (section) => (
+    <RecentlyViewedSection
+      title={section.title ?? "محصولات اخیراً مشاهده‌شده"}
+      limit={section.limit}
+    />
+  ),
 };
 
 export function HomepageSections({ sections }: { sections: HomepageSection[] }) {
@@ -197,7 +204,11 @@ export function HomepageSections({ sections }: { sections: HomepageSection[] }) 
     <div className="space-y-10">
       {sections.map((section) => {
         const renderer = SECTION_RENDERERS[section.type as HomepageSectionType];
-        return renderer ? <div key={section.id}>{renderer(section)}</div> : null;
+        return renderer ? (
+          <div key={section.id} className="empty:hidden">
+            {renderer(section)}
+          </div>
+        ) : null;
       })}
     </div>
   );
