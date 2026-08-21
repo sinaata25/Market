@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from common.responses import fail, ok
 
-from .category_tree import descendant_category_ids, visible_category_ids
+from .category_tree import visible_category_ids
 from .compare import MAX_COMPARE_PRODUCTS, MIN_COMPARE_PRODUCTS, compare_dto
 from .dto import brand_dto, category_dto, product_dto
 from .feedback import (
@@ -19,16 +19,8 @@ from .feedback import (
     visible_comment_threads,
 )
 from .models import Brand, Category, Product, ProductComment, ProductRating
+from .selectors import filtered_products_queryset
 from .specifications import product_specification_prefetch
-
-SORTS = {
-    "newest": "-created_at",
-    "cheapest": "price",
-    "expensive": "-price",
-    "popular": "-rating_count",
-    # ترتیب انتخاب مدیر برای پرفروش‌ترین‌ها — مستقل از آمار فروش/امتیاز واقعی
-    "featured": ("best_seller_position", "-created_at"),
-}
 
 
 class CategoryLinkResponseSerializer(serializers.Serializer):
@@ -137,45 +129,14 @@ class ProductListView(APIView):
         responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
-        qs = Product.objects.select_related("category", "brand").prefetch_related(
-            "categories", "images"
-        ).filter(is_active=True)
-
-        category = request.query_params.get("category")
-        if category:
-            visible_ids = visible_category_ids()
-            selected_category = Category.objects.filter(
-                slug=category, id__in=visible_ids
-            ).first()
-            if selected_category is not None:
-                category_ids = descendant_category_ids(
-                    selected_category.id, allowed_ids=visible_ids
-                )
-                qs = qs.filter(
-                    Q(category_id__in=category_ids)
-                    | Q(categories__id__in=category_ids)
-                ).distinct()
-            else:
-                qs = qs.none()
-
-        brand = request.query_params.get("brand")
-        if brand:
-            qs = qs.filter(brand__slug=brand, brand__is_active=True)
-
-        search = request.query_params.get("search")
-        if search:
-            qs = qs.filter(title__contains=search)
-
-        if request.query_params.get("discounted") in ("true", "1"):
-            qs = qs.filter(old_price__isnull=False)
-
-        # پرفروش‌ترین‌ها انتخاب دستی مدیر است، نه آمار فروش/امتیاز واقعی
-        if request.query_params.get("bestSeller") in ("true", "1"):
-            qs = qs.filter(is_best_seller=True)
-
-        sort = request.query_params.get("sort", "newest")
-        order = SORTS.get(sort, "-created_at")
-        qs = qs.order_by(*order) if isinstance(order, tuple) else qs.order_by(order)
+        qs = filtered_products_queryset(
+            category_slug=request.query_params.get("category"),
+            brand_slug=request.query_params.get("brand"),
+            search=request.query_params.get("search"),
+            discounted=request.query_params.get("discounted") in ("true", "1"),
+            best_seller=request.query_params.get("bestSeller") in ("true", "1"),
+            sort=request.query_params.get("sort", "newest"),
+        )
 
         try:
             page = max(1, int(request.query_params.get("page", 1)))
