@@ -75,7 +75,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           icon="💰"
-          label="درآمد کل"
+          label="میزان فروش"
           value={`${formatPrice(totals.revenue)} تومان`}
           accent="bg-emerald-50 text-emerald-600"
         />
