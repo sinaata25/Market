@@ -80,7 +80,7 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(created.status_code, 201)
         self.assertEqual(
             set(created.data["data"]["product"]),
-            PRODUCT_RESPONSE_KEYS | {"specifications"},
+            PRODUCT_RESPONSE_KEYS | {"specifications", "recommendedProducts"},
         )
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(
@@ -314,7 +314,11 @@ class AdminApiContractTests(TestCase):
         )
         retrieved = self.client.get(f"/api/admin/products/{product.id}")
 
-        expected_keys = PRODUCT_RESPONSE_KEYS | {"imageItems", "specifications"}
+        expected_keys = PRODUCT_RESPONSE_KEYS | {
+            "imageItems",
+            "specifications",
+            "recommendedProducts",
+        }
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(
             set(updated.data["data"]["product"]), expected_keys
