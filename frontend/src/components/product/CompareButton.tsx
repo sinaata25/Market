@@ -44,7 +44,7 @@ export default function CompareButton({ product }: { product: Product }) {
         aria-pressed={active}
         aria-label={label}
         title={label}
-        className={`grid h-9 w-9 place-items-center rounded-xl border text-base transition disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-10 ${
+        className={`grid h-10 w-10 place-items-center rounded-xl border text-base transition disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11 ${
           active
             ? "border-brand-300 bg-brand-50 text-brand-700"
             : "border-slate-200 bg-white text-slate-500 hover:border-brand-200"

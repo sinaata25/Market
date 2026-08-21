@@ -87,6 +87,37 @@ class AdminApiContractTests(TestCase):
             set(listed.data["data"]["products"][0]), PRODUCT_RESPONSE_KEYS
         )
 
+    def test_product_can_be_created_without_warranty(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertIsNone(created.data["data"]["product"]["warranty"])
+        product = Product.objects.get(pk=created.data["data"]["product"]["id"])
+        self.assertEqual(product.warranty, "")
+
+    def test_product_warranty_can_be_set_and_later_cleared(self):
+        created = self.client.post(
+            "/api/admin/products",
+            self.product_payload(warranty="۱۸ ماه گارانتی شرکتی"),
+            format="json",
+        )
+        product_id = created.data["data"]["product"]["id"]
+        self.assertEqual(
+            created.data["data"]["product"]["warranty"], "۱۸ ماه گارانتی شرکتی"
+        )
+
+        cleared = self.client.patch(
+            f"/api/admin/products/{product_id}",
+            self.product_payload(warranty=""),
+            format="json",
+        )
+
+        self.assertEqual(cleared.status_code, 200)
+        self.assertIsNone(cleared.data["data"]["product"]["warranty"])
+        self.assertEqual(Product.objects.get(pk=product_id).warranty, "")
+
     def test_product_can_be_assigned_to_multiple_categories(self):
         second_category = Category.objects.create(
             slug="irrigation", title="آبیاری"

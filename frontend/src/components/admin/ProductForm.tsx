@@ -457,7 +457,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 value={form.warranty}
                 onChange={(e) => set("warranty", e.target.value)}
                 className={inputCls()}
-                placeholder="۱۸ ماه گارانتی شرکتی"
+                placeholder="اختیاری — مثلا: ۱۸ ماه گارانتی شرکتی"
               />
             </div>
             <div>

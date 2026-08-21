@@ -36,12 +36,14 @@ export default function BuyBox({ product }: { product: Product }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-4 lg:sticky lg:top-28">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6 lg:sticky lg:top-28">
       {/* تضمین‌ها */}
-      <ul className="mb-4 space-y-2.5 text-xs text-slate-600">
-        <li className="flex items-center gap-2">
-          <span className="text-brand-600">✅</span> {product.warranty}
-        </li>
+      <ul className="mb-5 space-y-3 text-sm text-slate-600">
+        {product.warranty && (
+          <li className="flex items-center gap-2">
+            <span className="text-brand-600">✅</span> {product.warranty}
+          </li>
+        )}
         <li className="flex items-center gap-2">
           <span className="text-brand-600">🚚</span> ارسال به سراسر کشور
         </li>
@@ -54,16 +56,16 @@ export default function BuyBox({ product }: { product: Product }) {
       {typeof product.stock === "number" &&
         product.stock > 0 &&
         product.stock <= 5 && (
-          <p className="mb-3 text-xs font-medium text-red-500 font-num">
+          <p className="mb-4 text-sm font-medium text-red-500 font-num">
             تنها {product.stock.toLocaleString("fa-IR")} عدد در انبار باقی مانده
           </p>
         )}
 
       {/* قیمت */}
-      <div className="mb-4">
+      <div className="mb-5">
         {product.oldPrice && (
-          <div className="mb-1 flex items-center gap-2">
-            <span className="rounded-md bg-accent-500 px-1.5 py-0.5 text-[11px] font-bold text-secondary-900 font-num">
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="rounded-md bg-accent-500 px-2 py-1 text-xs font-bold text-secondary-900 font-num">
               ٪{discount.toLocaleString("fa-IR")}
             </span>
             <span className="text-sm text-slate-300 line-through font-num">
@@ -71,36 +73,36 @@ export default function BuyBox({ product }: { product: Product }) {
             </span>
           </div>
         )}
-        <div className="flex items-baseline justify-end gap-1">
-          <span className="text-xl font-bold text-slate-800 font-num">
+        <div className="flex items-baseline justify-end gap-1.5">
+          <span className="text-2xl font-bold text-slate-800 font-num sm:text-[28px]">
             {formatPrice(product.price)}
           </span>
-          <span className="text-sm text-slate-400">تومان</span>
+          <span className="text-base text-slate-400">تومان</span>
         </div>
       </div>
 
       {/* تعداد */}
-      <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 px-2 py-1.5">
-        <span className="text-xs text-slate-500">تعداد</span>
-        <div className="flex items-center gap-3">
+      <div className="mb-5 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5">
+        <span className="text-sm text-slate-500">تعداد</span>
+        <div className="flex items-center gap-4">
           <button
             onClick={() =>
               setQty((q) => Math.min(product.stock ?? 99, q + 1))
             }
             disabled={qty >= (product.stock ?? 99)}
             aria-label="افزایش تعداد"
-            className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-brand-600 hover:bg-slate-200 disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-base text-brand-600 hover:bg-slate-200 disabled:opacity-40"
           >
             +
           </button>
-          <span className="w-6 text-center font-num text-sm">
+          <span className="w-7 text-center font-num text-base">
             {qty.toLocaleString("fa-IR")}
           </span>
           <button
             onClick={() => setQty((q) => Math.max(1, q - 1))}
             disabled={qty <= 1}
             aria-label="کاهش تعداد"
-            className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-base text-slate-500 hover:bg-slate-200 disabled:opacity-40"
           >
             −
           </button>
@@ -111,7 +113,7 @@ export default function BuyBox({ product }: { product: Product }) {
       <button
         onClick={addToCart}
         disabled={loading || outOfStock}
-        className="w-full rounded-xl bg-brand-600 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl bg-brand-600 py-4 text-base font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {outOfStock
           ? "ناموجود"
@@ -122,7 +124,7 @@ export default function BuyBox({ product }: { product: Product }) {
 
       {message && (
         <p
-          className={`mt-3 text-center text-xs ${
+          className={`mt-4 text-center text-sm ${
             message.type === "ok" ? "text-brand-700" : "text-red-500"
           }`}
         >

@@ -73,6 +73,30 @@ class ProductApiContractTests(TestCase):
         self.assertEqual(len(data["related"]), 1)
         self.assertEqual(set(data["related"][0]), PRODUCT_RESPONSE_KEYS)
 
+    def test_product_without_warranty_returns_null_not_a_default_value(self):
+        self.assertEqual(self.product.warranty, "")
+
+        list_response = self.client.get("/api/products")
+        detail_response = self.client.get(f"/api/products/{self.product.id}")
+
+        listed = next(
+            item
+            for item in list_response.data["data"]["items"]
+            if item["id"] == self.product.id
+        )
+        self.assertIsNone(listed["warranty"])
+        self.assertIsNone(detail_response.data["data"]["product"]["warranty"])
+
+    def test_product_with_warranty_returns_its_actual_value(self):
+        self.product.warranty = "۱۸ ماه گارانتی شرکتی"
+        self.product.save(update_fields=["warranty"])
+
+        response = self.client.get(f"/api/products/{self.product.id}")
+
+        self.assertEqual(
+            response.data["data"]["product"]["warranty"], "۱۸ ماه گارانتی شرکتی"
+        )
+
 
 class ProductFeedbackContractTests(TestCase):
     def setUp(self):
