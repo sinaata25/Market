@@ -77,9 +77,13 @@ def product_dto(product: Product, *, include_specifications: bool = False) -> di
             f"{product.title} با کیفیت مناسب و قیمت رقابتی، یکی از محصولات "
             f"پرطرفدار دسته {category.title} است که با ضمانت اصالت کالا عرضه می‌شود."
         ),
-        "warranty": product.warranty or "۱۲ ماه ضمانت فروشگاه",
+        # گارانتی اختیاری است — بدون مقدار پیش‌فرض؛ در نبود مقدار واقعی null برگردانده می‌شود
+        "warranty": product.warranty or None,
         "stock": product.stock,
         "isActive": product.is_active,
+        # انتخاب دستی مدیر برای بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش/امتیاز واقعی
+        "isBestSeller": product.is_best_seller,
+        "bestSellerPosition": product.best_seller_position,
     }
     if include_specifications:
         data["specifications"] = [

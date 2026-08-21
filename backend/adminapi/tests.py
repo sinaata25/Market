@@ -33,6 +33,8 @@ PRODUCT_RESPONSE_KEYS = {
     "warranty",
     "stock",
     "isActive",
+    "isBestSeller",
+    "bestSellerPosition",
 }
 
 
@@ -78,12 +80,43 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(created.status_code, 201)
         self.assertEqual(
             set(created.data["data"]["product"]),
-            PRODUCT_RESPONSE_KEYS | {"specifications"},
+            PRODUCT_RESPONSE_KEYS | {"specifications", "recommendedProducts"},
         )
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(
             set(listed.data["data"]["products"][0]), PRODUCT_RESPONSE_KEYS
         )
+
+    def test_product_can_be_created_without_warranty(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertIsNone(created.data["data"]["product"]["warranty"])
+        product = Product.objects.get(pk=created.data["data"]["product"]["id"])
+        self.assertEqual(product.warranty, "")
+
+    def test_product_warranty_can_be_set_and_later_cleared(self):
+        created = self.client.post(
+            "/api/admin/products",
+            self.product_payload(warranty="۱۸ ماه گارانتی شرکتی"),
+            format="json",
+        )
+        product_id = created.data["data"]["product"]["id"]
+        self.assertEqual(
+            created.data["data"]["product"]["warranty"], "۱۸ ماه گارانتی شرکتی"
+        )
+
+        cleared = self.client.patch(
+            f"/api/admin/products/{product_id}",
+            self.product_payload(warranty=""),
+            format="json",
+        )
+
+        self.assertEqual(cleared.status_code, 200)
+        self.assertIsNone(cleared.data["data"]["product"]["warranty"])
+        self.assertEqual(Product.objects.get(pk=product_id).warranty, "")
 
     def test_product_can_be_assigned_to_multiple_categories(self):
         second_category = Category.objects.create(
@@ -165,6 +198,85 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(shown.data["data"]["product"]["isActive"], True)
         self.assertEqual(self.client.get(f"/api/products/{product_id}").status_code, 200)
 
+    def test_admin_can_mark_and_unmark_product_as_best_seller(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+        product_id = created.data["data"]["product"]["id"]
+        self.assertEqual(created.data["data"]["product"]["isBestSeller"], False)
+
+        marked = self.client.patch(
+            f"/api/admin/products/{product_id}/best-seller",
+            {"isBestSeller": True, "position": 2},
+            format="json",
+        )
+        self.assertEqual(marked.status_code, 200)
+        self.assertEqual(marked.data["data"]["product"]["isBestSeller"], True)
+        self.assertEqual(marked.data["data"]["product"]["bestSellerPosition"], 2)
+        self.assertEqual(
+            self.client.get("/api/products?bestSeller=true").data["data"]["total"],
+            1,
+        )
+
+        unmarked = self.client.patch(
+            f"/api/admin/products/{product_id}/best-seller",
+            {"isBestSeller": False},
+            format="json",
+        )
+        self.assertEqual(unmarked.status_code, 200)
+        self.assertEqual(unmarked.data["data"]["product"]["isBestSeller"], False)
+        # موقعیت ذخیره‌شده حفظ می‌شود؛ فقط ارسال ندادنش تغییرش نمی‌دهد
+        self.assertEqual(unmarked.data["data"]["product"]["bestSellerPosition"], 2)
+        self.assertEqual(
+            self.client.get("/api/products?bestSeller=true").data["data"]["total"],
+            0,
+        )
+
+    def test_hidden_product_can_be_marked_best_seller_without_becoming_visible(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+        product_id = created.data["data"]["product"]["id"]
+        self.client.patch(
+            f"/api/admin/products/{product_id}/visibility",
+            {"isActive": False},
+            format="json",
+        )
+
+        self.client.patch(
+            f"/api/admin/products/{product_id}/best-seller",
+            {"isBestSeller": True},
+            format="json",
+        )
+
+        self.assertEqual(
+            self.client.get("/api/products?bestSeller=true").data["data"]["total"],
+            0,
+        )
+        self.assertEqual(
+            self.client.get(f"/api/products/{product_id}").status_code, 404
+        )
+
+    def test_non_staff_cannot_change_best_seller_status(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+        product_id = created.data["data"]["product"]["id"]
+        non_staff = get_user_model().objects.create_user(phone="09129999999")
+        client = APIClient()
+        client.force_authenticate(non_staff)
+
+        response = client.patch(
+            f"/api/admin/products/{product_id}/best-seller",
+            {"isBestSeller": True},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Product.objects.get(pk=product_id).is_best_seller
+        )
+
     def test_new_product_can_receive_an_image_after_creation(self):
         created = self.client.post(
             "/api/admin/products", self.product_payload(), format="json"
@@ -202,7 +314,11 @@ class AdminApiContractTests(TestCase):
         )
         retrieved = self.client.get(f"/api/admin/products/{product.id}")
 
-        expected_keys = PRODUCT_RESPONSE_KEYS | {"imageItems", "specifications"}
+        expected_keys = PRODUCT_RESPONSE_KEYS | {
+            "imageItems",
+            "specifications",
+            "recommendedProducts",
+        }
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(
             set(updated.data["data"]["product"]), expected_keys

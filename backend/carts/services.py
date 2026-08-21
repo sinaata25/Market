@@ -1,12 +1,16 @@
 """منطق سبد خرید: سبد مهمان در سشن، سبد کاربر، و ادغام پس از ورود"""
 
-from django.db import transaction
+import logging
+
+from django.db import DatabaseError, transaction
 
 from catalog.dto import product_dto
+from catalog.recommendations import cart_recommendation_dtos
 
 from .models import Cart, CartItem
 
 SESSION_KEY = "cart_token"
+logger = logging.getLogger(__name__)
 
 
 def get_current_cart(request) -> Cart | None:
@@ -86,13 +90,25 @@ def merge_guest_cart_into_user(request, user) -> None:
 def cart_dto(cart: Cart | None) -> dict:
     """خلاصه‌ی قابل ارسال به کلاینت"""
     items = []
+    cart_products = []
     if cart is not None:
-        items = [
-            {"id": i.id, "qty": i.qty, "product": product_dto(i.product)}
-            for i in cart.items.select_related(
+        cart_items = list(
+            cart.items.select_related(
                 "product__category", "product__brand"
             ).prefetch_related("product__categories", "product__images")
+        )
+        cart_products = [item.product for item in cart_items]
+        items = [
+            {"id": i.id, "qty": i.qty, "product": product_dto(i.product)}
+            for i in cart_items
         ]
+
+    try:
+        recommendations = cart_recommendation_dtos(cart_products)
+    except DatabaseError:
+        # This optional cross-sell must never make the cart or checkout unusable.
+        logger.exception("Could not load optional cart recommendations")
+        recommendations = []
 
     items_price = sum(
         (i["product"]["oldPrice"] or i["product"]["price"]) * i["qty"] for i in items
@@ -105,4 +121,5 @@ def cart_dto(cart: Cart | None) -> dict:
         "itemsPrice": items_price,
         "discount": items_price - total_price,
         "totalPrice": total_price,
+        "recommendations": recommendations,
     }

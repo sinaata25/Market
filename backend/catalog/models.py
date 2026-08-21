@@ -114,6 +114,14 @@ class Product(models.Model):
     warranty = models.CharField("گارانتی", max_length=100, blank=True)
     stock = models.PositiveIntegerField("موجودی", default=10)
     is_active = models.BooleanField("نمایش در فروشگاه", default=True)
+    is_best_seller = models.BooleanField(
+        "پرفروش ویژه (انتخاب مدیر)",
+        default=False,
+        help_text="نمایش در بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش واقعی",
+    )
+    best_seller_position = models.PositiveIntegerField(
+        "ترتیب در پرفروش‌ترین‌ها", default=0
+    )
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     category = models.ForeignKey(
@@ -143,6 +151,52 @@ class Product(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class ProductRecommendation(models.Model):
+    """Directed, manually curated cross-sell relationship between products."""
+
+    source_product = models.ForeignKey(
+        Product,
+        verbose_name="محصول اصلی",
+        on_delete=models.CASCADE,
+        related_name="recommendation_links",
+    )
+    recommended_product = models.ForeignKey(
+        Product,
+        verbose_name="محصول پیشنهادی",
+        on_delete=models.CASCADE,
+        related_name="recommended_by_links",
+    )
+    position = models.PositiveSmallIntegerField("ترتیب")
+
+    class Meta:
+        verbose_name = "محصول پیشنهادی"
+        verbose_name_plural = "محصولات پیشنهادی"
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_product", "recommended_product"],
+                name="catalog_unique_product_recommendation",
+            ),
+            models.UniqueConstraint(
+                fields=["source_product", "position"],
+                name="catalog_unique_recommendation_position",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(
+                    source_product=models.F("recommended_product")
+                ),
+                name="catalog_recommendation_not_self",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(position__lte=2),
+                name="catalog_recommendation_position_max_three",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source_product} ← {self.recommended_product}"
 
 
 class ProductSpecification(models.Model):

@@ -14,6 +14,7 @@ from .models import (
     ProductComment,
     ProductImage,
     ProductRating,
+    ProductRecommendation,
     ProductSpecification,
     SpecificationKey,
 )
@@ -28,6 +29,15 @@ class ProductSpecificationInline(admin.TabularInline):
     model = ProductSpecification
     extra = 1
     autocomplete_fields = ["key"]
+    ordering = ["position", "id"]
+
+
+class ProductRecommendationInline(admin.TabularInline):
+    model = ProductRecommendation
+    fk_name = "source_product"
+    extra = 0
+    max_num = 3
+    autocomplete_fields = ["recommended_product"]
     ordering = ["position", "id"]
 
 
@@ -224,7 +234,11 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ["title", "title_en"]
     list_editable = ["price", "old_price", "stock", "is_active"]
     filter_horizontal = ["categories"]
-    inlines = [ProductImageInline, ProductSpecificationInline]
+    inlines = [
+        ProductImageInline,
+        ProductSpecificationInline,
+        ProductRecommendationInline,
+    ]
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)

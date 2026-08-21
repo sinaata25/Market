@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatPrice, type Product } from "@/lib/products";
 import AddToCartButton from "@/components/product/AddToCartButton";
+import CompareButton from "@/components/product/CompareButton";
 
 export default function ProductCard({ product }: { product: Product }) {
   const discount = product.oldPrice
@@ -79,11 +80,14 @@ export default function ProductCard({ product }: { product: Product }) {
             </span>
           </div>
         </div>
-        <AddToCartButton
-          productId={product.id}
-          productTitle={product.title}
-          stock={product.stock}
-        />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <CompareButton product={product} />
+          <AddToCartButton
+            productId={product.id}
+            productTitle={product.title}
+            stock={product.stock}
+          />
+        </div>
       </div>
     </article>
   );

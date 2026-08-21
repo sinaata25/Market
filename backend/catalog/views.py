@@ -1,5 +1,6 @@
 import math
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 from drf_spectacular.types import OpenApiTypes
@@ -9,7 +10,8 @@ from rest_framework.views import APIView
 
 from common.responses import fail, ok
 
-from .category_tree import descendant_category_ids, visible_category_ids
+from .category_tree import visible_category_ids
+from .compare import MAX_COMPARE_PRODUCTS, MIN_COMPARE_PRODUCTS, compare_dto
 from .dto import brand_dto, category_dto, product_dto
 from .feedback import (
     has_purchased_product,
@@ -17,14 +19,8 @@ from .feedback import (
     visible_comment_threads,
 )
 from .models import Brand, Category, Product, ProductComment, ProductRating
+from .selectors import filtered_products_queryset
 from .specifications import product_specification_prefetch
-
-SORTS = {
-    "newest": "-created_at",
-    "cheapest": "price",
-    "expensive": "-price",
-    "popular": "-rating_count",
-}
 
 
 class CategoryLinkResponseSerializer(serializers.Serializer):
@@ -118,6 +114,12 @@ class ProductListView(APIView):
             OpenApiParameter(
                 "discounted", OpenApiTypes.BOOL, OpenApiParameter.QUERY
             ),
+            OpenApiParameter(
+                "bestSeller",
+                OpenApiTypes.BOOL,
+                OpenApiParameter.QUERY,
+                description="Only products the admin marked as best-selling.",
+            ),
             OpenApiParameter("sort", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter("page", OpenApiTypes.INT, OpenApiParameter.QUERY),
             OpenApiParameter(
@@ -127,40 +129,14 @@ class ProductListView(APIView):
         responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
-        qs = Product.objects.select_related("category", "brand").prefetch_related(
-            "categories", "images"
-        ).filter(is_active=True)
-
-        category = request.query_params.get("category")
-        if category:
-            visible_ids = visible_category_ids()
-            selected_category = Category.objects.filter(
-                slug=category, id__in=visible_ids
-            ).first()
-            if selected_category is not None:
-                category_ids = descendant_category_ids(
-                    selected_category.id, allowed_ids=visible_ids
-                )
-                qs = qs.filter(
-                    Q(category_id__in=category_ids)
-                    | Q(categories__id__in=category_ids)
-                ).distinct()
-            else:
-                qs = qs.none()
-
-        brand = request.query_params.get("brand")
-        if brand:
-            qs = qs.filter(brand__slug=brand, brand__is_active=True)
-
-        search = request.query_params.get("search")
-        if search:
-            qs = qs.filter(title__contains=search)
-
-        if request.query_params.get("discounted") in ("true", "1"):
-            qs = qs.filter(old_price__isnull=False)
-
-        sort = request.query_params.get("sort", "newest")
-        qs = qs.order_by(SORTS.get(sort, "-created_at"))
+        qs = filtered_products_queryset(
+            category_slug=request.query_params.get("category"),
+            brand_slug=request.query_params.get("brand"),
+            search=request.query_params.get("search"),
+            discounted=request.query_params.get("discounted") in ("true", "1"),
+            best_seller=request.query_params.get("bestSeller") in ("true", "1"),
+            sort=request.query_params.get("sort", "newest"),
+        )
 
         try:
             page = max(1, int(request.query_params.get("page", 1)))
@@ -179,6 +155,44 @@ class ProductListView(APIView):
                 "page": page,
                 "perPage": per_page,
                 "pages": math.ceil(total / per_page),
+            }
+        )
+
+
+class ProductBulkView(APIView):
+    """Current public product DTOs for up to 15 IDs, preserving request order."""
+
+    MAX_IDS = 15
+
+    def get(self, request):
+        raw_ids = request.query_params.get("ids", "")
+        parts = [part.strip() for part in raw_ids.split(",") if part.strip()]
+        if not parts:
+            return ok({"items": []})
+        if len(parts) > self.MAX_IDS:
+            return fail("حداکثر ۱۵ محصول قابل دریافت است", 422)
+        try:
+            ids = [int(part) for part in parts]
+        except ValueError:
+            return fail("شناسه محصولات نامعتبر است", 422)
+        if any(product_id < 1 for product_id in ids):
+            return fail("شناسه محصولات نامعتبر است", 422)
+
+        # Deduplicate without changing the visitor's newest-first order.
+        ids = list(dict.fromkeys(ids))
+        products = (
+            Product.objects.select_related("category", "brand")
+            .prefetch_related("categories", "images")
+            .filter(pk__in=ids, is_active=True)
+        )
+        products_by_id = {product.id: product for product in products}
+        return ok(
+            {
+                "items": [
+                    product_dto(products_by_id[product_id])
+                    for product_id in ids
+                    if product_id in products_by_id
+                ]
             }
         )
 
@@ -251,6 +265,36 @@ class ProductBySlugView(APIView):
             return fail("محصول یافت نشد", 404)
         view = ProductDetailView()
         return view.get(request, pk=product_id)
+
+
+class CompareRequestSerializer(serializers.Serializer):
+    productIds = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=MIN_COMPARE_PRODUCTS,
+        max_length=MAX_COMPARE_PRODUCTS,
+        error_messages={
+            "required": "شناسه محصولات الزامی است",
+            "min_length": f"برای مقایسه حداقل {MIN_COMPARE_PRODUCTS} محصول لازم است",
+            "max_length": f"حداکثر {MAX_COMPARE_PRODUCTS} محصول را می‌توان هم‌زمان مقایسه کرد",
+        },
+    )
+
+
+class ProductCompareView(APIView):
+    """مقایسه‌ی ۲ تا ۵ محصول هم‌دسته — اعتبارسنجی سمت سرور، مستقل از فرانت"""
+
+    @extend_schema(
+        request=CompareRequestSerializer,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def post(self, request):
+        ser = CompareRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            data = compare_dto(ser.validated_data["productIds"])
+        except ValidationError as exc:
+            return fail(exc.messages[0], 409)
+        return ok(data)
 
 
 class RatingWriteSerializer(serializers.Serializer):

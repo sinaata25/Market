@@ -42,7 +42,7 @@ export default function FavoriteButton({ productId }: { productId: number }) {
       onClick={toggle}
       disabled={busy}
       title={favorited ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
-      className={`grid h-9 w-9 place-items-center rounded-xl border text-base transition disabled:opacity-50 ${
+      className={`grid h-10 w-10 place-items-center rounded-xl border text-base transition disabled:opacity-50 sm:h-11 sm:w-11 ${
         favorited
           ? "border-red-200 bg-red-50"
           : "border-slate-200 bg-white hover:border-red-200"

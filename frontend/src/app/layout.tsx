@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import CompareTray from "@/components/product/CompareTray";
 
 // فونت فارسی وزیرمتن — به‌صورت محلی host می‌شود (بدون وابستگی به اینترنت)
 const vazirmatn = localFont({
@@ -31,8 +32,9 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" className={`${vazirmatn.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-background text-foreground antialiased font-sans">
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-20">{children}</main>
         <Footer />
+        <CompareTray />
       </body>
     </html>
   );

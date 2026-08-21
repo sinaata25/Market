@@ -32,6 +32,7 @@ const SHOP_NAV = [
   { href: "/admin/users", icon: "👥", label: "کاربران" },
   { href: "/admin/comments", icon: "💬", label: "دیدگاه‌ها و پرسش‌ها" },
   { href: "/admin/blog", icon: "📝", label: "وبلاگ" },
+  { href: "/admin/homepage", icon: "🏠", label: "صفحه اصلی" },
   { href: "/admin/content", icon: "📄", label: "محتوای صفحات" },
 ];
 

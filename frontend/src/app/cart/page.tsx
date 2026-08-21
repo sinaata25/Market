@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { formatPrice } from "@/lib/products";
+import ProductCard from "@/components/product/ProductCard";
+import { formatPrice, type Product } from "@/lib/products";
 import { api } from "@/lib/client-api";
 
 type CartItem = {
@@ -24,6 +25,12 @@ type Cart = {
   itemsPrice: number;
   discount: number;
   totalPrice: number;
+  recommendations?: CartRecommendation[];
+};
+
+type CartRecommendation = {
+  product: Product;
+  recommendedFor: { id: number; title: string }[];
 };
 
 type CheckoutInfo = {
@@ -74,6 +81,8 @@ export default function CartPage() {
 
   useEffect(() => {
     loadCart();
+    const refreshCart = () => void loadCart();
+    window.addEventListener("cart:updated", refreshCart);
     // آدرس‌های ذخیره‌شده کاربر (اگر لاگین باشد)
     api
       .get<{ addresses: SavedAddress[] }>("/api/auth/addresses")
@@ -86,6 +95,7 @@ export default function CartPage() {
           if (def) setSelectedAddress(def.id);
         }
       });
+    return () => window.removeEventListener("cart:updated", refreshCart);
   }, []);
 
   function notifyHeader() {
@@ -293,6 +303,32 @@ export default function CartPage() {
               </div>
             </div>
           ))}
+
+          {(cart.recommendations?.length ?? 0) > 0 && (
+            <section className="mt-5 rounded-3xl border border-brand-100 bg-brand-50/40 p-4 sm:p-5">
+              <div className="mb-4">
+                <h2 className="text-base font-bold text-slate-800">
+                  پیشنهاد برای خرید شما
+                </h2>
+                <p className="mt-1 text-xs leading-6 text-slate-500">
+                  این محصولات مکمل اختیاری هستند؛ بدون افزودن آن‌ها هم می‌توانید
+                  خرید را ادامه دهید.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                {cart.recommendations?.map((recommendation) => (
+                  <div key={recommendation.product.id} className="min-w-0">
+                    <p className="mb-2 truncate px-1 text-[11px] text-brand-700">
+                      پیشنهاد برای {recommendation.recommendedFor
+                        .map((product) => product.title)
+                        .join("، ")}
+                    </p>
+                    <ProductCard product={recommendation.product} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {error && !checkout && (
             <p className="text-xs text-red-500">{error}</p>

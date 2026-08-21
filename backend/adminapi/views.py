@@ -33,6 +33,12 @@ from catalog.models import (
     ProductRating,
     SpecificationKey,
 )
+from catalog.recommendations import (
+    RecommendationValidationError,
+    product_recommendation_prefetch,
+    recommended_products_dto,
+    replace_product_recommendations,
+)
 from catalog.specifications import (
     MAX_SPECIFICATION_POSITION,
     normalize_specification_name,
@@ -81,6 +87,13 @@ def admin_product_dto(product: Product) -> dict:
     data["imageItems"] = [
         {"id": img.id, "url": img.image.url} for img in product.images.all()
     ]
+    data["recommendedProducts"] = recommended_products_dto(product)
+    return data
+
+
+def admin_created_product_dto(product: Product) -> dict:
+    data = product_dto(product, include_specifications=True)
+    data["recommendedProducts"] = recommended_products_dto(product)
     return data
 
 
@@ -834,8 +847,22 @@ class ProductWriteSerializer(serializers.Serializer):
     specifications = ProductSpecificationWriteSerializer(
         many=True, required=False, allow_empty=True, max_length=100
     )
+    recommendedProductIds = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=True,
+        max_length=3,
+    )
 
     def validate(self, data):
+        recommendation_ids = data.pop("recommendedProductIds", None)
+        if recommendation_ids is not None and len(recommendation_ids) != len(
+            set(recommendation_ids)
+        ):
+            raise serializers.ValidationError(
+                {"recommendedProductIds": "محصول پیشنهادی تکراری مجاز نیست"}
+            )
+        data["recommendation_ids"] = recommendation_ids
         raw_specifications = data.pop("specifications", None)
         data["specification_items"] = (
             validate_specification_inputs(raw_specifications)
@@ -906,18 +933,29 @@ class AdminProductListView(StaffRequiredMixin, APIView):
         ser.is_valid(raise_exception=True)
         data = dict(ser.validated_data)
         specification_items = data.pop("specification_items")
-        product = save_product_with_specifications(
-            product=Product(), data=data, specification_items=specification_items
-        )
+        recommendation_ids = data.pop("recommendation_ids")
+        try:
+            with transaction.atomic():
+                product = save_product_with_specifications(
+                    product=Product(),
+                    data=data,
+                    specification_items=specification_items,
+                )
+                replace_product_recommendations(product, recommendation_ids or [])
+        except RecommendationValidationError as exc:
+            return fail(str(exc), 422)
         product = (
             Product.objects.select_related("category", "brand")
             .prefetch_related(
-                "categories", "images", product_specification_prefetch()
+                "categories",
+                "images",
+                product_specification_prefetch(),
+                product_recommendation_prefetch(),
             )
             .get(pk=product.pk)
         )
         return ok(
-            {"product": product_dto(product, include_specifications=True)}, status=201
+            {"product": admin_created_product_dto(product)}, status=201
         )
 
 
@@ -926,7 +964,10 @@ class AdminProductDetailView(StaffRequiredMixin, APIView):
         return (
             Product.objects.select_related("category", "brand")
             .prefetch_related(
-                "categories", "images", product_specification_prefetch()
+                "categories",
+                "images",
+                product_specification_prefetch(),
+                product_recommendation_prefetch(),
             )
             .filter(pk=pk)
             .first()
@@ -946,9 +987,18 @@ class AdminProductDetailView(StaffRequiredMixin, APIView):
         ser.is_valid(raise_exception=True)
         data = dict(ser.validated_data)
         specification_items = data.pop("specification_items")
-        save_product_with_specifications(
-            product=product, data=data, specification_items=specification_items
-        )
+        recommendation_ids = data.pop("recommendation_ids")
+        try:
+            with transaction.atomic():
+                product = save_product_with_specifications(
+                    product=product,
+                    data=data,
+                    specification_items=specification_items,
+                )
+                if recommendation_ids is not None:
+                    replace_product_recommendations(product, recommendation_ids)
+        except RecommendationValidationError as exc:
+            return fail(str(exc), 422)
         return ok({"product": admin_product_dto(self._get(pk))})
 
     def delete(self, request, pk: int):
@@ -978,7 +1028,10 @@ class AdminProductVisibilityView(StaffRequiredMixin, APIView):
         product = (
             Product.objects.select_related("category", "brand")
             .prefetch_related(
-                "categories", "images", product_specification_prefetch()
+                "categories",
+                "images",
+                product_specification_prefetch(),
+                product_recommendation_prefetch(),
             )
             .filter(pk=pk)
             .first()
@@ -987,6 +1040,39 @@ class AdminProductVisibilityView(StaffRequiredMixin, APIView):
             return fail("محصول یافت نشد", 404)
         product.is_active = serializer.validated_data["isActive"]
         product.save(update_fields=["is_active"])
+        return ok({"product": admin_product_dto(product)})
+
+
+class ProductBestSellerSerializer(serializers.Serializer):
+    isBestSeller = serializers.BooleanField()
+    position = serializers.IntegerField(min_value=0, required=False)
+
+
+class AdminProductBestSellerView(StaffRequiredMixin, APIView):
+    """انتخاب/حذف دستی محصول از بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش واقعی"""
+
+    def patch(self, request, pk: int):
+        serializer = ProductBestSellerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = (
+            Product.objects.select_related("category", "brand")
+            .prefetch_related(
+                "categories",
+                "images",
+                product_specification_prefetch(),
+                product_recommendation_prefetch(),
+            )
+            .filter(pk=pk)
+            .first()
+        )
+        if product is None:
+            return fail("محصول یافت نشد", 404)
+        product.is_best_seller = serializer.validated_data["isBestSeller"]
+        update_fields = ["is_best_seller"]
+        if "position" in serializer.validated_data:
+            product.best_seller_position = serializer.validated_data["position"]
+            update_fields.append("best_seller_position")
+        product.save(update_fields=update_fields)
         return ok({"product": admin_product_dto(product)})
 
 
@@ -1017,7 +1103,10 @@ class AdminProductImageView(StaffRequiredMixin, APIView):
                 "product": admin_product_dto(
                     Product.objects.select_related("category", "brand")
                     .prefetch_related(
-                        "categories", "images", product_specification_prefetch()
+                        "categories",
+                        "images",
+                        product_specification_prefetch(),
+                        product_recommendation_prefetch(),
                     )
                     .get(pk=pk)
                 )
