@@ -24,6 +24,11 @@ history. `items_price`, `discount`, `shipping_price`, and `total_price` are inte
 toman snapshots. Status choices are the allowed state vocabulary; canceled is
 terminal in current behavior.
 
+Delivery snapshots also include nullable official `province_code` and `city_code`
+values. Existing orders retain their historic strings with null codes. New manual
+checkout locations are validated by the application-owned 1404 reference dataset;
+saved legacy addresses remain usable and copy their strings/codes as-is.
+
 `OrderItem` stores the product foreign key plus copied `title` and `price`. The
 copies preserve what was purchased if catalog title/price later changes. Product
 deletion is protected/nullable according to the model relationship; contributor
@@ -31,11 +36,11 @@ code should use snapshot fields for historical display and accounting.
 
 ## Input validation
 
-`CreateOrderSerializer` validates recipient, canonical Iranian phone, province,
-city, sufficiently detailed address, optional postal code, and payment method.
-Cross-field validation rejects unsupported payment choices. Input serializers are
-the trust boundary for shape, but product price/stock and totals always come from
-the database.
+`CreateOrderSerializer` validates recipient, province/city membership,
+sufficiently detailed address, and optional postal code. It accepts official
+`provinceId`/`cityId` codes while retaining validated name-only compatibility.
+Input serializers are the trust boundary for shape, but product price/stock and
+totals always come from the database.
 
 ## Checkout transaction
 

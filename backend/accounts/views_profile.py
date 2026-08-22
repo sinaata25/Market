@@ -12,6 +12,7 @@ from catalog.feedback import verified_purchase_pairs
 from catalog.models import Product, ProductComment, ProductRating
 from common.responses import fail, ok
 from common.utils import is_valid_iran_mobile, normalize_phone
+from locations.validation import validate_location_fields
 from orders.models import Order
 
 from .models import Address, Favorite
@@ -29,6 +30,8 @@ def address_dto(a: Address) -> dict:
         "phone": a.phone,
         "province": a.province,
         "city": a.city,
+        "provinceId": a.province_code,
+        "cityId": a.city_code,
         "address": a.address,
         "postalCode": a.postal_code,
         "isDefault": a.is_default,
@@ -111,11 +114,21 @@ class AddressSerializer(serializers.Serializer):
         error_messages={"required": "شماره تماس الزامی است"}
     )
     province = serializers.CharField(
-        min_length=2, error_messages={"required": "استان الزامی است"}
+        min_length=2,
+        max_length=50,
+        required=False,
+        error_messages={"blank": "استان الزامی است"},
     )
     city = serializers.CharField(
-        min_length=2, error_messages={"required": "شهر الزامی است"}
+        min_length=2,
+        max_length=50,
+        required=False,
+        error_messages={"blank": "شهر الزامی است"},
     )
+    provinceId = serializers.CharField(
+        max_length=2, required=False, allow_null=True
+    )
+    cityId = serializers.CharField(max_length=4, required=False, allow_null=True)
     address = serializers.CharField(
         min_length=10,
         error_messages={
@@ -140,17 +153,31 @@ class AddressSerializer(serializers.Serializer):
             raise serializers.ValidationError("کد پستی باید ۱۰ رقم باشد")
         return code
 
+    def validate(self, data):
+        return validate_location_fields(
+            data,
+            existing=self.context.get("existing"),
+            required=self.context.get("existing") is None,
+        )
+
 
 def apply_address(addr: Address, data: dict, user) -> Address:
     addr.user = user
-    addr.title = data["title"]
-    addr.full_name = data["fullName"]
-    addr.phone = data["phone"]
-    addr.province = data["province"]
-    addr.city = data["city"]
-    addr.address = data["address"]
-    addr.postal_code = data["postalCode"]
-    addr.is_default = data["isDefault"]
+    fields = {
+        "title": "title",
+        "fullName": "full_name",
+        "phone": "phone",
+        "province": "province",
+        "city": "city",
+        "provinceId": "province_code",
+        "cityId": "city_code",
+        "address": "address",
+        "postalCode": "postal_code",
+        "isDefault": "is_default",
+    }
+    for input_name, model_name in fields.items():
+        if input_name in data:
+            setattr(addr, model_name, data[input_name])
     addr.save()
     # فقط یک آدرس می‌تواند پیش‌فرض باشد
     if addr.is_default:
@@ -189,7 +216,9 @@ class AddressDetailView(AuthRequired, APIView):
         addr = self._get(request, pk)
         if addr is None:
             return fail("آدرس یافت نشد", 404)
-        ser = AddressSerializer(data=request.data)
+        ser = AddressSerializer(
+            data=request.data, partial=True, context={"existing": addr}
+        )
         ser.is_valid(raise_exception=True)
         addr = apply_address(addr, ser.validated_data, request.user)
         return ok({"address": address_dto(addr)})

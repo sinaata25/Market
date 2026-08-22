@@ -107,6 +107,12 @@ class Address(models.Model):
     phone = models.CharField("شماره تماس", max_length=11)
     province = models.CharField("استان", max_length=50)
     city = models.CharField("شهر", max_length=50)
+    province_code = models.CharField(
+        "کد رسمی استان", max_length=2, null=True, blank=True, editable=False
+    )
+    city_code = models.CharField(
+        "کد رسمی شهر", max_length=4, null=True, blank=True, editable=False
+    )
     address = models.TextField("آدرس")
     postal_code = models.CharField("کد پستی", max_length=10, blank=True)
     is_default = models.BooleanField("آدرس پیش‌فرض", default=False)

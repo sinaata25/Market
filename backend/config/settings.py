@@ -118,6 +118,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     # اپ‌های پروژه
+    "locations",
     "accounts",
     "catalog",
     "carts",

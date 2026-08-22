@@ -15,6 +15,7 @@ from carts.services import get_current_cart
 from catalog.models import Product
 from common.responses import fail, ok
 from common.utils import normalize_phone
+from locations.validation import validate_location_fields
 
 from .invoice import render_invoice_pdf
 from .models import Order, OrderItem
@@ -45,14 +46,20 @@ class CreateOrderSerializer(serializers.Serializer):
     )
     province = serializers.CharField(
         min_length=2,
+        max_length=50,
         required=False,
-        error_messages={"required": "استان الزامی است"},
+        error_messages={"blank": "استان الزامی است"},
     )
     city = serializers.CharField(
         min_length=2,
+        max_length=50,
         required=False,
-        error_messages={"required": "شهر الزامی است"},
+        error_messages={"blank": "شهر الزامی است"},
     )
+    provinceId = serializers.CharField(
+        max_length=2, required=False, allow_null=True
+    )
+    cityId = serializers.CharField(max_length=4, required=False, allow_null=True)
     address = serializers.CharField(
         min_length=10,
         required=False,
@@ -76,14 +83,13 @@ class CreateOrderSerializer(serializers.Serializer):
                 label
                 for field, label in (
                     ("fullName", "نام تحویل‌گیرنده"),
-                    ("province", "استان"),
-                    ("city", "شهر"),
                     ("address", "آدرس"),
                 )
                 if not data.get(field)
             ]
             if missing:
                 raise serializers.ValidationError(f"{missing[0]} الزامی است")
+            data = validate_location_fields(data)
         return data
 
 
@@ -98,6 +104,8 @@ def order_dto(order: Order) -> dict:
         "phone": order.phone,
         "province": order.province,
         "city": order.city,
+        "provinceId": order.province_code,
+        "cityId": order.city_code,
         "address": order.address,
         "postalCode": order.postal_code,
         "itemsPrice": order.items_price,
@@ -148,6 +156,8 @@ class OrderListCreateView(APIView):
                 "fullName": addr.full_name,
                 "province": addr.province,
                 "city": addr.city,
+                "provinceId": addr.province_code,
+                "cityId": addr.city_code,
                 "address": addr.address,
                 "postalCode": addr.postal_code,
             }
@@ -201,6 +211,8 @@ class OrderListCreateView(APIView):
                     phone=request.user.phone,
                     province=info["province"],
                     city=info["city"],
+                    province_code=info.get("provinceId"),
+                    city_code=info.get("cityId"),
                     address=info["address"],
                     postal_code=info.get("postalCode", ""),
                     items_price=items_price,

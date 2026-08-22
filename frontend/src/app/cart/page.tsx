@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ProvinceCityFields from "@/components/forms/ProvinceCityFields";
 import ProductCard from "@/components/product/ProductCard";
 import { formatPrice, type Product } from "@/lib/products";
 import { api } from "@/lib/client-api";
@@ -37,6 +38,8 @@ type CheckoutInfo = {
   fullName: string;
   province: string;
   city: string;
+  provinceId: string | null;
+  cityId: string | null;
   address: string;
   postalCode: string;
 };
@@ -47,6 +50,8 @@ type SavedAddress = {
   fullName: string;
   province: string;
   city: string;
+  provinceId: string | null;
+  cityId: string | null;
   address: string;
   isDefault: boolean;
 };
@@ -60,6 +65,8 @@ export default function CartPage() {
     fullName: "",
     province: "",
     city: "",
+    provinceId: null,
+    cityId: null,
     address: "",
     postalCode: "",
   });
@@ -100,6 +107,14 @@ export default function CartPage() {
 
   function notifyHeader() {
     window.dispatchEvent(new CustomEvent("cart:updated"));
+  }
+
+  function setCheckoutInfo<K extends keyof CheckoutInfo>(
+    key: K,
+    value: CheckoutInfo[K]
+  ) {
+    setError("");
+    setInfo((current) => ({ ...current, [key]: value }));
   }
 
   async function changeQty(item: CartItem, qty: number) {
@@ -394,7 +409,10 @@ export default function CartPage() {
                           type="radio"
                           name="address"
                           checked={selectedAddress === a.id}
-                          onChange={() => setSelectedAddress(a.id)}
+                          onChange={() => {
+                            setSelectedAddress(a.id);
+                            setError("");
+                          }}
                           className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
                         />
                         <span className="min-w-0">
@@ -422,37 +440,30 @@ export default function CartPage() {
                       placeholder="نام و نام خانوادگی تحویل‌گیرنده"
                       value={info.fullName}
                       onChange={(e) =>
-                        setInfo({ ...info, fullName: e.target.value })
+                        setCheckoutInfo("fullName", e.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
                     />
-                    <div className="flex gap-2">
-                      <input
-                        required
-                        placeholder="استان"
-                        value={info.province}
-                        onChange={(e) =>
-                          setInfo({ ...info, province: e.target.value })
-                        }
-                        className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                      />
-                      <input
-                        required
-                        placeholder="شهر"
-                        value={info.city}
-                        onChange={(e) =>
-                          setInfo({ ...info, city: e.target.value })
-                        }
-                        className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                      />
-                    </div>
+                    <ProvinceCityFields
+                      province={info.province}
+                      city={info.city}
+                      provinceId={info.provinceId}
+                      cityId={info.cityId}
+                      onChange={(location) =>
+                        setInfo((current) => ({ ...current, ...location }))
+                      }
+                      onClearError={() => setError("")}
+                      disabled={submitting}
+                      className="grid gap-2 sm:grid-cols-2"
+                      labelClassName="sr-only"
+                    />
                     <textarea
                       required
                       placeholder="آدرس کامل پستی"
                       rows={3}
                       value={info.address}
                       onChange={(e) =>
-                        setInfo({ ...info, address: e.target.value })
+                        setCheckoutInfo("address", e.target.value)
                       }
                       className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
                     />
@@ -461,7 +472,7 @@ export default function CartPage() {
                       dir="ltr"
                       value={info.postalCode}
                       onChange={(e) =>
-                        setInfo({ ...info, postalCode: e.target.value })
+                        setCheckoutInfo("postalCode", e.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-sm font-num outline-none focus:border-brand-400 focus:bg-white"
                     />
