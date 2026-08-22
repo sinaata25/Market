@@ -285,6 +285,36 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# The storefront owns the current visual identity. Invoice rendering reads these
+# assets directly; deployments that package the apps separately can override them.
+INVOICE_LOGO_PATH = Path(
+    os.getenv(
+        "INVOICE_LOGO_PATH",
+        BASE_DIR.parent / "frontend" / "public" / "brand" / "logo.png",
+    )
+)
+INVOICE_FONT_REGULAR_PATH = Path(
+    os.getenv(
+        "INVOICE_FONT_REGULAR_PATH",
+        BASE_DIR.parent
+        / "frontend"
+        / "public"
+        / "fonts"
+        / "Vazirmatn-Regular.woff2",
+    )
+)
+INVOICE_FONT_BOLD_PATH = Path(
+    os.getenv(
+        "INVOICE_FONT_BOLD_PATH",
+        BASE_DIR.parent
+        / "frontend"
+        / "public"
+        / "fonts"
+        / "Vazirmatn-Bold.woff2",
+    )
+)
+INVOICE_STORE_NAME = os.getenv("INVOICE_STORE_NAME", "گروه صنعتی توانا").strip()
+
 # ─── تنظیمات فروشگاه ─────────────────────────────────────────
 
 SHOP = {

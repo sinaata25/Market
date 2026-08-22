@@ -46,6 +46,11 @@ class Order(models.Model):
     def __str__(self) -> str:
         return self.code
 
+    @property
+    def invoice_number(self) -> str:
+        """Stable invoice identifier based on the unique, immutable order code."""
+        return f"INV-{self.code}"
+
 
 class OrderItem(models.Model):
     # عنوان و قیمت در لحظه‌ی خرید کپی می‌شوند

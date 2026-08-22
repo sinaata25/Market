@@ -50,6 +50,8 @@ export default function OrderDetail({
   const [order, setOrder] = useState<Order | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
 
   const load = useCallback(() => {
     api.get<{ order: Order }>(`/api/orders/${id}`).then((res) => {
@@ -97,6 +99,40 @@ export default function OrderDetail({
 
   const isCanceled = order.status === "CANCELED";
   const currentStep = STEPS.findIndex((s) => s.key === order.status);
+  const invoiceFallbackFilename = `invoice-${order.code}.pdf`;
+
+  async function downloadInvoice() {
+    setDownloadingInvoice(true);
+    setInvoiceError("");
+
+    try {
+      const result = await api.downloadPdf(
+        `/api/orders/${id}/invoice`,
+        invoiceFallbackFilename
+      );
+      if (!result.ok || !result.data) {
+        setInvoiceError(result.error ?? "دریافت فاکتور با خطا روبه‌رو شد");
+        return;
+      }
+
+      const objectUrl = window.URL.createObjectURL(result.data.blob);
+      const link = document.createElement("a");
+      try {
+        link.href = objectUrl;
+        link.download = result.data.filename;
+        link.hidden = true;
+        document.body.appendChild(link);
+        link.click();
+      } finally {
+        link.remove();
+        window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1_000);
+      }
+    } catch {
+      setInvoiceError("ذخیره فاکتور در مرورگر با خطا روبه‌رو شد");
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -229,6 +265,31 @@ export default function OrderDetail({
                 </span>
               </li>
             </ul>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={downloadInvoice}
+                disabled={downloadingInvoice}
+                aria-busy={downloadingInvoice}
+                aria-describedby={
+                  invoiceError ? "invoice-download-error" : undefined
+                }
+                className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+              >
+                {downloadingInvoice
+                  ? "در حال آماده‌سازی فاکتور..."
+                  : "دانلود فاکتور"}
+              </button>
+              {invoiceError && (
+                <p
+                  id="invoice-download-error"
+                  role="alert"
+                  className="mt-2 text-xs leading-5 text-red-500"
+                >
+                  {invoiceError}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white p-5">

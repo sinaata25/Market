@@ -1,8 +1,12 @@
+import logging
 import secrets
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import F
+from django.http import HttpResponse
+from django.utils.cache import patch_vary_headers
+from django.utils.http import content_disposition_header
 from rest_framework import serializers
 from rest_framework.views import APIView
 
@@ -12,9 +16,11 @@ from catalog.models import Product
 from common.responses import fail, ok
 from common.utils import normalize_phone
 
+from .invoice import render_invoice_pdf
 from .models import Order, OrderItem
 
 SHOP = settings.SHOP
+logger = logging.getLogger(__name__)
 
 
 class OutOfStock(Exception):
@@ -263,3 +269,37 @@ class OrderDetailView(APIView):
             order.save(update_fields=["status"])
 
         return ok({"order": order_dto(order)})
+
+
+class OrderInvoiceView(APIView):
+    """Download a snapshot-backed invoice for its owner or a staff user."""
+
+    def get(self, request, pk: int):
+        if not request.user.is_authenticated:
+            return fail("ابتدا وارد شوید", 401)
+
+        orders = Order.objects.filter(pk=pk).prefetch_related("items")
+        if not request.user.is_staff:
+            orders = orders.filter(user=request.user)
+        order = orders.first()
+        if order is None:
+            # The same response for absent and foreign orders avoids disclosing IDs.
+            return fail("سفارش یافت نشد", 404)
+
+        try:
+            pdf = render_invoice_pdf(order)
+        except Exception:
+            logger.exception("Could not render invoice for order %s", order.pk)
+            return fail("ساخت فایل فاکتور ممکن نشد", 500)
+
+        filename = f"invoice-{order.invoice_number}.pdf"
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = content_disposition_header(
+            as_attachment=True,
+            filename=filename,
+        )
+        response["Content-Length"] = len(pdf)
+        response["Cache-Control"] = "private, no-store"
+        response["Pragma"] = "no-cache"
+        patch_vary_headers(response, ["Cookie"])
+        return response
