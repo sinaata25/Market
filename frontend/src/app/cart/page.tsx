@@ -196,7 +196,7 @@ export default function CartPage() {
               {orderCode}
             </b>
           </p>
-          <div className="flex justify-center gap-3 text-sm">
+          <div className="flex flex-wrap justify-center gap-3 text-sm">
             <Link
               href="/orders"
               className="rounded-xl bg-brand-600 px-5 py-2.5 font-medium text-white transition hover:bg-brand-700"
@@ -248,14 +248,14 @@ export default function CartPage() {
         {/* اقلام */}
         <div className="flex-1 space-y-3">
           {cart.items.map((item) => (
-            <div
+            <article
               key={item.id}
-              className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4"
+              className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 sm:flex sm:gap-4 sm:p-4"
             >
               {item.product.image && (
                 <Link
                   href={`/product/${item.product.id}`}
-                  className="block h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50"
+                  className="block h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-50 sm:h-20 sm:w-20"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -268,11 +268,11 @@ export default function CartPage() {
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/product/${item.product.id}`}
-                  className="mb-2 block truncate text-sm font-medium text-slate-700 hover:text-brand-700"
+                  className="mb-2 line-clamp-2 text-sm font-medium leading-6 text-slate-700 hover:text-brand-700"
                 >
                   {item.product.title}
                 </Link>
-                <div className="flex items-baseline gap-1 text-sm">
+                <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 text-sm">
                   <span className="font-bold text-slate-800 font-num">
                     {formatPrice(item.product.price * item.qty)}
                   </span>
@@ -286,11 +286,12 @@ export default function CartPage() {
               </div>
 
               {/* کنترل تعداد */}
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1.5">
+              <div className="col-start-2 flex items-center gap-2 justify-self-end rounded-xl border border-slate-200 px-2 py-1.5 sm:col-auto sm:shrink-0">
                 <button
                   disabled={busyItem === item.id}
                   onClick={() => changeQty(item, item.qty + 1)}
-                  className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-brand-600 hover:bg-slate-200 disabled:opacity-50"
+                  aria-label={`افزایش تعداد ${item.product.title}`}
+                  className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-brand-600 hover:bg-slate-200 disabled:opacity-50"
                 >
                   +
                 </button>
@@ -301,7 +302,8 @@ export default function CartPage() {
                   <button
                     disabled={busyItem === item.id}
                     onClick={() => changeQty(item, item.qty - 1)}
-                    className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 disabled:opacity-50"
+                    aria-label={`کاهش تعداد ${item.product.title}`}
+                    className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 disabled:opacity-50"
                   >
                     −
                   </button>
@@ -309,14 +311,15 @@ export default function CartPage() {
                   <button
                     disabled={busyItem === item.id}
                     onClick={() => removeItem(item)}
-                    className="grid h-7 w-7 place-items-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-50"
+                    aria-label={`حذف ${item.product.title} از سبد`}
+                    className="grid h-9 w-9 place-items-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-50"
                     title="حذف از سبد"
                   >
                     🗑
                   </button>
                 )}
               </div>
-            </div>
+            </article>
           ))}
 
           {(cart.recommendations?.length ?? 0) > 0 && (
@@ -354,28 +357,28 @@ export default function CartPage() {
         <div className="lg:w-80 lg:shrink-0">
           <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:sticky lg:top-28">
             <div className="space-y-3 border-b border-slate-100 pb-4 text-sm">
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between gap-3 text-slate-500">
                 <span>
                   قیمت کالاها{" "}
                   <span className="font-num">
                     ({cart.itemsCount.toLocaleString("fa-IR")})
                   </span>
                 </span>
-                <span className="font-num">
+                <span className="shrink-0 text-left font-num">
                   {formatPrice(cart.itemsPrice)} تومان
                 </span>
               </div>
               {cart.discount > 0 && (
-                <div className="flex justify-between text-accent-700">
+                <div className="flex justify-between gap-3 text-accent-700">
                   <span>سود شما از خرید</span>
-                  <span className="font-num">
+                  <span className="shrink-0 text-left font-num">
                     {formatPrice(cart.discount)} تومان
                   </span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-slate-800">
+              <div className="flex justify-between gap-3 font-bold text-slate-800">
                 <span>مبلغ قابل پرداخت</span>
-                <span className="font-num">
+                <span className="shrink-0 text-left font-num">
                   {formatPrice(cart.totalPrice)} تومان
                 </span>
               </div>
@@ -415,7 +418,7 @@ export default function CartPage() {
                           }}
                           className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
                         />
-                        <span className="min-w-0">
+                        <span className="min-w-0 break-words">
                           <span className="block font-medium text-slate-700">
                             {a.title} — {a.fullName}
                           </span>

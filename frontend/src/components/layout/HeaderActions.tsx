@@ -82,7 +82,7 @@ export default function HeaderActions() {
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
       {user ? (
         <div
           className="relative"
@@ -104,20 +104,21 @@ export default function HeaderActions() {
             aria-expanded={menuOpen}
             aria-controls="account-menu"
             onClick={() => setMenuOpen((open) => !open)}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-400"
+            className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-sm font-medium text-slate-700 transition hover:border-brand-400 sm:flex sm:w-auto sm:gap-2 sm:px-3 xl:px-4"
+            aria-label={`حساب کاربری ${user.name ?? user.phone}`}
           >
-            <span>👤</span>
-            <span dir="ltr" className="font-num">
+            <span aria-hidden="true">👤</span>
+            <span dir="ltr" className="hidden max-w-28 truncate font-num sm:block xl:max-w-40">
               {user.name ?? user.phone}
             </span>
-            <span className="text-xs">▾</span>
+            <span aria-hidden="true" className="hidden text-xs sm:inline">▾</span>
           </button>
           {menuOpen && (
             <div
               id="account-menu"
-              className="absolute left-0 top-full z-50 pt-2"
+              className="fixed left-3 top-[4.25rem] z-50 pt-2 sm:absolute sm:left-0 sm:top-full"
             >
-              <div className="w-48 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+              <div className="max-h-[calc(100dvh-5rem)] w-48 overflow-y-auto rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
                 {[
                   { href: "/profile", icon: "👤", label: "پروفایل من" },
                   {
@@ -171,10 +172,12 @@ export default function HeaderActions() {
               ? "/login"
               : `/login?next=${encodeURIComponent(pathname)}`
           }
-          className="hidden items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-400 hover:text-brand-700 sm:flex"
+          aria-label="ورود یا ثبت‌نام"
+          title="ورود | ثبت‌نام"
+          className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-sm font-medium text-slate-700 transition hover:border-brand-400 hover:text-brand-700 sm:flex sm:w-auto sm:gap-2 sm:px-3 xl:px-4"
         >
-          <span>👤</span>
-          <span>ورود | ثبت‌نام</span>
+          <span aria-hidden="true">👤</span>
+          <span className="hidden sm:inline">ورود | ثبت‌نام</span>
         </Link>
       )}
 

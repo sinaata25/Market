@@ -137,7 +137,7 @@ export default function ComparePage() {
             {MAX_COMPARE_ITEMS.toLocaleString("fa-IR")})
           </span>
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {canAddMore && shareCategory && (
             <Link
               href={`/category/${products[0].categorySlug}`}

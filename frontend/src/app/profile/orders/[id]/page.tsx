@@ -159,8 +159,9 @@ export default function OrderDetail({
 
       {/* نوار پیشرفت */}
       {!isCanceled ? (
-        <div className="rounded-2xl border border-slate-100 bg-white p-6">
-          <div className="flex items-center">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-6">
+          <div className="responsive-scroll pb-2 sm:pb-0">
+          <div className="flex min-w-[32rem] items-center sm:min-w-0">
             {STEPS.map((step, i) => {
               const done = i <= currentStep;
               return (
@@ -194,6 +195,7 @@ export default function OrderDetail({
               );
             })}
           </div>
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-red-100 bg-red-50 p-5 text-center text-sm text-red-500">
@@ -209,7 +211,7 @@ export default function OrderDetail({
           </h2>
           <ul className="divide-y divide-slate-50">
             {order.items.map((it) => (
-              <li key={it.id} className="flex items-center gap-3 px-5 py-4">
+              <li key={it.id} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:px-5">
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/product/${it.productId}`}
@@ -221,7 +223,7 @@ export default function OrderDetail({
                     {faNum(it.qty)} عدد × {formatPrice(it.price)} تومان
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-bold text-slate-700 font-num">
+                <span className="mr-auto shrink-0 text-sm font-bold text-slate-700 font-num sm:mr-0">
                   {formatPrice(it.price * it.qty)}
                 </span>
               </li>

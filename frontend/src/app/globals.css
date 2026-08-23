@@ -3,6 +3,8 @@
 :root {
   --background: #ebede3;
   --foreground: #1f3d89;
+  --site-max-width: 80rem;
+  --site-gutter: clamp(1rem, 2.5vw, 2rem);
 }
 
 @theme inline {
@@ -51,9 +53,124 @@
   box-sizing: border-box;
 }
 
+html {
+  min-width: 0;
+  text-size-adjust: 100%;
+}
+
 body {
+  margin: 0;
+  min-width: 0;
   background: var(--background);
   color: var(--foreground);
+}
+
+img,
+picture,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+li,
+dt,
+dd,
+a,
+button,
+label {
+  overflow-wrap: anywhere;
+}
+
+:focus-visible {
+  outline: 2px solid #5a8349;
+  outline-offset: 2px;
+}
+
+/* پوسته‌ی مشترک صفحات؛ در نمایشگرهای عریض کشیده نمی‌شود. */
+.site-container {
+  width: min(calc(100% - (2 * var(--site-gutter))), var(--site-max-width));
+  margin-inline: auto;
+}
+
+/* اسکرول افقی فقط در ناحیه‌های عمداً اسکرول‌پذیر باقی می‌ماند. */
+.responsive-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* نوار اصلی روی موبایل یک track واقعی و قابل drag/swipe دارد. */
+.mobile-nav-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-width: thin;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-nav-scroll > div > * {
+  scroll-snap-align: start;
+}
+
+.mobile-nav-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+
+@media (min-width: 1024px) {
+  .mobile-nav-scroll {
+    overflow: visible;
+    scroll-snap-type: none;
+    scrollbar-width: auto;
+    touch-action: auto;
+  }
+}
+
+/* نوار مقایسه فقط هنگام نمایش خودش از انتهای صفحه فضا می‌گیرد. */
+body:has([data-compare-tray]) .site-main {
+  padding-bottom: 9rem;
+}
+
+@media (min-width: 640px) {
+  body:has([data-compare-tray]) .site-main {
+    padding-bottom: 6rem;
+  }
+}
+
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 }
 
 /* اعداد فارسی در ورودی‌ها و قیمت‌ها به‌صورت خودکار */

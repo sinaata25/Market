@@ -181,7 +181,7 @@ export default async function BlogPage({
             {result.items.map((post) => <BlogCard key={post.id} post={post} />)}
           </div>
           {result.pages > 1 && (
-            <nav className="mt-8 flex justify-center gap-1.5" aria-label="صفحه‌بندی وبلاگ">
+            <nav className="mt-8 flex flex-wrap justify-center gap-1.5" aria-label="صفحه‌بندی وبلاگ">
               {Array.from({ length: result.pages }, (_, index) => index + 1).map((page) => (
                 <Link
                   key={page}

@@ -145,7 +145,7 @@ function ProductSection({ section }: { section: HomepageSection }) {
           : ""
       }
     >
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {section.title && (
           <h2
             className={`text-lg font-bold ${isDeals ? "text-secondary-900" : "text-slate-800"}`}

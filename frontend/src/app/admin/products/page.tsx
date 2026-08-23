@@ -121,7 +121,7 @@ export default function AdminProducts() {
               setPage(1);
             }}
             placeholder="جستجوی محصول..."
-            className="w-48 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-48"
           />
           <Link
             href="/admin/products/new"

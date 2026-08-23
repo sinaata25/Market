@@ -68,7 +68,7 @@ export default function SeoPages() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="جستجوی صفحه..."
-          className="w-56 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-56"
         />
       </div>
 

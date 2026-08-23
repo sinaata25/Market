@@ -32,7 +32,7 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" className={`${vazirmatn.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-background text-foreground antialiased font-sans">
         <Header />
-        <main className="flex-1 pb-20">{children}</main>
+        <main className="site-main flex-1 pb-8">{children}</main>
         <Footer />
         <CompareTray />
       </body>

@@ -243,7 +243,7 @@ export default async function CategoryPage({
 
       {/* صفحه‌بندی */}
       {result.pages > 1 && (
-        <nav className="mt-8 flex items-center justify-center gap-1.5">
+        <nav className="mt-8 flex flex-wrap items-center justify-center gap-1.5" aria-label="صفحه‌بندی محصولات">
           {page > 1 && (
             <Link
               href={buildUrl(slug, sp, { page: String(page - 1) })}

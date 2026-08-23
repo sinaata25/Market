@@ -25,12 +25,13 @@ export default function ProductGallery({
       </div>
 
       {images.length > 1 && (
-        <div className="mt-3 flex justify-center gap-2">
+        <div className="responsive-scroll mt-3 flex justify-start gap-2 pb-1 sm:justify-center">
           {images.map((src, i) => (
             <button
               key={src}
               onClick={() => setActive(i)}
-              className={`h-16 w-16 overflow-hidden rounded-xl border transition ${
+              aria-label={`نمایش تصویر ${i + 1} از ${images.length}`}
+              className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border transition ${
                 active === i
                   ? "border-brand-500"
                   : "border-slate-200 hover:border-brand-300"

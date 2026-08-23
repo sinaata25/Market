@@ -682,7 +682,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">
                   قیمت فروش *
@@ -729,7 +729,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               <label className="mb-3 block text-xs font-medium text-slate-600">
                 تصاویر محصول
               </label>
-              <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className="mb-3 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
                 {images.map((img) => (
                   <div
                     key={img.id}
@@ -744,7 +744,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
                     <button
                       type="button"
                       onClick={() => removeImage(img)}
-                      className="absolute inset-0 hidden place-items-center bg-black/50 text-lg text-white group-hover:grid"
+                      aria-label="حذف تصویر"
+                      className="absolute inset-0 grid place-items-center bg-black/30 text-lg text-white opacity-100 transition sm:bg-black/50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                       title="حذف"
                     >
                       🗑

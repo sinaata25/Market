@@ -147,17 +147,17 @@ export default function AdminLayout({
     !me.isStaff && me.isSeoManager && !pathname.startsWith("/admin/seo");
 
   return (
-    <div className="mx-auto flex max-w-7xl gap-5 px-4 py-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-4 sm:py-6 lg:flex-row">
       {/* سایدبار */}
-      <aside className="w-56 shrink-0">
-        <div className="sticky top-24 overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200">
+      <aside className="min-w-0 lg:w-56 lg:shrink-0">
+        <div className="overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200 lg:sticky lg:top-24">
           <div className="border-b border-secondary-700/60 px-5 py-4">
             <p className="text-sm font-bold text-white">پنل مدیریت</p>
             <p className="mt-1 text-[11px] text-slate-400 font-num" dir="ltr">
               {me.name ?? me.phone}
             </p>
           </div>
-          <nav className="p-2">
+          <nav aria-label="منوی مدیریت" className="responsive-scroll flex gap-1 p-2 lg:block">
             {showShopNav &&
               SHOP_NAV.map((item) => {
                 const active =
@@ -168,7 +168,7 @@ export default function AdminLayout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition ${
+                    className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm transition lg:mb-1 lg:gap-3 lg:px-4 ${
                       active
                         ? "bg-brand-600 font-medium text-white"
                         : "hover:bg-secondary-800 hover:text-white"
@@ -180,7 +180,7 @@ export default function AdminLayout({
                 );
               })}
 
-            <p className="mb-1 mt-3 px-4 text-[10px] font-bold tracking-wide text-slate-500">
+            <p className="hidden lg:mb-1 lg:mt-3 lg:block lg:px-4 lg:text-[10px] lg:font-bold lg:tracking-wide lg:text-slate-500">
               سئو
             </p>
             {SEO_NAV.map((item) => {
@@ -192,7 +192,7 @@ export default function AdminLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition ${
+                  className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm transition lg:mb-1 lg:gap-3 lg:px-4 ${
                     active
                       ? "bg-brand-600 font-medium text-white"
                     : "hover:bg-secondary-800 hover:text-white"
@@ -204,17 +204,17 @@ export default function AdminLayout({
               );
             })}
           </nav>
-          <div className="border-t border-secondary-700/60 p-2">
+          <div className="flex gap-1 border-t border-secondary-700/60 p-2 lg:block">
             <Link
               href="/"
-              className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition hover:bg-secondary-800 hover:text-white"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm transition hover:bg-secondary-800 hover:text-white lg:justify-start lg:gap-3 lg:px-4"
             >
               <span>🏬</span> مشاهده فروشگاه
             </Link>
             <button
               onClick={logout}
               data-admin-navigation
-              className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-red-400 transition hover:bg-secondary-800"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-right text-sm text-red-400 transition hover:bg-secondary-800 lg:w-full lg:justify-start lg:gap-3 lg:px-4"
             >
               <span>⏻</span> خروج
             </button>

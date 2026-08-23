@@ -179,7 +179,7 @@ export default async function BrandPage({
       )}
 
       {result.pages > 1 && (
-        <nav className="mt-8 flex items-center justify-center gap-1.5">
+        <nav className="mt-8 flex flex-wrap items-center justify-center gap-1.5" aria-label="صفحه‌بندی محصولات برند">
           {Array.from({ length: result.pages }, (_, index) => index + 1).map(
             (number) => (
               <Link

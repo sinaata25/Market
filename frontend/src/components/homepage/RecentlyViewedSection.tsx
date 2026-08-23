@@ -58,7 +58,7 @@ export default function RecentlyViewedSection({
 
   return (
     <section className="min-w-0">
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-slate-800">{title}</h2>
         <button
           type="button"

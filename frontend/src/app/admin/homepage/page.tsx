@@ -362,7 +362,7 @@ export default function AdminHomepagePage() {
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500">
                   {(index + 1).toLocaleString("fa-IR")}
                 </span>
-                <div className="min-w-44 flex-1">
+                <div className="min-w-0 flex-1 basis-44">
                   <p className="text-sm font-bold text-slate-700">
                     {section.resolvedTitle ?? SECTION_LABELS[section.sectionType]}
                   </p>
@@ -374,7 +374,7 @@ export default function AdminHomepagePage() {
                 <span className={`rounded-full px-2.5 py-1 text-[11px] ${section.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                   {section.isActive ? "فعال" : "غیرفعال"}
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto">
                   <button type="button" disabled={busy || index === 0} onClick={() => moveSection(section, "up")} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs disabled:opacity-30" title="انتقال به بالا">↑</button>
                   <button type="button" disabled={busy || index === sections.length - 1} onClick={() => moveSection(section, "down")} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs disabled:opacity-30" title="انتقال به پایین">↓</button>
                   <button type="button" disabled={busy} onClick={() => toggleSection(section)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600">{section.isActive ? "غیرفعال" : "فعال"}</button>
