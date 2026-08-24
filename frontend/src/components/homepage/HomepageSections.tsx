@@ -141,7 +141,7 @@ function ProductSection({ section }: { section: HomepageSection }) {
     <section
       className={
         isDeals
-          ? "overflow-hidden rounded-3xl bg-gradient-to-l from-accent-600 to-accent-400 p-5"
+          ? "overflow-hidden rounded-3xl bg-gradient-to-l from-accent-600 to-accent-400 p-3 sm:p-5"
           : ""
       }
     >
@@ -168,11 +168,23 @@ function ProductSection({ section }: { section: HomepageSection }) {
         )}
       </div>
       <div
-        className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${isDeals ? "lg:grid-cols-6" : "lg:grid-cols-4"}`}
+        className={
+          isDeals
+            ? "-mx-1 max-w-full overflow-x-auto overscroll-x-contain px-1 pb-2 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0"
+            : ""
+        }
       >
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
+        <div
+          className={
+            isDeals
+              ? "grid w-max grid-flow-col auto-cols-[10.5rem] items-stretch gap-2 sm:w-auto sm:grid-flow-row sm:grid-cols-3 sm:gap-3 lg:grid-cols-5 xl:grid-cols-6"
+              : "grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5"
+          }
+        >
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
       </div>
     </section>
   );

@@ -22,11 +22,6 @@ export default function MyFavorites() {
     load();
   }, [load]);
 
-  async function remove(p: Product) {
-    await api.post("/api/auth/favorites", { productId: p.id });
-    setItems((prev) => prev.filter((i) => i.id !== p.id));
-  }
-
   if (loading) {
     return (
       <div className="grid min-h-[40vh] place-items-center text-sm text-slate-400">
@@ -63,16 +58,17 @@ export default function MyFavorites() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {items.map((p) => (
-            <div key={p.id} className="relative">
-              <ProductCard product={p} />
-              <button
-                onClick={() => remove(p)}
-                title="حذف از علاقه‌مندی‌ها"
-                className="absolute left-4 top-4 z-10 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-sm shadow-sm backdrop-blur transition hover:bg-red-50"
-              >
-                🗑
-              </button>
-            </div>
+            <ProductCard
+              key={p.id}
+              product={p}
+              onFavoriteChange={(favorited) => {
+                if (!favorited) {
+                  setItems((current) =>
+                    current.filter((item) => item.id !== p.id)
+                  );
+                }
+              }}
+            />
           ))}
         </div>
       )}

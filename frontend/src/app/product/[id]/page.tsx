@@ -133,7 +133,10 @@ export default async function ProductPage({
             </h1>
             <div className="flex shrink-0 items-center gap-2">
               <CompareButton product={product} />
-              <FavoriteButton productId={product.id} />
+              <FavoriteButton
+                productId={product.id}
+                productTitle={product.title}
+              />
             </div>
           </div>
           {product.titleEn && (
@@ -245,7 +248,7 @@ export default async function ProductPage({
           <h2 className="mb-4 text-lg font-bold text-slate-800">
             محصولات مشابه
           </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
             {related.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

@@ -50,7 +50,7 @@ export default async function AboutPage() {
 
   return (
     <div className="overflow-hidden">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:pt-8">
+      <div className="site-shell pb-16 pt-6 sm:pt-8">
         <nav aria-label="مسیر راهنما" className="mb-5 flex items-center gap-2 text-xs text-slate-500">
           <Link href="/" className="transition hover:text-brand-700">
             خانه
@@ -64,7 +64,7 @@ export default async function AboutPage() {
           <div className="absolute -left-20 top-10 -z-10 h-72 w-72 rounded-full border border-white/10" />
           <div className="absolute -left-10 top-20 -z-10 h-52 w-52 rounded-full border border-white/10" />
 
-          <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
             <div>
               <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs text-secondary-100 backdrop-blur-sm">
                 <span className="h-2 w-2 rounded-full bg-accent-400" />
@@ -102,7 +102,7 @@ export default async function AboutPage() {
           </div>
         </section>}
 
-        {sections.story && <section className="grid gap-8 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-20 lg:py-24">
+        {sections.story && <section className="grid grid-cols-1 gap-8 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-20 lg:py-24">
           <div>
             <p className="mb-3 text-sm font-bold text-brand-600">{content.story.eyebrow}</p>
             <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">
@@ -121,7 +121,7 @@ export default async function AboutPage() {
             <p className="mb-2 text-sm font-bold text-brand-600">{content.values.eyebrow}</p>
             <h2 className="text-2xl font-bold text-secondary-900">{content.values.title}</h2>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {content.values.items.map((value, index) => (
               <article key={index} className="group rounded-2xl border border-slate-100 bg-slate-50/70 p-6 transition hover:-translate-y-1 hover:border-brand-200 hover:bg-brand-50/50">
                 <div className="mb-7 flex items-start justify-between">
@@ -142,7 +142,7 @@ export default async function AboutPage() {
         </section>}
 
         {sections.journey && <section className="py-16 lg:py-24">
-          <div className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16">
             <div>
               <p className="mb-3 text-sm font-bold text-brand-600">{content.journey.eyebrow}</p>
               <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">

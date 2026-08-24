@@ -203,9 +203,9 @@ export default function OrderDetail({
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* اقلام */}
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white lg:col-span-2">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-100 bg-white lg:col-span-2">
           <h2 className="border-b border-slate-100 px-5 py-4 text-sm font-bold text-slate-700">
             کالاهای سفارش
           </h2>

@@ -174,8 +174,8 @@ export default function BlogPostForm({ postId }: { postId?: number }) {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="min-w-0 space-y-4 rounded-2xl border border-slate-100 bg-white p-5 lg:col-span-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-600">عنوان نوشته *</label>
             <input required maxLength={255} value={form.title} onChange={(event) => set("title", event.target.value)} className={inputClass()} />

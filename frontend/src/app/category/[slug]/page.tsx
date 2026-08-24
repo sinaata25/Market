@@ -81,7 +81,7 @@ export default async function CategoryPage({
   const seo = await fetchSeo("category", slug);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       {/* اسکیمای JSON-LD از پنل سئو */}
       {seo?.schema && <JsonLd data={seo.schema} />}
       {seo?.site.breadcrumbsEnabled && (
@@ -131,7 +131,7 @@ export default async function CategoryPage({
               <Link
                 key={subcategory.slug}
                 href={`/category/${subcategory.slug}`}
-                className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-600 transition hover:border-brand-400 hover:text-brand-700"
+                className="inline-flex min-h-11 items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-600 transition hover:border-brand-400 hover:text-brand-700 sm:min-h-0"
               >
                 {subcategory.title}
               </Link>
@@ -218,7 +218,7 @@ export default async function CategoryPage({
 
       {/* گرید محصولات */}
       {result.items.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
           {result.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}

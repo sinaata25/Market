@@ -128,7 +128,7 @@ export default function SeoOverview() {
         <h2 className="mb-4 text-sm font-bold text-slate-700">
           ⚠️ نیازمند رسیدگی
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {issues.map((issue) => (
             <Link
               key={issue.label}

@@ -131,7 +131,7 @@ export default function MyAddresses() {
           <h2 className="text-sm font-bold text-slate-700">
             {editingId ? "ویرایش آدرس" : "آدرس جدید"}
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs text-slate-500">
                 عنوان آدرس
@@ -191,7 +191,7 @@ export default function MyAddresses() {
               }
               onClearError={() => setError("")}
               disabled={saving}
-              className="grid gap-3 sm:col-span-2 sm:grid-cols-2"
+              className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2"
               selectClassName={inputCls}
             />
           </div>
@@ -257,7 +257,7 @@ export default function MyAddresses() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {addresses.map((a) => (
             <div
               key={a.id}

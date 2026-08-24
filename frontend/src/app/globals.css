@@ -5,6 +5,18 @@
   --foreground: #1f3d89;
   --site-max-width: 80rem;
   --site-gutter: clamp(1rem, 2.5vw, 2rem);
+  /* ارتفاع واقعی هدر با ResizeObserver در HeaderHeightProbe به‌روز می‌شود.
+     این مقدارها فقط تا پیش از اولین اندازه‌گیری (و در SSR) به کار می‌روند و
+     عمداً کمی سخاوتمندانه‌اند: کمی پایین‌تر نشستن بهتر از پنهان‌شدن زیر هدر است. */
+  --header-h: 10.875rem; /* ~۱۷۴px — چیدمان دوسطری موبایل (جستجو در سطر دوم) */
+  --sticky-gap: 1rem;
+}
+
+/* از lg هدر تک‌سطری می‌شود و کوتاه‌تر است. */
+@media (min-width: 64rem) {
+  :root {
+    --header-h: 7.875rem; /* ~۱۲۶px */
+  }
 }
 
 @theme inline {
@@ -189,4 +201,57 @@ body:has([data-compare-tray]) .site-main {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #759966;
+}
+
+/* ---------------------------------------------------------------------------
+   ابزارهای واکنش‌گرا (Tailwind v4 @utility — با همه‌ی variantها کار می‌کنند)
+   --------------------------------------------------------------------------- */
+
+/* پوسته‌ی صفحه: هم‌راستا با هدر در همه‌ی عرض‌ها. جایگزین mx-auto max-w-7xl px-4 */
+@utility site-shell {
+  width: min(calc(100% - (2 * var(--site-gutter))), var(--site-max-width));
+  margin-inline: auto;
+}
+
+/* عنصر چسبان که هرگز زیر هدر پنهان نمی‌شود.
+   max-height باگ کلاسیک sticky را می‌بندد: ستون بلندتر از viewport در حالت عادی
+   بالا می‌چسبد و انتهایش دیگر با اسکرول قابل دیدن نیست. */
+@utility sticky-below-header {
+  position: sticky;
+  top: calc(var(--header-h) + var(--sticky-gap));
+  align-self: start;
+  max-height: calc(100dvh - var(--header-h) - (2 * var(--sticky-gap)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* پنل کشویی هدر روی موبایل دقیقاً زیر هدر باز می‌شود */
+@utility below-header {
+  top: var(--header-h);
+}
+
+/* بیشترین ارتفاع یک پنل که از زیر هدر تا پایین صفحه باز می‌شود */
+@utility h-under-header {
+  max-height: calc(100dvh - var(--header-h) - 1.5rem);
+}
+
+/* لنگرهای درون‌صفحه‌ای زیر هدر چسبان پنهان نمی‌شوند.
+   داخل layer base است تا utilityهای scroll-mt-* بتوانند override کنند. */
+@layer base {
+  [id] {
+    scroll-margin-top: calc(var(--header-h) + var(--sticky-gap));
+  }
+}
+
+/* دکمه‌ها و لینک‌های اکشن روی موبایل تمام‌عرض می‌شوند */
+@utility action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.75rem;
+
+  @media (width >= 40rem) {
+    width: auto;
+  }
 }

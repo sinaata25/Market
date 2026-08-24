@@ -116,9 +116,9 @@ export default function HeaderActions() {
           {menuOpen && (
             <div
               id="account-menu"
-              className="fixed left-3 top-[4.25rem] z-50 pt-2 sm:absolute sm:left-0 sm:top-full"
+              className="fixed left-3 below-header z-50 pt-2 sm:absolute sm:left-0 sm:top-full"
             >
-              <div className="max-h-[calc(100dvh-5rem)] w-48 overflow-y-auto rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+              <div className="h-under-header w-48 overflow-y-auto rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
                 {[
                   { href: "/profile", icon: "👤", label: "پروفایل من" },
                   {

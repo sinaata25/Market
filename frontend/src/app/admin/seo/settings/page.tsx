@@ -111,7 +111,7 @@ export default function SeoSettingsPage() {
     <div className="space-y-4">
       <h1 className="text-lg font-bold text-slate-800">⚙️ تنظیمات سئو</h1>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* اطلاعات سایت */}
         <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5">
           <h2 className="text-xs font-bold text-slate-500">اطلاعات سایت</h2>
@@ -316,7 +316,7 @@ export default function SeoSettingsPage() {
       <button
         onClick={save}
         disabled={saving}
-        className="rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+        className="action-btn rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
       >
         {saving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
       </button>

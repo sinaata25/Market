@@ -36,7 +36,7 @@ export default async function IncrediblePage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       {/* مسیر راهنما */}
       <nav className="mb-4 flex items-center gap-1 text-xs text-slate-400">
         <Link href="/" className="hover:text-brand-600">
@@ -156,7 +156,7 @@ export default async function IncrediblePage() {
           <h2 className="mb-4 text-base font-bold text-slate-800">
             همه‌ی کالاهای تخفیف‌دار
           </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
             {sorted.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

@@ -45,7 +45,7 @@ export default async function BestSellersPage({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       {/* مسیر راهنما */}
       <nav className="mb-4 flex items-center gap-1 text-xs text-slate-400">
         <Link href="/" className="hover:text-brand-600">
@@ -79,7 +79,7 @@ export default async function BestSellersPage({
       <div className="mb-6 flex flex-wrap gap-2">
         <Link
           href={url()}
-          className={`inline-flex items-center rounded-full border px-4 py-1.5 text-xs transition ${
+          className={`inline-flex min-h-11 items-center rounded-full border px-4 py-1.5 text-xs transition sm:min-h-0 ${
             !activeCategory
               ? "border-brand-500 bg-brand-600 font-medium text-white"
               : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
@@ -91,7 +91,7 @@ export default async function BestSellersPage({
           <Link
             key={c.slug}
             href={url(c.slug)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs transition ${
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs transition sm:min-h-0 ${
               activeCategory === c.slug
                 ? "border-brand-500 bg-brand-600 font-medium text-white"
                 : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
@@ -134,7 +134,7 @@ export default async function BestSellersPage({
             <h2 className="mb-4 text-base font-bold text-slate-800">
               🏅 سه محصول برتر
             </h2>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {top3.map((p, i) => (
                 <article
                   key={p.id}
@@ -196,7 +196,7 @@ export default async function BestSellersPage({
               <h2 className="mb-4 text-base font-bold text-slate-800">
                 سایر محصولات پرفروش
               </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
                 {rest.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}

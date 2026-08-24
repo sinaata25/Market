@@ -176,7 +176,7 @@ export default function CartPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 text-center text-sm text-slate-400">
+      <div className="site-shell py-16 text-center text-sm text-slate-400">
         در حال بارگذاری سبد خرید...
       </div>
     );
@@ -236,7 +236,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       <h1 className="mb-5 text-lg font-bold text-slate-800">
         سبد خرید{" "}
         <span className="text-sm font-normal text-slate-400 font-num">
@@ -252,19 +252,24 @@ export default function CartPage() {
               key={item.id}
               className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 sm:flex sm:gap-4 sm:p-4"
             >
-              {item.product.image && (
-                <Link
-                  href={`/product/${item.product.id}`}
-                  className="block h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-50 sm:h-20 sm:w-20"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* سلول تصویر همیشه رندر می‌شود؛ در غیر این صورت عنوان به ستون
+                  ۴rem می‌افتد و روی موبایل له می‌شود. */}
+              <Link
+                href={`/product/${item.product.id}`}
+                aria-label={item.product.title}
+                className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 sm:h-20 sm:w-20"
+              >
+                {item.product.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={item.product.image}
                     alt={item.product.title}
                     className="h-full w-full object-cover"
                   />
-                </Link>
-              )}
+                ) : (
+                  <span aria-hidden="true" className="text-2xl opacity-40">🛠️</span>
+                )}
+              </Link>
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/product/${item.product.id}`}
@@ -323,7 +328,7 @@ export default function CartPage() {
           ))}
 
           {(cart.recommendations?.length ?? 0) > 0 && (
-            <section className="mt-5 rounded-3xl border border-brand-100 bg-brand-50/40 p-4 sm:p-5">
+            <section className="@container/recommendations mt-5 rounded-3xl border border-brand-100 bg-brand-50/40 p-4 sm:p-5">
               <div className="mb-4">
                 <h2 className="text-base font-bold text-slate-800">
                   پیشنهاد برای خرید شما
@@ -333,15 +338,20 @@ export default function CartPage() {
                   خرید را ادامه دهید.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              <div className="grid grid-cols-1 items-stretch gap-3 @min-[19rem]/recommendations:grid-cols-2 @min-[42rem]/recommendations:grid-cols-3">
                 {cart.recommendations?.map((recommendation) => (
-                  <div key={recommendation.product.id} className="min-w-0">
+                  <div
+                    key={recommendation.product.id}
+                    className="flex min-w-0 flex-col"
+                  >
                     <p className="mb-2 truncate px-1 text-[11px] text-brand-700">
                       پیشنهاد برای {recommendation.recommendedFor
                         .map((product) => product.title)
                         .join("، ")}
                     </p>
-                    <ProductCard product={recommendation.product} />
+                    <div className="flex-1">
+                      <ProductCard product={recommendation.product} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -355,7 +365,7 @@ export default function CartPage() {
 
         {/* خلاصه و ثبت سفارش */}
         <div className="lg:w-80 lg:shrink-0">
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:sticky lg:top-28">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:sticky-below-header">
             <div className="space-y-3 border-b border-slate-100 pb-4 text-sm">
               <div className="flex justify-between gap-3 text-slate-500">
                 <span>
@@ -457,7 +467,7 @@ export default function CartPage() {
                       }
                       onClearError={() => setError("")}
                       disabled={submitting}
-                      className="grid gap-2 sm:grid-cols-2"
+                      className="grid grid-cols-1 gap-2 sm:grid-cols-2"
                       labelClassName="sr-only"
                     />
                     <textarea

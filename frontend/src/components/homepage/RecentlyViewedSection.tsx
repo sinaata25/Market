@@ -66,7 +66,7 @@ export default function RecentlyViewedSection({
             clearRecentlyViewed();
             setProducts([]);
           }}
-          className="shrink-0 text-xs text-slate-400 transition hover:text-red-500"
+          className="-my-2 inline-flex min-h-11 shrink-0 items-center px-1 text-xs text-slate-400 transition hover:text-red-500 sm:min-h-0 sm:py-0"
         >
           پاک کردن تاریخچه
         </button>

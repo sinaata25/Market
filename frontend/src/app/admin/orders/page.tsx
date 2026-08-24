@@ -214,7 +214,7 @@ function OrderRow({
       {expanded && (
         <tr className="bg-slate-50/60">
           <td colSpan={6} className="px-5 py-4">
-            <div className="grid gap-4 text-xs sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
               <div>
                 <p className="mb-2 font-bold text-slate-600">اقلام سفارش</p>
                 <ul className="space-y-1.5">

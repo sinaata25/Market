@@ -74,9 +74,9 @@ export default function BrandMenu() {
       {open && (
         <div
           id="product-brand-menu"
-          className="fixed inset-x-4 top-[10.75rem] z-50 pt-2 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full"
+          className="fixed inset-x-4 below-header z-50 pt-2 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full"
         >
-          <div className="mr-auto flex max-h-[calc(100dvh-11.25rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_18px_50px_-16px_rgba(15,23,42,0.35)] lg:max-h-[calc(100dvh-8rem)] lg:w-80">
+          <div className="mr-auto flex h-under-header w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_18px_50px_-16px_rgba(15,23,42,0.35)] lg:w-80">
             <p className="border-b border-slate-100 px-2 pb-3 text-xs font-bold text-slate-700">
               انتخاب بر اساس برند
             </p>

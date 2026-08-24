@@ -157,9 +157,9 @@ export default function CategoryMenu() {
       {open && active && (
         <div
           id="product-category-menu"
-          className="fixed inset-x-2 top-[10.75rem] z-50 pt-2 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full"
+          className="fixed inset-x-2 below-header z-50 pt-2 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full"
         >
-          <div className="flex h-[min(36rem,calc(100dvh-11.25rem))] min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-18px_rgba(15,23,42,0.35)] lg:h-[min(580px,calc(100dvh-9rem))] lg:w-[min(1120px,calc(100vw-2rem))] lg:flex-row lg:rounded-b-2xl lg:rounded-tl-2xl lg:rounded-tr-none">
+          <div className="flex max-h-[min(36rem,calc(100dvh-var(--header-h)-1.5rem))] min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-18px_rgba(15,23,42,0.35)] lg:max-h-[min(580px,calc(100dvh-var(--header-h)-2rem))] lg:w-[min(1120px,calc(100vw-2rem))] lg:flex-row lg:rounded-b-2xl lg:rounded-tl-2xl lg:rounded-tr-none">
             {/* ستون دسته‌های اصلی */}
             <ul
               aria-label="دسته‌بندی‌های اصلی"

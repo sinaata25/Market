@@ -147,10 +147,10 @@ export default function AdminLayout({
     !me.isStaff && me.isSeoManager && !pathname.startsWith("/admin/seo");
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-4 sm:py-6 lg:flex-row">
+    <div className="site-shell flex flex-col gap-5 py-4 sm:py-6 lg:flex-row">
       {/* سایدبار */}
       <aside className="min-w-0 lg:w-56 lg:shrink-0">
-        <div className="overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200 lg:sticky lg:top-24">
+        <div className="overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200 lg:sticky-below-header">
           <div className="border-b border-secondary-700/60 px-5 py-4">
             <p className="text-sm font-bold text-white">پنل مدیریت</p>
             <p className="mt-1 text-[11px] text-slate-400 font-num" dir="ltr">
@@ -225,7 +225,7 @@ export default function AdminLayout({
       {/* محتوا — مدیر سئو به بخش‌های فروشگاهی دسترسی ندارد */}
       <main className="min-w-0 flex-1">
         {seoOnlyBlocked ? (
-          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-8 text-center">
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-6 text-center sm:p-8">
             <span className="mb-3 block text-4xl">🔒</span>
             <p className="mb-4 text-sm text-slate-600">
               نقش شما «مدیر سئو» است و به این بخش دسترسی ندارید.

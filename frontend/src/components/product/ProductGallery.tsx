@@ -14,7 +14,7 @@ export default function ProductGallery({
   if (images.length === 0) return null;
 
   return (
-    <div className="lg:sticky lg:top-28">
+    <div className="lg:sticky-below-header">
       <div className="aspect-square overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

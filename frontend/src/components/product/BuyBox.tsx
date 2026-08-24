@@ -36,7 +36,7 @@ export default function BuyBox({ product }: { product: Product }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6 lg:sticky lg:top-28">
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-6 lg:sticky-below-header">
       {/* تضمین‌ها */}
       <ul className="mb-5 space-y-3 text-sm text-slate-600">
         {product.warranty && (

@@ -90,11 +90,11 @@ export default function ProfileLayout({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       <div className="flex flex-col gap-5 lg:flex-row">
         {/* سایدبار */}
         <aside className="min-w-0 lg:w-64 lg:shrink-0">
-          <div className="lg:sticky lg:top-24">
+          <div className="lg:sticky-below-header">
             {/* کارت کاربر */}
             <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-right lg:block lg:p-5 lg:text-center">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-brand-50 text-2xl lg:mx-auto lg:mb-3 lg:h-16 lg:w-16 lg:text-3xl">

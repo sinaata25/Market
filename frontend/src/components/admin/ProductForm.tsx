@@ -415,9 +415,9 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* ستون اصلی */}
-        <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 lg:col-span-2">
+        <div className="min-w-0 space-y-4 rounded-2xl border border-slate-100 bg-white p-5 lg:col-span-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-600">
               عنوان محصول *
@@ -454,7 +454,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               placeholder="معرفی کامل محصول..."
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
                 گارانتی
@@ -682,7 +682,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 </div>
               )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">
                   قیمت فروش *
@@ -841,7 +841,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          className="action-btn rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
           {saving
             ? !isEdit && pendingImages.length > 0

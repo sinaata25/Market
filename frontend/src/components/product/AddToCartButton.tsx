@@ -8,6 +8,7 @@ type AddToCartButtonProps = {
   productId: number;
   productTitle: string;
   stock?: number;
+  variant?: "default" | "card";
 };
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -116,6 +117,7 @@ export default function AddToCartButton({
   productId,
   productTitle,
   stock,
+  variant = "default",
 }: AddToCartButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [feedback, setFeedback] = useState("");
@@ -175,6 +177,10 @@ export default function AddToCartButton({
       : status === "error"
         ? "bg-red-50 text-red-600 ring-1 ring-red-100 hover:bg-red-100"
         : "bg-brand-600 text-white shadow-sm hover:bg-brand-700";
+  const sizeClass =
+    variant === "card"
+      ? "h-9 w-9 rounded-lg"
+      : "h-9 w-9 rounded-xl sm:h-10 sm:w-10";
 
   return (
     <div className="relative z-10 shrink-0">
@@ -185,7 +191,7 @@ export default function AddToCartButton({
         aria-label={label}
         aria-busy={loading || undefined}
         title={label}
-        className={`grid h-9 w-9 place-items-center rounded-xl transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 ${colorClass}`}
+        className={`grid place-items-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-60 ${sizeClass} ${colorClass}`}
       >
         {loading ? (
           <LoadingIcon />

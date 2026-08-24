@@ -52,7 +52,7 @@ export default async function ContactPage() {
 
   return (
     <div className="overflow-hidden">
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:pt-8">
+      <div className="site-shell pb-16 pt-6 sm:pt-8">
         <nav aria-label="مسیر راهنما" className="mb-5 flex items-center gap-2 text-xs text-slate-500">
           <Link href="/" className="transition hover:text-brand-700">
             خانه
@@ -65,7 +65,7 @@ export default async function ContactPage() {
           <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_15%_15%,rgba(228,176,40,0.25),transparent_27%),radial-gradient(circle_at_85%_100%,rgba(255,255,255,0.12),transparent_32%)]" />
           <div className="absolute -left-20 -top-24 -z-10 h-80 w-80 rounded-full border-[55px] border-white/5" />
 
-          <div className="grid items-end gap-10 lg:grid-cols-[1fr_auto]">
+          <div className="grid grid-cols-1 items-end gap-10 lg:grid-cols-[1fr_auto]">
             <div className="max-w-2xl">
               <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs text-brand-50 backdrop-blur-sm">
                 <span className="relative flex h-2.5 w-2.5">
@@ -131,7 +131,7 @@ export default async function ContactPage() {
           })}
         </section>}
 
-        {sections.topics && <section className="grid gap-10 py-16 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20 lg:py-24">
+        {sections.topics && <section className="grid grid-cols-1 gap-10 py-16 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20 lg:py-24">
           <div>
             <p className="mb-3 text-sm font-bold text-brand-600">{content.topics.eyebrow}</p>
             <h2 className="text-2xl font-bold leading-10 text-secondary-900 sm:text-3xl">
@@ -143,7 +143,7 @@ export default async function ContactPage() {
           </div>
           <ol className="divide-y divide-slate-100 overflow-hidden rounded-3xl border border-slate-100 bg-white">
             {content.topics.items.map((topic, index) => (
-              <li key={topicNumbers[index]} className="grid gap-3 p-6 sm:grid-cols-[3.5rem_1fr] sm:gap-5 sm:p-7">
+              <li key={topicNumbers[index]} className="grid grid-cols-1 gap-3 p-6 sm:grid-cols-[3.5rem_1fr] sm:gap-5 sm:p-7">
                 <span className="font-num text-xl font-bold text-accent-600">{topicNumbers[index]}</span>
                 <div>
                   <h3 className="font-bold text-secondary-900">{topic.title}</h3>
@@ -154,7 +154,7 @@ export default async function ContactPage() {
           </ol>
         </section>}
 
-        {sections["faq-promo"] && <section className="grid overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_70px_-50px_rgba(31,61,137,0.7)] lg:grid-cols-[1fr_0.95fr]">
+        {sections["faq-promo"] && <section className="grid grid-cols-1 overflow-hidden rounded-[2rem] bg-white shadow-[0_20px_70px_-50px_rgba(31,61,137,0.7)] lg:grid-cols-[1fr_0.95fr]">
           <div className="p-7 sm:p-10 lg:p-12">
             <span className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-accent-50 text-2xl">🌱</span>
             <p className="mb-2 text-sm font-bold text-brand-600">{content.faqPromo.eyebrow}</p>

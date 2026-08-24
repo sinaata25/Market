@@ -63,7 +63,7 @@ export default function SpecificationEditor({
                 key={row.clientId}
                 className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
               >
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_auto] sm:items-start">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_auto] sm:items-start">
                   <div>
                     <label
                       htmlFor={`specification-key-${row.clientId}`}

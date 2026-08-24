@@ -113,7 +113,7 @@ export default function AdminProducts() {
             ({faNum(total)})
           </span>
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <input
             value={search}
             onChange={(e) => {
@@ -121,11 +121,11 @@ export default function AdminProducts() {
               setPage(1);
             }}
             placeholder="جستجوی محصول..."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-48"
+            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-48 sm:flex-none"
           />
           <Link
             href="/admin/products/new"
-            className="rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-brand-700"
+            className="shrink-0 whitespace-nowrap rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-brand-700"
           >
             + افزودن محصول
           </Link>
