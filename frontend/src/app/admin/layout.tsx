@@ -157,7 +157,10 @@ export default function AdminLayout({
               {me.name ?? me.phone}
             </p>
           </div>
-          <nav aria-label="منوی مدیریت" className="responsive-scroll flex gap-1 p-2 lg:block">
+          <nav
+            aria-label="منوی مدیریت"
+            className="grid grid-cols-2 gap-1 p-2 sm:grid-cols-3 lg:block"
+          >
             {showShopNav &&
               SHOP_NAV.map((item) => {
                 const active =
@@ -168,13 +171,13 @@ export default function AdminLayout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm transition lg:mb-1 lg:gap-3 lg:px-4 ${
+                    className={`flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm leading-5 transition lg:mb-1 lg:gap-3 lg:whitespace-nowrap lg:px-4 ${
                       active
                         ? "bg-brand-600 font-medium text-white"
                         : "hover:bg-secondary-800 hover:text-white"
                     }`}
                   >
-                    <span>{item.icon}</span>
+                    <span className="shrink-0">{item.icon}</span>
                     {item.label}
                   </Link>
                 );
@@ -192,13 +195,13 @@ export default function AdminLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm transition lg:mb-1 lg:gap-3 lg:px-4 ${
+                  className={`flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm leading-5 transition lg:mb-1 lg:gap-3 lg:whitespace-nowrap lg:px-4 ${
                     active
                       ? "bg-brand-600 font-medium text-white"
                     : "hover:bg-secondary-800 hover:text-white"
                   }`}
                 >
-                  <span>{item.icon}</span>
+                  <span className="shrink-0">{item.icon}</span>
                   {item.label}
                 </Link>
               );

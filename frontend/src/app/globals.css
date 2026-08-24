@@ -131,35 +131,6 @@ label {
   -webkit-overflow-scrolling: touch;
 }
 
-/* نوار اصلی روی موبایل یک track واقعی و قابل drag/swipe دارد. */
-.mobile-nav-scroll {
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-inline: contain;
-  scroll-snap-type: inline proximity;
-  scrollbar-width: thin;
-  touch-action: pan-x;
-  -webkit-overflow-scrolling: touch;
-}
-
-.mobile-nav-scroll > div > * {
-  scroll-snap-align: start;
-}
-
-.mobile-nav-scroll::-webkit-scrollbar {
-  height: 5px;
-}
-
-@media (min-width: 1024px) {
-  .mobile-nav-scroll {
-    overflow: visible;
-    scroll-snap-type: none;
-    scrollbar-width: auto;
-    touch-action: auto;
-  }
-}
-
 /* نوار مقایسه فقط هنگام نمایش خودش از انتهای صفحه فضا می‌گیرد. */
 body:has([data-compare-tray]) .site-main {
   padding-bottom: 9rem;

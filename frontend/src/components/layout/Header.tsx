@@ -51,39 +51,37 @@ export default function Header() {
       {/* نوار دسته‌بندی */}
       <nav className="border-b border-slate-100 bg-white">
         <div className="site-container">
-          <div className="mobile-nav-scroll">
-            <div className="flex w-max min-w-full items-center gap-1 py-1 text-sm sm:gap-2 sm:py-1.5 lg:w-full">
-              <CategoryMenu />
-              <BrandMenu />
+          <div className="flex w-full flex-wrap items-center justify-center gap-x-1 py-1 text-sm sm:gap-x-2 sm:py-1.5 lg:flex-nowrap lg:justify-start">
+            <CategoryMenu />
+            <BrandMenu />
 
-              <span className="mx-1 h-5 w-px shrink-0 bg-slate-200" />
+            <span className="mx-1 hidden h-5 w-px shrink-0 bg-slate-200 lg:block" />
 
-              <Link
-                href="/incredible"
-                className="flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-accent-700 transition hover:bg-accent-50"
-              >
-                ⚡ شگفت‌انگیزها
-              </Link>
-              <Link
-                href="/best-sellers"
-                className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-              >
-                پرفروش‌ترین‌ها
-              </Link>
-              <Link
-                href="/blog"
-                className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-              >
-                وبلاگ کشاورزی
-              </Link>
+            <Link
+              href="/incredible"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-accent-700 transition hover:bg-accent-50"
+            >
+              ⚡ شگفت‌انگیزها
+            </Link>
+            <Link
+              href="/best-sellers"
+              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
+            >
+              پرفروش‌ترین‌ها
+            </Link>
+            <Link
+              href="/blog"
+              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
+            >
+              وبلاگ کشاورزی
+            </Link>
 
-              <Link
-                href="/support"
-                className="mr-auto flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-              >
-                سوالی دارید؟
-              </Link>
-            </div>
+            <Link
+              href="/support"
+              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:mr-auto"
+            >
+              سوالی دارید؟
+            </Link>
           </div>
         </div>
       </nav>
