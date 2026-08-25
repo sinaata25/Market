@@ -122,6 +122,14 @@ class Product(models.Model):
     best_seller_position = models.PositiveIntegerField(
         "ترتیب در پرفروش‌ترین‌ها", default=0
     )
+    is_incredible = models.BooleanField(
+        "شگفت‌انگیز ویژه (انتخاب مدیر)",
+        default=False,
+        help_text="نمایش در بخش «شگفت‌انگیزها» — انتخاب دستی مدیر، مستقل از تخفیف",
+    )
+    incredible_position = models.PositiveIntegerField(
+        "ترتیب در شگفت‌انگیزها", default=0
+    )
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     category = models.ForeignKey(

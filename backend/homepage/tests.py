@@ -119,6 +119,57 @@ class HomepageServiceTests(TestCase):
         )
         self.assertEqual(section_products(section), [curated])
 
+    def test_every_product_section_type_is_exposed_publicly(self):
+        """هیچ نوع بخش محصولی نباید بی‌سروصدا از پاسخ عمومی حذف شود"""
+        from homepage.dto import public_section_dto
+        from homepage.services import PRODUCT_SECTION_FILTERS
+
+        for section_type in PRODUCT_SECTION_FILTERS:
+            with self.subTest(section_type=section_type):
+                section = create_section(section_type=section_type)
+                dto = public_section_dto(section)
+                self.assertIsNotNone(dto)
+                self.assertEqual(dto["type"], section_type)
+                self.assertIn("products", dto["data"])
+
+    def test_section_products_incredible_uses_curated_flag(self):
+        """بخش شگفت‌انگیزها منتخب مدیر است، نه هر محصول تخفیف‌دار"""
+        Product.objects.create(
+            title="تخفیف‌دار انتخاب‌نشده",
+            category=self.category,
+            price=1000,
+            old_price=2000,
+            is_active=True,
+        )
+        curated = Product.objects.create(
+            title="شگفت‌انگیز منتخب",
+            category=self.category,
+            price=1000,
+            is_active=True,
+            is_incredible=True,
+        )
+        section = create_section(
+            section_type=HomepageSection.SectionType.INCREDIBLE_PRODUCTS
+        )
+        self.assertEqual(section_products(section), [curated])
+
+    def test_section_products_discounted_lists_every_discounted_product(self):
+        """بخش تخفیف‌ها مستقل از انتخاب مدیر، همه‌ی تخفیف‌دارها را می‌آورد"""
+        discounted = Product.objects.create(
+            title="تخفیف‌دار",
+            category=self.category,
+            price=1000,
+            old_price=2000,
+            is_active=True,
+        )
+        Product.objects.create(
+            title="بدون تخفیف", category=self.category, price=1000, is_active=True
+        )
+        section = create_section(
+            section_type=HomepageSection.SectionType.DISCOUNTED_PRODUCTS
+        )
+        self.assertEqual(section_products(section), [discounted])
+
     def test_section_products_product_collection_filters_by_brand(self):
         other_brand = Brand.objects.create(name="برند ب", slug="b")
         matching = Product.objects.create(

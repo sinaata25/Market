@@ -16,6 +16,7 @@ export type HomepageSectionType =
   | "categories"
   | "brands"
   | "best_sellers"
+  | "incredible_products"
   | "discounted_products"
   | "new_products"
   | "product_collection"

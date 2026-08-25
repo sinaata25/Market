@@ -84,6 +84,9 @@ def product_dto(product: Product, *, include_specifications: bool = False) -> di
         # انتخاب دستی مدیر برای بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش/امتیاز واقعی
         "isBestSeller": product.is_best_seller,
         "bestSellerPosition": product.best_seller_position,
+        # انتخاب دستی مدیر برای بخش «شگفت‌انگیزها»
+        "isIncredible": product.is_incredible,
+        "incrediblePosition": product.incredible_position,
     }
     if include_specifications:
         data["specifications"] = [

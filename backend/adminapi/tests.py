@@ -35,6 +35,8 @@ PRODUCT_RESPONSE_KEYS = {
     "isActive",
     "isBestSeller",
     "bestSellerPosition",
+    "isIncredible",
+    "incrediblePosition",
 }
 
 

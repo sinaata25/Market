@@ -12,6 +12,7 @@ import ProductGallery from "@/components/product/ProductGallery";
 import BuyBox from "@/components/product/BuyBox";
 import ProductTabs from "@/components/product/ProductTabs";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import FavoriteButton from "@/components/product/FavoriteButton";
 import CompareButton from "@/components/product/CompareButton";
 import JsonLd from "@/components/seo/JsonLd";
@@ -248,11 +249,11 @@ export default async function ProductPage({
           <h2 className="mb-4 text-lg font-bold text-slate-800">
             محصولات مشابه
           </h2>
-          <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
+          <ProductGrid>
             {related.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
-          </div>
+          </ProductGrid>
         </section>
       )}
     </div>

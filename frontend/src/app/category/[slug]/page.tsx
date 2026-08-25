@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCategories, getProducts } from "@/lib/catalog";
 import { breadcrumbSchema, fetchSeo, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import JsonLd from "@/components/seo/JsonLd";
 
 // داده‌ها از دیتابیس (جنگو) خوانده می‌شوند
@@ -218,11 +219,11 @@ export default async function CategoryPage({
 
       {/* گرید محصولات */}
       {result.items.length > 0 ? (
-        <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
+        <ProductGrid>
           {result.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
-        </div>
+        </ProductGrid>
       ) : (
         <div className="rounded-3xl border border-slate-100 bg-white px-6 py-16 text-center">
           <span className="mb-4 block text-6xl">🔍</span>

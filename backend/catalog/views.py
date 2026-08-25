@@ -120,6 +120,12 @@ class ProductListView(APIView):
                 OpenApiParameter.QUERY,
                 description="Only products the admin marked as best-selling.",
             ),
+            OpenApiParameter(
+                "incredible",
+                OpenApiTypes.BOOL,
+                OpenApiParameter.QUERY,
+                description="Only products the admin curated as incredible offers.",
+            ),
             OpenApiParameter("sort", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter("page", OpenApiTypes.INT, OpenApiParameter.QUERY),
             OpenApiParameter(
@@ -135,6 +141,7 @@ class ProductListView(APIView):
             search=request.query_params.get("search"),
             discounted=request.query_params.get("discounted") in ("true", "1"),
             best_seller=request.query_params.get("bestSeller") in ("true", "1"),
+            incredible=request.query_params.get("incredible") in ("true", "1"),
             sort=request.query_params.get("sort", "newest"),
         )
 

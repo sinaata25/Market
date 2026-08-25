@@ -1,5 +1,7 @@
 import Link from "next/link";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
+import ProductRail from "@/components/product/ProductRail";
 import type {
   HomepageBanner,
   HomepageSection,
@@ -128,13 +130,16 @@ function BrandsSection({ section }: { section: HomepageSection }) {
 
 const PRODUCT_LINKS: Partial<Record<HomepageSectionType, string>> = {
   best_sellers: "/best-sellers",
-  discounted_products: "/incredible",
+  incredible_products: "/incredible",
+  discounted_products: "/discounts",
 };
 
 function ProductSection({ section }: { section: HomepageSection }) {
   const products = section.data.products ?? [];
   if (!products.length) return null;
-  const isDeals = section.type === "discounted_products";
+  const isDeals =
+    section.type === "discounted_products" ||
+    section.type === "incredible_products";
   const allLink = PRODUCT_LINKS[section.type as HomepageSectionType];
 
   return (
@@ -167,25 +172,19 @@ function ProductSection({ section }: { section: HomepageSection }) {
           </Link>
         )}
       </div>
-      <div
-        className={
-          isDeals
-            ? "-mx-1 max-w-full overflow-x-auto overscroll-x-contain px-1 pb-2 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0"
-            : ""
-        }
-      >
-        <div
-          className={
-            isDeals
-              ? "grid w-max grid-flow-col auto-cols-[10.5rem] items-stretch gap-2 sm:w-auto sm:grid-flow-row sm:grid-cols-3 sm:gap-3 lg:grid-cols-5 xl:grid-cols-6"
-              : "grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5"
-          }
-        >
+      {isDeals ? (
+        <ProductRail>
           {products.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
-        </div>
-      </div>
+        </ProductRail>
+      ) : (
+        <ProductGrid>
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </ProductGrid>
+      )}
     </section>
   );
 }
@@ -200,6 +199,7 @@ const SECTION_RENDERERS: Partial<
   categories: (section) => <CategoriesSection section={section} />,
   brands: (section) => <BrandsSection section={section} />,
   best_sellers: (section) => <ProductSection section={section} />,
+  incredible_products: (section) => <ProductSection section={section} />,
   discounted_products: (section) => <ProductSection section={section} />,
   new_products: (section) => <ProductSection section={section} />,
   product_collection: (section) => <ProductSection section={section} />,

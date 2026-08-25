@@ -9,6 +9,7 @@ type SectionType =
   | "categories"
   | "brands"
   | "best_sellers"
+  | "incredible_products"
   | "discounted_products"
   | "new_products"
   | "product_collection"
@@ -66,7 +67,8 @@ const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "categories", label: "دسته‌بندی‌ها" },
   { value: "brands", label: "برندها" },
   { value: "best_sellers", label: "پرفروش‌ترین‌ها" },
-  { value: "discounted_products", label: "تخفیف‌های ویژه" },
+  { value: "incredible_products", label: "شگفت‌انگیزها (منتخب مدیر)" },
+  { value: "discounted_products", label: "همه محصولات تخفیف‌دار" },
   { value: "new_products", label: "جدیدترین محصولات" },
   { value: "product_collection", label: "مجموعه محصولات سفارشی" },
   { value: "recently_viewed", label: "محصولات اخیراً مشاهده‌شده" },

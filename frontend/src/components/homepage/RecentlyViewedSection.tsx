@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ProductCard from "@/components/product/ProductCard";
+import ProductRail from "@/components/product/ProductRail";
 import { api } from "@/lib/client-api";
 import type { Product } from "@/lib/products";
 import {
@@ -71,13 +72,11 @@ export default function RecentlyViewedSection({
           پاک کردن تاریخچه
         </button>
       </div>
-      <div className="max-w-full overflow-x-auto overscroll-x-contain pb-3">
-        <div className="grid w-max grid-flow-col auto-cols-[10.5rem] gap-3 sm:auto-cols-[13rem] lg:auto-cols-[14rem]">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      </div>
+      <ProductRail>
+        {products.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </ProductRail>
     </section>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/client-api";
 import type { Product } from "@/lib/products";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import { faNum } from "@/components/admin/ui";
 
 export default function MyFavorites() {
@@ -56,7 +57,7 @@ export default function MyFavorites() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <ProductGrid>
           {items.map((p) => (
             <ProductCard
               key={p.id}
@@ -70,7 +71,7 @@ export default function MyFavorites() {
               }}
             />
           ))}
-        </div>
+        </ProductGrid>
       )}
     </div>
   );

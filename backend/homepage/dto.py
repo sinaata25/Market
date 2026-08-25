@@ -7,7 +7,12 @@ from catalog.dto import brand_dto, category_dto, category_summary, product_dto
 from catalog.models import Brand, Category
 
 from .models import Banner, HomepageSection
-from .services import resolved_limit, resolved_title, section_products
+from .services import (
+    PRODUCT_SECTION_FILTERS,
+    resolved_limit,
+    resolved_title,
+    section_products,
+)
 
 
 def banner_dto(banner: Banner) -> dict:
@@ -107,16 +112,16 @@ def public_section_dto(section: HomepageSection) -> dict | None:
             "data": {},
         }
 
-    product_types = {
-        HomepageSection.SectionType.BEST_SELLERS,
-        HomepageSection.SectionType.DISCOUNTED_PRODUCTS,
-        HomepageSection.SectionType.NEW_PRODUCTS,
-        HomepageSection.SectionType.PRODUCT_COLLECTION,
+    # از خودِ پیکربندی فیلترها گرفته می‌شود تا افزودن نوع بخش محصولی جدید،
+    # یک‌جا انجام شود و بخش تازه بی‌سروصدا از پاسخ عمومی حذف نشود
+    product_types = set(PRODUCT_SECTION_FILTERS) | {
+        HomepageSection.SectionType.PRODUCT_COLLECTION
     }
     if section_type not in product_types:
         return None
 
-    # بخش‌های محصولی: پرفروش‌ترین‌ها، تخفیف‌دارها، جدیدترین‌ها، مجموعه سفارشی
+    # بخش‌های محصولی: پرفروش‌ترین‌ها، شگفت‌انگیزها، تخفیف‌دارها، جدیدترین‌ها،
+    # مجموعه سفارشی
     products = section_products(section)
     return {
         "id": section.id,

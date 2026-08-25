@@ -114,6 +114,9 @@ export default function ProductForm({ productId }: { productId?: number }) {
   const [changingVisibility, setChangingVisibility] = useState(false);
   const [isBestSeller, setIsBestSeller] = useState(false);
   const [bestSellerPosition, setBestSellerPosition] = useState(0);
+  const [isIncredible, setIsIncredible] = useState(false);
+  const [incrediblePosition, setIncrediblePosition] = useState(0);
+  const [changingIncredible, setChangingIncredible] = useState(false);
   const [changingBestSeller, setChangingBestSeller] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
     null
@@ -171,6 +174,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
             setIsActive(p.isActive !== false);
             setIsBestSeller(p.isBestSeller ?? false);
             setBestSellerPosition(p.bestSellerPosition ?? 0);
+            setIsIncredible(p.isIncredible ?? false);
+            setIncrediblePosition(p.incrediblePosition ?? 0);
           }
           setLoading(false);
         });
@@ -388,6 +393,48 @@ export default function ProductForm({ productId }: { productId?: number }) {
     }
   }
 
+  async function toggleIncredible() {
+    if (activeProductId === undefined || changingIncredible) return;
+    setChangingIncredible(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/incredible`,
+      { isIncredible: !isIncredible }
+    );
+    setChangingIncredible(false);
+    if (result.ok && result.data) {
+      setIsIncredible(result.data.product.isIncredible ?? false);
+      setMessage({
+        ok: true,
+        text: result.data.product.isIncredible
+          ? "محصول به شگفت‌انگیزها اضافه شد ✅"
+          : "محصول از شگفت‌انگیزها حذف شد ✅",
+      });
+    } else {
+      setMessage({
+        ok: false,
+        text: result.error ?? "تغییر وضعیت شگفت‌انگیز انجام نشد",
+      });
+    }
+  }
+
+  async function saveIncrediblePosition() {
+    if (activeProductId === undefined || changingIncredible) return;
+    setChangingIncredible(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/incredible`,
+      { isIncredible, position: incrediblePosition }
+    );
+    setChangingIncredible(false);
+    if (result.ok && result.data) {
+      setIncrediblePosition(result.data.product.incrediblePosition ?? 0);
+      setMessage({ ok: true, text: "ترتیب نمایش ذخیره شد ✅" });
+    } else {
+      setMessage({ ok: false, text: result.error ?? "ذخیره ترتیب انجام نشد" });
+    }
+  }
+
   async function saveBestSellerPosition() {
     if (activeProductId === undefined || changingBestSeller) return;
     setChangingBestSeller(true);
@@ -597,6 +644,70 @@ export default function ProductForm({ productId }: { productId?: number }) {
               <p className="mt-3 text-[11px] leading-5 text-slate-400">
                 انتخابی دستی و مستقل از آمار فروش/امتیاز واقعی — برای تبلیغ یا
                 معرفی محصول در صفحه اصلی فروشگاه استفاده می‌شود.
+              </p>
+            </div>
+          )}
+
+          {isEdit && (
+            <div className="rounded-2xl border border-slate-100 bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-slate-600">
+                    بخش شگفت‌انگیزها
+                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                      isIncredible
+                        ? "bg-accent-100 text-accent-800"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isIncredible ? "⚡ شگفت‌انگیز است" : "☆ شگفت‌انگیز نیست"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={changingIncredible}
+                  onClick={toggleIncredible}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isIncredible
+                      ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      : "border-accent-200 text-accent-800 hover:bg-accent-50"
+                  }`}
+                >
+                  {changingIncredible
+                    ? "در حال تغییر..."
+                    : isIncredible
+                      ? "حذف از شگفت‌انگیزها"
+                      : "افزودن به شگفت‌انگیزها"}
+                </button>
+              </div>
+              {isIncredible && (
+                <div className="mt-3 flex items-center gap-2">
+                  <label
+                    htmlFor="incredible-position"
+                    className="shrink-0 text-[11px] text-slate-500"
+                  >
+                    ترتیب نمایش (کوچک‌تر = زودتر)
+                  </label>
+                  <input
+                    id="incredible-position"
+                    type="number"
+                    min={0}
+                    value={incrediblePosition}
+                    onChange={(e) =>
+                      setIncrediblePosition(Number(e.target.value) || 0)
+                    }
+                    onBlur={saveIncrediblePosition}
+                    disabled={changingIncredible}
+                    className={`${inputCls()} font-num w-24 py-1.5`}
+                  />
+                </div>
+              )}
+              <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                انتخابی دستی برای صفحه‌ی «شگفت‌انگیزها» — مستقل از داشتن تخفیف.
+                همه‌ی کالاهای تخفیف‌دار به‌طور خودکار در صفحه‌ی «تخفیف‌ها»
+                نمایش داده می‌شوند.
               </p>
             </div>
           )}

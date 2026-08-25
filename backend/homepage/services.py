@@ -39,7 +39,8 @@ DEFAULT_TITLES: dict[str, str] = {
     HomepageSection.SectionType.CATEGORIES: "دسته‌بندی‌ها",
     HomepageSection.SectionType.BRANDS: "برندهای ما",
     HomepageSection.SectionType.BEST_SELLERS: "پرفروش‌ترین‌ها",
-    HomepageSection.SectionType.DISCOUNTED_PRODUCTS: "تخفیف‌های ویژه",
+    HomepageSection.SectionType.INCREDIBLE_PRODUCTS: "شگفت‌انگیزها",
+    HomepageSection.SectionType.DISCOUNTED_PRODUCTS: "همه تخفیف‌ها",
     HomepageSection.SectionType.NEW_PRODUCTS: "جدیدترین محصولات",
     HomepageSection.SectionType.PRODUCT_COLLECTION: "منتخب فروشگاه",
     HomepageSection.SectionType.RECENTLY_VIEWED: "محصولات اخیراً مشاهده‌شده",
@@ -49,6 +50,7 @@ DEFAULT_LIMITS: dict[str, int] = {
     HomepageSection.SectionType.CATEGORIES: 8,
     HomepageSection.SectionType.BRANDS: 12,
     HomepageSection.SectionType.BEST_SELLERS: 8,
+    HomepageSection.SectionType.INCREDIBLE_PRODUCTS: 6,
     HomepageSection.SectionType.DISCOUNTED_PRODUCTS: 6,
     HomepageSection.SectionType.NEW_PRODUCTS: 8,
     HomepageSection.SectionType.PRODUCT_COLLECTION: 8,
@@ -58,6 +60,11 @@ DEFAULT_LIMITS: dict[str, int] = {
 # نوع بخش‌هایی که داده‌شان یک فهرست محصول است — پارامترهای انتخاب محصول هرکدام
 PRODUCT_SECTION_FILTERS = {
     HomepageSection.SectionType.BEST_SELLERS: {"best_seller": True, "sort": "featured"},
+    # شگفت‌انگیزها انتخاب دستی مدیر است، نه هر محصول تخفیف‌دار
+    HomepageSection.SectionType.INCREDIBLE_PRODUCTS: {
+        "incredible": True,
+        "sort": "incredible",
+    },
     HomepageSection.SectionType.DISCOUNTED_PRODUCTS: {"discounted": True, "sort": "newest"},
     HomepageSection.SectionType.NEW_PRODUCTS: {"sort": "newest"},
 }

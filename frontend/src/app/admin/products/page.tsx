@@ -16,6 +16,9 @@ export default function AdminProducts() {
   const [changingVisibility, setChangingVisibility] = useState<number | null>(
     null
   );
+  const [changingIncredible, setChangingIncredible] = useState<number | null>(
+    null
+  );
   const [changingBestSeller, setChangingBestSeller] = useState<number | null>(
     null
   );
@@ -76,6 +79,31 @@ export default function AdminProducts() {
       setMessage(result.error ?? "تغییر وضعیت محصول انجام نشد");
     }
     setChangingVisibility(null);
+    setTimeout(() => setMessage(""), 4000);
+  }
+
+  async function toggleIncredible(product: Product) {
+    if (changingIncredible !== null) return;
+    setChangingIncredible(product.id);
+    const result = await api.patch<{ product: Product }>(
+      `/api/admin/products/${product.id}/incredible`,
+      { isIncredible: !product.isIncredible }
+    );
+    if (result.ok && result.data) {
+      setProducts((current) =>
+        current.map((item) =>
+          item.id === product.id ? result.data!.product : item
+        )
+      );
+      setMessage(
+        product.isIncredible
+          ? "محصول از شگفت‌انگیزها حذف شد ✅"
+          : "محصول به شگفت‌انگیزها اضافه شد ✅"
+      );
+    } else {
+      setMessage(result.error ?? "تغییر وضعیت شگفت‌انگیز انجام نشد");
+    }
+    setChangingIncredible(null);
     setTimeout(() => setMessage(""), 4000);
   }
 
@@ -150,14 +178,15 @@ export default function AdminProducts() {
               <th className="px-3 py-3 font-medium">امتیاز</th>
               <th className="px-3 py-3 font-medium">وضعیت نمایش</th>
               <th className="px-3 py-3 font-medium">پرفروش‌ترین‌ها</th>
+              <th className="px-3 py-3 font-medium">شگفت‌انگیزها</th>
               <th className="px-5 py-3 font-medium">عملیات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={9} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={10} text="در حال بارگذاری..." />
             ) : products.length === 0 ? (
-              <EmptyRow colSpan={9} text="محصولی یافت نشد" />
+              <EmptyRow colSpan={10} text="محصولی یافت نشد" />
             ) : (
               products.map((p) => (
                 <tr
@@ -248,6 +277,21 @@ export default function AdminProducts() {
                       }`}
                     >
                       {p.isBestSeller ? "⭐ پرفروش" : "☆ افزودن"}
+                    </button>
+                  </td>
+                  <td className="px-3 py-3">
+                    <button
+                      type="button"
+                      disabled={changingIncredible !== null}
+                      onClick={() => toggleIncredible(p)}
+                      title="انتخاب دستی برای بخش شگفت‌انگیزها — مستقل از داشتن تخفیف"
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        p.isIncredible
+                          ? "bg-accent-100 text-accent-800 hover:bg-accent-200"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                    >
+                      {p.isIncredible ? "⚡ شگفت‌انگیز" : "☆ افزودن"}
                     </button>
                   </td>
                   <td className="px-5 py-3">

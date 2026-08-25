@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import { getBrands, getProducts } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
@@ -156,11 +157,11 @@ export default async function BrandPage({
       </div>
 
       {result.items.length > 0 ? (
-        <div className="grid grid-cols-2 items-stretch gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
+        <ProductGrid>
           {result.items.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
-        </div>
+        </ProductGrid>
       ) : (
         <div className="rounded-3xl border border-slate-100 bg-white px-6 py-16 text-center">
           <span className="mb-4 block text-6xl">🔍</span>

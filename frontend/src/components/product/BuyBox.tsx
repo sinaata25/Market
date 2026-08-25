@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatPrice, type Product } from "@/lib/products";
+import { discountPercent, formatPrice, type Product } from "@/lib/products";
 import { api } from "@/lib/client-api";
 
 export default function BuyBox({ product }: { product: Product }) {
@@ -12,9 +12,7 @@ export default function BuyBox({ product }: { product: Product }) {
     text: string;
   } | null>(null);
 
-  const discount = product.oldPrice
-    ? Math.round((1 - product.price / product.oldPrice) * 100)
-    : 0;
+  const discount = discountPercent(product);
 
   const outOfStock = (product.stock ?? 0) < 1;
 

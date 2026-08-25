@@ -64,6 +64,12 @@ export default function Header() {
               ⚡ شگفت‌انگیزها
             </Link>
             <Link
+              href="/discounts"
+              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
+            >
+              تخفیف‌ها
+            </Link>
+            <Link
               href="/best-sellers"
               className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
             >
