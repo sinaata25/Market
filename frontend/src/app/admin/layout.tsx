@@ -181,9 +181,10 @@ export default function AdminLayout({
 
   return (
     <div className="site-shell flex flex-col gap-5 py-4 sm:py-6 lg:flex-row">
-      {/* سایدبار */}
+      {/* سایدبار — عمداً چسبان/اسکرول‌دار نیست: منو خودش نوار اسکرول جدا
+          ندارد و بلندتر که شد، کل صفحه اسکرول می‌شود */}
       <aside className="min-w-0 lg:w-56 lg:shrink-0">
-        <div className="overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200 lg:sticky-below-header">
+        <div className="overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200">
           <div className="border-b border-secondary-700/60 px-5 py-4">
             <p className="text-sm font-bold text-white">{panelTitle}</p>
             <p className="mt-0.5 text-[10px] font-medium text-brand-300">
