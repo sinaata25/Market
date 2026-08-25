@@ -22,6 +22,14 @@ class Command(BaseCommand):
             self.stderr.write("شماره موبایل معتبر نیست")
             return
         user, created = User.objects.get_or_create(phone=phone)
+        # پنل سئو ناحیه‌ای جداست: مدیر فروشگاه/سوپریوزر نمی‌تواند مدیر سئو شود
+        if not options["revoke"] and (user.is_staff or user.is_superuser):
+            command = "make_manager" if user.is_manager_admin else "make_admin"
+            self.stderr.write(
+                "این کاربر مدیر فروشگاه است؛ ابتدا با "
+                f"«{command} {phone} --revoke» دسترسی داشبورد را بگیرید"
+            )
+            return
         user.is_seo_manager = not options["revoke"]
         user.save(update_fields=["is_seo_manager"])
         state = "مدیر سئو شد ✅" if user.is_seo_manager else "دسترسی سئویش گرفته شد"

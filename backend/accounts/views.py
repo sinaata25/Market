@@ -46,6 +46,8 @@ def user_dto(user) -> dict:
         "phone": user.phone,
         "name": user.name or None,
         "isStaff": user.is_staff,
+        "isSuperuser": user.is_superuser,
+        "isManagerAdmin": user.is_manager_admin,
         "isSeoManager": user.is_seo_manager,
         "createdAt": user.date_joined.isoformat(),
     }
@@ -109,6 +111,8 @@ class UserDtoSerializer(serializers.Serializer):
     phone = serializers.CharField()
     name = serializers.CharField(allow_null=True)
     isStaff = serializers.BooleanField()
+    isSuperuser = serializers.BooleanField()
+    isManagerAdmin = serializers.BooleanField()
     isSeoManager = serializers.BooleanField()
     createdAt = serializers.DateTimeField()
 

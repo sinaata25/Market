@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, views_managers, views_seo_admins
 
 urlpatterns = [
     path("stats", views.StatsView.as_view()),
@@ -36,6 +36,13 @@ urlpatterns = [
         views.AdminProductImageDetailView.as_view(),
     ),
     path("users", views.AdminUserListView.as_view()),
+    # مدیریت نقش‌های ممتاز — فقط سوپریوزر (ناحیه‌ی توسعه‌دهنده)
+    path("managers", views_managers.ManagerListView.as_view()),
+    path("managers/<int:pk>", views_managers.ManagerDetailView.as_view()),
+    path("seo-admins", views_seo_admins.SeoAdminListView.as_view()),
+    path(
+        "seo-admins/<int:pk>", views_seo_admins.SeoAdminDetailView.as_view()
+    ),
     path("comments", views.AdminCommentListView.as_view()),
     path("comments/<int:pk>", views.AdminCommentDetailView.as_view()),
     path(

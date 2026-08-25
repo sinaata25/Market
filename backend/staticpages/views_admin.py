@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 
-from adminapi.views import StaffRequiredMixin
+from accounts.permissions import ShopAdminRequiredMixin
 from common.responses import fail, first_error_message, ok
 
 from .definitions import SUPPORTED_PAGE_KEYS, get_page_definition
@@ -44,7 +44,7 @@ def _validation_failure(errors) -> object:
     return fail(message, 422, data={"fieldErrors": flattened})
 
 
-class AdminStaticPageListView(StaffRequiredMixin, APIView):
+class AdminStaticPageListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         operation_id="admin_content_static_pages_list",
         responses={
@@ -64,7 +64,7 @@ class AdminStaticPageListView(StaffRequiredMixin, APIView):
         )
 
 
-class AdminStaticPageDetailView(StaffRequiredMixin, APIView):
+class AdminStaticPageDetailView(ShopAdminRequiredMixin, APIView):
     def _definition_exists(self, key: str) -> bool:
         return get_page_definition(key) is not None
 

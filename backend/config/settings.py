@@ -108,7 +108,8 @@ CSRF_TRUSTED_ORIGINS = [
 # ─── اپلیکیشن‌ها ─────────────────────────────────────────────
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # ادمین جنگو ناحیه‌ی توسعه‌دهنده است و فقط برای سوپریوزر باز می‌شود
+    "config.admin.DeveloperAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

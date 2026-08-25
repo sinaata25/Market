@@ -64,7 +64,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     name = models.CharField("نام", max_length=100, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    # نقش «مدیر سئو»: دسترسی فقط به پنل سئو، بدون سفارش‌ها/کاربران/مالی
+    # نقش «مدیر اجرایی»: کل داشبورد کسب‌وکار، بدون ناحیه‌های سطح‌سیستم.
+    # همیشه is_staff دارد و هرگز سوپریوزر نیست (accounts.permissions).
+    is_manager_admin = models.BooleanField("مدیر اجرایی", default=False)
+    # نقش «مدیر سئو»: دسترسی فقط به پنل سئو، بدون سفارش‌ها/کاربران/مالی.
+    # این نقش با is_staff/is_superuser ناسازگار است (accounts.permissions).
     is_seo_manager = models.BooleanField("مدیر سئو", default=False)
     date_joined = models.DateTimeField("تاریخ عضویت", default=timezone.now)
 
@@ -80,13 +84,52 @@ class User(AbstractBaseUser, PermissionsMixin):
             models.CheckConstraint(
                 condition=models.Q(phone__regex=r"^09[0-9]{9}$"),
                 name="accounts_user_phone_canonical",
-            )
+            ),
+            # پنل سئو ناحیه‌ای جداست: هیچ کاربری همزمان مدیر فروشگاه و مدیر سئو نیست
+            models.CheckConstraint(
+                condition=models.Q(is_seo_manager=False)
+                | models.Q(is_staff=False, is_superuser=False),
+                name="accounts_user_seo_role_exclusive",
+            ),
+            # مدیر اجرایی همیشه staff است و هرگز سوپریوزر نیست؛ این قید
+            # ناسازگاری با نقش سئو را هم پوشش می‌دهد (چون سئو staff ندارد)
+            models.CheckConstraint(
+                condition=models.Q(is_manager_admin=False)
+                | models.Q(is_staff=True, is_superuser=False),
+                name="accounts_user_manager_role_consistent",
+            ),
         ]
+
+    def clean(self):
+        """اعتبارسنجی نقش‌ها برای فرم‌ها (از جمله ادمین جنگو)"""
+        super().clean()
+        errors = self._role_errors()
+        if errors:
+            raise ValidationError(errors)
+
+    def _role_errors(self) -> dict:
+        errors: dict[str, str] = {}
+        if self.is_seo_manager and (self.is_staff or self.is_superuser):
+            errors["is_seo_manager"] = (
+                "مدیر سئو نمی‌تواند همزمان مدیر فروشگاه یا سوپریوزر باشد"
+            )
+        if self.is_manager_admin and self.is_superuser:
+            errors["is_manager_admin"] = (
+                "مدیر اجرایی نمی‌تواند همزمان سوپریوزر باشد"
+            )
+        if self.is_manager_admin and not self.is_staff:
+            errors["is_manager_admin"] = (
+                "مدیر اجرایی باید دسترسی داشبورد (is_staff) داشته باشد"
+            )
+        return errors
 
     def save(self, *args, **kwargs):
         self.phone = normalize_phone(self.phone)
         if not is_valid_iran_mobile(self.phone):
             raise ValidationError({"phone": "شماره موبایل معتبر نیست"})
+        errors = self._role_errors()
+        if errors:
+            raise ValidationError(errors)
         return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
