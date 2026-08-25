@@ -6,6 +6,21 @@ import { api } from "@/lib/client-api";
 import { formatPrice, type Product } from "@/lib/products";
 import { faNum, Pager, EmptyRow } from "@/components/admin/ui";
 
+// دکمه‌های ستون «عملیات» — هم‌سبک با دکمه‌های ردیف در پنل «صفحه اصلی»:
+// فقط کادر و رنگ متن، بدون پس‌زمینه.
+const ACTION_BASE =
+  "inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-30";
+
+const ACTION_VARIANTS = {
+  neutral: "border-slate-200 text-slate-600 focus-visible:outline-slate-400",
+  edit: "border-brand-200 text-brand-700 focus-visible:outline-brand-600",
+  danger: "border-red-100 text-red-600 focus-visible:outline-red-500",
+} as const;
+
+function actionCls(variant: keyof typeof ACTION_VARIANTS) {
+  return `${ACTION_BASE} ${ACTION_VARIANTS[variant]}`;
+}
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -167,7 +182,7 @@ export default function AdminProducts() {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-        <table className="w-full min-w-[940px] text-sm">
+        <table className="w-full min-w-[1000px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-right text-[11px] text-slate-400">
               <th className="px-5 py-3 font-medium">محصول</th>
@@ -295,16 +310,12 @@ export default function AdminProducts() {
                     </button>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         disabled={changingVisibility !== null}
                         onClick={() => toggleVisibility(p)}
-                        className={`hover:underline disabled:cursor-not-allowed disabled:opacity-50 ${
-                          p.isActive === false
-                            ? "text-emerald-600"
-                            : "text-slate-500"
-                        }`}
+                        className={actionCls("neutral")}
                       >
                         {changingVisibility === p.id
                           ? "در حال تغییر..."
@@ -312,15 +323,18 @@ export default function AdminProducts() {
                             ? "نمایش دادن"
                             : "پنهان کردن"}
                       </button>
+                      {/* ویرایش ناوبری است، پس لینک می‌ماند تا باز کردن در تب
+                          جدید کار کند — فقط ظاهرش دکمه است */}
                       <Link
                         href={`/admin/products/${p.id}`}
-                        className="text-brand-600 hover:underline"
+                        className={actionCls("edit")}
                       >
                         ویرایش
                       </Link>
                       <button
+                        type="button"
                         onClick={() => remove(p)}
-                        className="text-red-400 hover:text-red-600"
+                        className={actionCls("danger")}
                       >
                         حذف
                       </button>
