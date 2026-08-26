@@ -27,7 +27,9 @@ export type HomepageBanner = {
   id: number;
   title: string | null;
   subtitle: string | null;
-  image: string | null;
+  // دو نسخه‌ی مستقل؛ فروشگاه بسته به عرض نمایشگر یکی را نمایش می‌دهد
+  desktopImage: string | null;
+  mobileImage: string | null;
   theme: "brand" | "secondary" | "accent";
   linkUrl: string | null;
   linkLabel: string | null;

@@ -7,6 +7,7 @@ import type {
   HomepageSection,
   HomepageSectionType,
 } from "@/lib/homepage";
+import { bannerImageSources } from "@/lib/banner-image";
 import RecentlyViewedSection from "@/components/homepage/RecentlyViewedSection";
 import AllProductsSection from "@/components/homepage/AllProductsSection";
 
@@ -24,17 +25,23 @@ function BannerSection({
   title?: string | null;
 }) {
   const visibleTitle = title ?? banner.title;
+  const images = bannerImageSources(banner);
   return (
     <section
       className={`relative overflow-hidden rounded-3xl bg-gradient-to-l ${BANNER_THEMES[banner.theme]} px-6 py-12 text-white sm:px-12 sm:py-16`}
     >
-      {banner.image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={banner.image}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-30"
-        />
+      {images && (
+        // مرورگر فقط نسخه‌ی متناسب با عرض نمایشگر را دانلود می‌کند
+        <picture className="pointer-events-none absolute inset-0">
+          {images.desktop && (
+            <source media={images.media} srcSet={images.desktop} />
+          )}
+          <img
+            src={images.fallback}
+            alt=""
+            className="h-full w-full object-cover opacity-30"
+          />
+        </picture>
       )}
       <div className="relative z-10 max-w-lg">
         {visibleTitle && (
@@ -56,7 +63,7 @@ function BannerSection({
           </Link>
         )}
       </div>
-      {!banner.image && (
+      {!images && (
         <span className="pointer-events-none absolute -left-6 bottom-0 text-[10rem] opacity-20 sm:opacity-30">
           🚜
         </span>

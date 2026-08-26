@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { Brand, Category } from "@/lib/products";
 
@@ -20,7 +20,9 @@ type Banner = {
   id: number;
   title: string | null;
   subtitle: string | null;
-  image: string | null;
+  // دو نسخه‌ی مستقل؛ فروشگاه بسته به عرض نمایشگر یکی را نشان می‌دهد
+  desktopImage: string | null;
+  mobileImage: string | null;
   theme: "brand" | "secondary" | "accent";
   linkUrl: string | null;
   linkLabel: string | null;
@@ -62,6 +64,34 @@ type BannerForm = {
   linkLabel: string;
   isActive: boolean;
 };
+
+type BannerImageVariant = "desktop" | "mobile";
+
+const BANNER_IMAGE_VARIANTS: {
+  value: BannerImageVariant;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: "desktop",
+    label: "تصویر بنر دسکتاپ",
+    hint: "برای لپ‌تاپ و نمایشگرهای بزرگ — ترجیحاً عریض",
+  },
+  {
+    value: "mobile",
+    label: "تصویر بنر موبایل",
+    hint: "برای موبایل و نمایشگرهای کوچک — نسخه‌ی جدا، نه برش دسکتاپ",
+  },
+];
+
+const EMPTY_BANNER_IMAGES: Record<BannerImageVariant, File | null> = {
+  desktop: null,
+  mobile: null,
+};
+
+function bannerImageUrl(banner: Banner, variant: BannerImageVariant) {
+  return variant === "desktop" ? banner.desktopImage : banner.mobileImage;
+}
 
 const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "banner", label: "بنر" },
@@ -127,6 +157,43 @@ function bannerForm(banner: Banner): BannerForm {
   };
 }
 
+/**
+ * پیش‌نمایش یک نسخه‌ی تصویر بنر — فایل تازه‌انتخاب‌شده اولویت دارد تا مدیر
+ * پیش از ذخیره هم بتواند تصویر را ببیند؛ در غیر این صورت تصویر ذخیره‌شده.
+ */
+function BannerImagePreview({
+  file,
+  savedUrl,
+}: {
+  file: File | null;
+  savedUrl: string | null;
+}) {
+  const objectUrl = useMemo(
+    () => (file ? URL.createObjectURL(file) : null),
+    [file]
+  );
+
+  useEffect(() => {
+    if (!objectUrl) return;
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [objectUrl]);
+
+  const src = objectUrl ?? savedUrl;
+  if (!src) {
+    return (
+      <span className="grid h-24 w-full place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400">
+        بدون تصویر
+      </span>
+    );
+  }
+  return (
+    <span className="block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" className="h-24 w-full object-contain" />
+    </span>
+  );
+}
+
 export default function AdminHomepagePage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -136,11 +203,15 @@ export default function AdminHomepagePage() {
   const [bannerValues, setBannerValues] = useState(EMPTY_BANNER);
   const [editingSection, setEditingSection] = useState<Section | null>(null);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
-  const [bannerImage, setBannerImage] = useState<File | null>(null);
+  const [bannerImages, setBannerImages] =
+    useState<Record<BannerImageVariant, File | null>>(EMPTY_BANNER_IMAGES);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const fileInput = useRef<HTMLInputElement>(null);
+  const fileInputs = useRef<Record<BannerImageVariant, HTMLInputElement | null>>({
+    desktop: null,
+    mobile: null,
+  });
   const sectionEditor = useRef<HTMLElement>(null);
   const bannerEditor = useRef<HTMLElement>(null);
 
@@ -180,11 +251,17 @@ export default function AdminHomepagePage() {
     setSectionValues(EMPTY_SECTION);
   }
 
+  function clearBannerImageInputs() {
+    setBannerImages(EMPTY_BANNER_IMAGES);
+    for (const input of Object.values(fileInputs.current)) {
+      if (input) input.value = "";
+    }
+  }
+
   function resetBanner() {
     setEditingBanner(null);
     setBannerValues(EMPTY_BANNER);
-    setBannerImage(null);
-    if (fileInput.current) fileInput.current.value = "";
+    clearBannerImageInputs();
   }
 
   function editSection(section: Section) {
@@ -196,8 +273,7 @@ export default function AdminHomepagePage() {
   function editBanner(banner: Banner) {
     setEditingBanner(banner);
     setBannerValues(bannerForm(banner));
-    setBannerImage(null);
-    if (fileInput.current) fileInput.current.value = "";
+    clearBannerImageInputs();
     bannerEditor.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -301,16 +377,22 @@ export default function AdminHomepagePage() {
       notify(result.error ?? "ذخیره بنر انجام نشد");
       return;
     }
-    if (bannerImage) {
+    const bannerId = result.data.banner.id;
+    // هر نسخه‌ی تصویر جدا آپلود می‌شود؛ نسخه‌ی انتخاب‌نشده دست‌نخورده می‌ماند
+    for (const variant of BANNER_IMAGE_VARIANTS) {
+      const file = bannerImages[variant.value];
+      if (!file) continue;
       const form = new FormData();
-      form.append("file", bannerImage);
+      form.append("file", file);
       const upload = await api.upload<{ banner: Banner }>(
-        `/api/admin/home/banners/${result.data.banner.id}/image`,
+        `/api/admin/home/banners/${bannerId}/image/${variant.value}`,
         form
       );
       if (!upload.ok) {
         setBusy(false);
-        notify(`بنر ذخیره شد، اما تصویر بارگذاری نشد: ${upload.error ?? "خطای نامشخص"}`);
+        notify(
+          `بنر ذخیره شد، اما ${variant.label} بارگذاری نشد: ${upload.error ?? "خطای نامشخص"}`
+        );
         await load();
         return;
       }
@@ -318,6 +400,22 @@ export default function AdminHomepagePage() {
     setBusy(false);
     notify(editingBanner ? "بنر ویرایش شد ✅" : "بنر افزوده شد ✅");
     resetBanner();
+    await load();
+  }
+
+  async function removeBannerImage(banner: Banner, variant: BannerImageVariant) {
+    const label = BANNER_IMAGE_VARIANTS.find((item) => item.value === variant)?.label;
+    if (busy || !window.confirm(`${label} حذف شود؟`)) return;
+    setBusy(true);
+    const result = await api.delete(
+      `/api/admin/home/banners/${banner.id}/image/${variant}`
+    );
+    setBusy(false);
+    if (!result.ok) {
+      notify(result.error ?? "حذف تصویر انجام نشد");
+      return;
+    }
+    notify("تصویر حذف شد ✅");
     await load();
   }
 
@@ -337,6 +435,10 @@ export default function AdminHomepagePage() {
   }
 
   const type = sectionValues.sectionType;
+  // نسخه‌ی به‌روزِ بنر در حال ویرایش — بعد از هر load پیش‌نمایش‌ها تازه می‌شوند
+  const editedBanner = editingBanner
+    ? banners.find((item) => item.id === editingBanner.id) ?? editingBanner
+    : null;
 
   return (
     <div className="space-y-6">
@@ -459,7 +561,22 @@ export default function AdminHomepagePage() {
           <label><span className="mb-1.5 block text-xs text-slate-600">لینک مقصد</span><input dir="ltr" value={bannerValues.linkUrl} onChange={(event) => setBannerValues((current) => ({ ...current, linkUrl: event.target.value }))} className={INPUT_CLASS} placeholder="/category/..." /></label>
           <label><span className="mb-1.5 block text-xs text-slate-600">متن دکمه</span><input value={bannerValues.linkLabel} onChange={(event) => setBannerValues((current) => ({ ...current, linkLabel: event.target.value }))} className={INPUT_CLASS} maxLength={60} /></label>
           <label><span className="mb-1.5 block text-xs text-slate-600">رنگ زمینه</span><select value={bannerValues.theme} onChange={(event) => setBannerValues((current) => ({ ...current, theme: event.target.value as Banner["theme"] }))} className={INPUT_CLASS}><option value="brand">سبز برند</option><option value="secondary">آبی</option><option value="accent">طلایی</option></select></label>
-          <label><span className="mb-1.5 block text-xs text-slate-600">تصویر (اختیاری، حداکثر ۵ مگابایت)</span><input ref={fileInput} type="file" accept="image/*" onChange={(event) => setBannerImage(event.target.files?.[0] ?? null)} className={INPUT_CLASS} /></label>
+          {BANNER_IMAGE_VARIANTS.map((variant) => {
+            const savedUrl = editedBanner ? bannerImageUrl(editedBanner, variant.value) : null;
+            return (
+              <div key={variant.value} className="min-w-0 space-y-1.5">
+                <label className="block">
+                  <span className="block text-xs text-slate-600">{variant.label} (اختیاری، حداکثر ۵ مگابایت)</span>
+                  <span className="mt-0.5 mb-1.5 block text-[11px] text-slate-400">{variant.hint}</span>
+                  <input ref={(node) => { fileInputs.current[variant.value] = node; }} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0] ?? null; setBannerImages((current) => ({ ...current, [variant.value]: file })); }} className={INPUT_CLASS} />
+                </label>
+                <BannerImagePreview file={bannerImages[variant.value]} savedUrl={savedUrl} />
+                {savedUrl && editedBanner && (
+                  <button type="button" disabled={busy} onClick={() => removeBannerImage(editedBanner, variant.value)} className="text-[11px] text-red-600 disabled:opacity-50">حذف {variant.label}</button>
+                )}
+              </div>
+            );
+          })}
           <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={bannerValues.isActive} onChange={(event) => setBannerValues((current) => ({ ...current, isActive: event.target.checked }))} />بنر فعال باشد</label>
           <div className="min-w-0 md:col-span-2"><button disabled={busy} className="rounded-xl bg-secondary-900 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? "در حال ذخیره..." : editingBanner ? "ذخیره بنر" : "ساخت بنر"}</button></div>
         </form>
@@ -470,10 +587,22 @@ export default function AdminHomepagePage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {banners.map((banner) => (
             <article key={banner.id} className="flex min-w-0 gap-3 rounded-xl border border-slate-100 p-3">
-              {banner.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={banner.image} alt="" className="h-16 w-24 shrink-0 rounded-lg object-cover" />
-              ) : <span className="grid h-16 w-24 shrink-0 place-items-center rounded-lg bg-brand-50 text-2xl">🚜</span>}
+              <div className="flex shrink-0 gap-2">
+                {BANNER_IMAGE_VARIANTS.map((variant) => {
+                  const url = bannerImageUrl(banner, variant.value);
+                  return (
+                    <div key={variant.value} className="w-24 shrink-0">
+                      {url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={url} alt="" className="h-16 w-24 rounded-lg object-cover" />
+                      ) : (
+                        <span className="grid h-16 w-24 place-items-center rounded-lg bg-brand-50 text-2xl">🚜</span>
+                      )}
+                      <p className="mt-1 text-center text-[10px] text-slate-400">{variant.value === "desktop" ? "دسکتاپ" : "موبایل"}</p>
+                    </div>
+                  );
+                })}
+              </div>
               <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-slate-700">{banner.title ?? `بنر #${banner.id}`}</p><p className="mt-1 text-[11px] text-slate-400">استفاده در {banner.sectionCount.toLocaleString("fa-IR")} بخش · {banner.isActive ? "فعال" : "غیرفعال"}</p><div className="mt-2 flex gap-2"><button type="button" onClick={() => editBanner(banner)} className="text-xs text-brand-700">ویرایش</button><button type="button" disabled={busy} onClick={() => removeBanner(banner)} className="text-xs text-red-600">حذف</button></div></div>
             </article>
           ))}

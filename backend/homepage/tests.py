@@ -1,10 +1,12 @@
+import shutil
+import tempfile
 from io import BytesIO
 
 from PIL import Image
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from catalog.models import Brand, Category, Product
@@ -22,10 +24,27 @@ from .services import (
 )
 
 
-def make_image_file(name="banner.png") -> SimpleUploadedFile:
+def make_image_file(name="banner.png", size=(10, 10)) -> SimpleUploadedFile:
     buffer = BytesIO()
-    Image.new("RGB", (10, 10), "red").save(buffer, format="PNG")
+    Image.new("RGB", size, "red").save(buffer, format="PNG")
     return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+
+class TempMediaRootMixin:
+    """آپلودهای تست در پوشه‌ی موقت بنویسند، نه در media واقعی پروژه"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._media_root = tempfile.mkdtemp(prefix="homepage-test-media-")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._media_override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
 
 
 class HomepageModelTests(TestCase):
@@ -243,7 +262,7 @@ class HomepageServiceTests(TestCase):
         self.assertEqual(appended.position, 3)
 
 
-class HomepageAdminApiTests(TestCase):
+class HomepageAdminApiTests(TempMediaRootMixin, TestCase):
     def setUp(self):
         HomepageSection.objects.all().delete()
         Banner.objects.all().delete()
@@ -367,12 +386,12 @@ class HomepageAdminApiTests(TestCase):
         banner_id = create_response.data["data"]["banner"]["id"]
 
         upload_response = self.client.post(
-            f"/api/admin/home/banners/{banner_id}/image",
+            f"/api/admin/home/banners/{banner_id}/image/desktop",
             {"file": make_image_file()},
             format="multipart",
         )
         self.assertEqual(upload_response.status_code, 201)
-        self.assertIsNotNone(upload_response.data["data"]["banner"]["image"])
+        self.assertIsNotNone(upload_response.data["data"]["banner"]["desktopImage"])
 
         section_response = self.client.post(
             "/api/admin/home/sections",
@@ -390,6 +409,77 @@ class HomepageAdminApiTests(TestCase):
         )
         self.assertIsNone(section.banner_id)
 
+    def test_each_banner_image_variant_is_stored_separately(self):
+        """تصویر موبایل نسخه‌ی جدا است، نه همان فایل دسکتاپ"""
+        banner = create_banner(title="بنر دو تصویری")
+
+        desktop = self.client.post(
+            f"/api/admin/home/banners/{banner.id}/image/desktop",
+            {"file": make_image_file("desktop.png", size=(1200, 400))},
+            format="multipart",
+        )
+        mobile = self.client.post(
+            f"/api/admin/home/banners/{banner.id}/image/mobile",
+            {"file": make_image_file("mobile.png", size=(400, 500))},
+            format="multipart",
+        )
+
+        self.assertEqual(desktop.status_code, 201)
+        self.assertEqual(mobile.status_code, 201)
+        data = mobile.data["data"]["banner"]
+        self.assertIsNotNone(data["desktopImage"])
+        self.assertIsNotNone(data["mobileImage"])
+        self.assertNotEqual(data["desktopImage"], data["mobileImage"])
+
+        banner.refresh_from_db()
+        self.assertIn("desktop", banner.desktop_image.name)
+        self.assertIn("mobile", banner.mobile_image.name)
+
+    def test_deleting_one_image_variant_keeps_the_other(self):
+        banner = create_banner(title="بنر")
+        for variant in ("desktop", "mobile"):
+            self.client.post(
+                f"/api/admin/home/banners/{banner.id}/image/{variant}",
+                {"file": make_image_file(f"{variant}.png")},
+                format="multipart",
+            )
+
+        response = self.client.delete(
+            f"/api/admin/home/banners/{banner.id}/image/mobile"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data["data"]["banner"]["mobileImage"])
+        self.assertIsNotNone(response.data["data"]["banner"]["desktopImage"])
+
+    def test_unknown_image_variant_is_rejected(self):
+        banner = create_banner(title="بنر")
+        response = self.client.post(
+            f"/api/admin/home/banners/{banner.id}/image/tablet",
+            {"file": make_image_file()},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_replacing_an_image_variant_only_touches_that_variant(self):
+        banner = create_banner(title="بنر")
+        self.client.post(
+            f"/api/admin/home/banners/{banner.id}/image/desktop",
+            {"file": make_image_file("desktop.png")},
+            format="multipart",
+        )
+        banner.refresh_from_db()
+        desktop_name = banner.desktop_image.name
+
+        self.client.post(
+            f"/api/admin/home/banners/{banner.id}/image/mobile",
+            {"file": make_image_file("mobile.png")},
+            format="multipart",
+        )
+
+        banner.refresh_from_db()
+        self.assertEqual(banner.desktop_image.name, desktop_name)
+
     def test_banner_link_validation(self):
         response = self.client.post(
             "/api/admin/home/banners",
@@ -399,7 +489,7 @@ class HomepageAdminApiTests(TestCase):
         self.assertEqual(response.status_code, 422)
 
 
-class HomepagePublicApiTests(TestCase):
+class HomepagePublicApiTests(TempMediaRootMixin, TestCase):
     def setUp(self):
         HomepageSection.objects.all().delete()
         Banner.objects.all().delete()
@@ -451,6 +541,39 @@ class HomepagePublicApiTests(TestCase):
             for item in response.data["data"]["sections"]
         ]
         self.assertEqual(banner_ids, [first.id, second.id])
+
+    def test_banner_section_exposes_both_image_variants(self):
+        """فروشگاه باید هر دو نسخه را بگیرد تا خودش مناسب نمایشگر را انتخاب کند"""
+        banner = create_banner(
+            title="بنر واکنش‌گرا",
+            desktop_image=make_image_file("wide.png", size=(1200, 400)),
+            mobile_image=make_image_file("narrow.png", size=(400, 500)),
+        )
+        create_section(
+            section_type=HomepageSection.SectionType.BANNER, banner=banner
+        )
+
+        response = self.client.get("/api/home/sections")
+
+        data = response.data["data"]["sections"][0]["data"]["banner"]
+        self.assertIsNotNone(data["desktopImage"])
+        self.assertIsNotNone(data["mobileImage"])
+        self.assertNotEqual(data["desktopImage"], data["mobileImage"])
+
+    def test_banner_without_mobile_image_still_reports_the_desktop_one(self):
+        """بنرهای قدیمی فقط تصویر دسکتاپ دارند و نباید بشکنند"""
+        banner = create_banner(
+            title="بنر قدیمی", desktop_image=make_image_file("legacy.png")
+        )
+        create_section(
+            section_type=HomepageSection.SectionType.BANNER, banner=banner
+        )
+
+        response = self.client.get("/api/home/sections")
+
+        data = response.data["data"]["sections"][0]["data"]["banner"]
+        self.assertIsNotNone(data["desktopImage"])
+        self.assertIsNone(data["mobileImage"])
 
     def test_banner_section_with_deleted_banner_is_skipped(self):
         banner = create_banner(title="بنر موقت")

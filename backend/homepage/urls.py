@@ -15,5 +15,8 @@ admin_urlpatterns = [
     ),
     path("banners", views_admin.AdminBannerListView.as_view()),
     path("banners/<int:pk>", views_admin.AdminBannerDetailView.as_view()),
-    path("banners/<int:pk>/image", views_admin.AdminBannerImageView.as_view()),
+    path(
+        "banners/<int:pk>/image/<str:variant>",
+        views_admin.AdminBannerImageView.as_view(),
+    ),
 ]

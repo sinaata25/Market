@@ -6,6 +6,12 @@ from catalog.selectors import SORTS as PRODUCT_SORTS
 
 SORT_CHOICES = [(key, key) for key in PRODUCT_SORTS]
 
+# نسخه‌های تصویر بنر: نام نسخه در API → نام فیلد مدل
+BANNER_IMAGE_FIELDS: dict[str, str] = {
+    "desktop": "desktop_image",
+    "mobile": "mobile_image",
+}
+
 THEME_CHOICES = [
     ("brand", "سبز (برند)"),
     ("secondary", "آبی"),
@@ -33,7 +39,14 @@ class Banner(models.Model):
 
     title = models.CharField("عنوان", max_length=150, blank=True)
     subtitle = models.CharField("زیرعنوان", max_length=300, blank=True)
-    image = models.ImageField("تصویر", upload_to="banners/", blank=True)
+    # هر بنر دو تصویر مستقل دارد؛ فروشگاه بسته به اندازه‌ی نمایشگر یکی را
+    # دانلود می‌کند. تصویر موبایل بریدهٔ تصویر دسکتاپ نیست و جدا آپلود می‌شود.
+    desktop_image = models.ImageField(
+        "تصویر دسکتاپ", upload_to="banners/", blank=True
+    )
+    mobile_image = models.ImageField(
+        "تصویر موبایل", upload_to="banners/mobile/", blank=True
+    )
     theme = models.CharField(
         "پس‌زمینه", max_length=20, choices=THEME_CHOICES, default="brand"
     )
