@@ -3,6 +3,20 @@
 :root {
   --background: #ebede3;
   --foreground: #1f3d89;
+  --site-max-width: 80rem;
+  --site-gutter: clamp(1rem, 2.5vw, 2rem);
+  /* ارتفاع واقعی هدر با ResizeObserver در HeaderHeightProbe به‌روز می‌شود.
+     این مقدارها فقط تا پیش از اولین اندازه‌گیری (و در SSR) به کار می‌روند و
+     عمداً کمی سخاوتمندانه‌اند: کمی پایین‌تر نشستن بهتر از پنهان‌شدن زیر هدر است. */
+  --header-h: 10.875rem; /* ~۱۷۴px — چیدمان دوسطری موبایل (جستجو در سطر دوم) */
+  --sticky-gap: 1rem;
+}
+
+/* از lg هدر تک‌سطری می‌شود و کوتاه‌تر است. */
+@media (min-width: 64rem) {
+  :root {
+    --header-h: 7.875rem; /* ~۱۲۶px */
+  }
 }
 
 @theme inline {
@@ -51,9 +65,95 @@
   box-sizing: border-box;
 }
 
+html {
+  min-width: 0;
+  text-size-adjust: 100%;
+}
+
 body {
+  margin: 0;
+  min-width: 0;
   background: var(--background);
   color: var(--foreground);
+}
+
+img,
+picture,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+li,
+dt,
+dd,
+a,
+button,
+label {
+  overflow-wrap: anywhere;
+}
+
+:focus-visible {
+  outline: 2px solid #5a8349;
+  outline-offset: 2px;
+}
+
+/* پوسته‌ی مشترک صفحات؛ در نمایشگرهای عریض کشیده نمی‌شود. */
+.site-container {
+  width: min(calc(100% - (2 * var(--site-gutter))), var(--site-max-width));
+  margin-inline: auto;
+}
+
+/* اسکرول افقی فقط در ناحیه‌های عمداً اسکرول‌پذیر باقی می‌ماند. */
+.responsive-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* نوار مقایسه فقط هنگام نمایش خودش از انتهای صفحه فضا می‌گیرد. */
+body:has([data-compare-tray]) .site-main {
+  padding-bottom: 9rem;
+}
+
+@media (min-width: 640px) {
+  body:has([data-compare-tray]) .site-main {
+    padding-bottom: 6rem;
+  }
+}
+
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 }
 
 /* اعداد فارسی در ورودی‌ها و قیمت‌ها به‌صورت خودکار */
@@ -72,4 +172,57 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #759966;
+}
+
+/* ---------------------------------------------------------------------------
+   ابزارهای واکنش‌گرا (Tailwind v4 @utility — با همه‌ی variantها کار می‌کنند)
+   --------------------------------------------------------------------------- */
+
+/* پوسته‌ی صفحه: هم‌راستا با هدر در همه‌ی عرض‌ها. جایگزین mx-auto max-w-7xl px-4 */
+@utility site-shell {
+  width: min(calc(100% - (2 * var(--site-gutter))), var(--site-max-width));
+  margin-inline: auto;
+}
+
+/* عنصر چسبان که هرگز زیر هدر پنهان نمی‌شود.
+   max-height باگ کلاسیک sticky را می‌بندد: ستون بلندتر از viewport در حالت عادی
+   بالا می‌چسبد و انتهایش دیگر با اسکرول قابل دیدن نیست. */
+@utility sticky-below-header {
+  position: sticky;
+  top: calc(var(--header-h) + var(--sticky-gap));
+  align-self: start;
+  max-height: calc(100dvh - var(--header-h) - (2 * var(--sticky-gap)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* پنل کشویی هدر روی موبایل دقیقاً زیر هدر باز می‌شود */
+@utility below-header {
+  top: var(--header-h);
+}
+
+/* بیشترین ارتفاع یک پنل که از زیر هدر تا پایین صفحه باز می‌شود */
+@utility h-under-header {
+  max-height: calc(100dvh - var(--header-h) - 1.5rem);
+}
+
+/* لنگرهای درون‌صفحه‌ای زیر هدر چسبان پنهان نمی‌شوند.
+   داخل layer base است تا utilityهای scroll-mt-* بتوانند override کنند. */
+@layer base {
+  [id] {
+    scroll-margin-top: calc(var(--header-h) + var(--sticky-gap));
+  }
+}
+
+/* دکمه‌ها و لینک‌های اکشن روی موبایل تمام‌عرض می‌شوند */
+@utility action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.75rem;
+
+  @media (width >= 40rem) {
+    width: auto;
+  }
 }

@@ -6,7 +6,13 @@ import type { Product } from "@/lib/products";
 import { useCompare } from "@/lib/compare";
 
 // دکمه‌ی افزودن/حذف محصول از مقایسه — کاملاً سمت کلاینت (localStorage)
-export default function CompareButton({ product }: { product: Product }) {
+export default function CompareButton({
+  product,
+  variant = "default",
+}: {
+  product: Product;
+  variant?: "default" | "card";
+}) {
   const { items, add, remove, check } = useCompare();
   const [feedback, setFeedback] = useState("");
 
@@ -34,6 +40,10 @@ export default function CompareButton({ product }: { product: Product }) {
     : disabled
       ? (availability.reason ?? `افزودن ${product.title} به مقایسه امکان‌پذیر نیست`)
       : `افزودن ${product.title} به مقایسه`;
+  const sizeClass =
+    variant === "card"
+      ? "h-9 w-9 rounded-lg"
+      : "h-10 w-10 rounded-xl sm:h-11 sm:w-11";
 
   return (
     <div className="relative z-10 shrink-0">
@@ -44,7 +54,7 @@ export default function CompareButton({ product }: { product: Product }) {
         aria-pressed={active}
         aria-label={label}
         title={label}
-        className={`grid h-10 w-10 place-items-center rounded-xl border text-base transition disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11 ${
+        className={`grid place-items-center border text-base transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-50 ${sizeClass} ${
           active
             ? "border-brand-300 bg-brand-50 text-brand-700"
             : "border-slate-200 bg-white text-slate-500 hover:border-brand-200"

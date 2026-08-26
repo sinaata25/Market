@@ -60,7 +60,7 @@ export default function SupportContent({
   }, [query, activeGroup, isSearching, groups]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="site-shell py-8">
       {sections.hero && <section className="mb-8 rounded-3xl bg-gradient-to-l from-brand-700 to-brand-500 px-6 py-10 text-center text-white sm:px-12">
         <h1 className="mb-2 text-2xl font-bold">{content.hero.title}</h1>
         <p className="mb-6 text-sm text-brand-50">{content.hero.description}</p>

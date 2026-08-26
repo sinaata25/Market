@@ -99,7 +99,7 @@ export default function ComparePage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 text-center text-sm text-slate-400">
+      <div className="site-shell py-16 text-center text-sm text-slate-400">
         در حال بارگذاری مقایسه...
       </div>
     );
@@ -128,7 +128,7 @@ export default function ComparePage() {
   const shareCategory = products[0]?.category;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-slate-800">
           مقایسه محصولات{" "}
@@ -137,7 +137,7 @@ export default function ComparePage() {
             {MAX_COMPARE_ITEMS.toLocaleString("fa-IR")})
           </span>
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {canAddMore && shareCategory && (
             <Link
               href={`/category/${products[0].categorySlug}`}
@@ -169,7 +169,7 @@ export default function ComparePage() {
                       onClick={() => remove(product.id)}
                       aria-label={`حذف ${product.title} از مقایسه`}
                       title="حذف از مقایسه"
-                      className="self-end text-xs text-slate-400 transition hover:text-red-500"
+                      className="-mt-1 -ml-1 grid h-9 w-9 shrink-0 place-items-center self-end rounded-lg text-xs text-slate-400 transition hover:bg-red-50 hover:text-red-500"
                     >
                       ✕
                     </button>

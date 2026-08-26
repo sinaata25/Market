@@ -17,6 +17,7 @@ from .services import (
     delete_section,
     move_section,
     section_products,
+    section_products_total,
     update_section,
 )
 
@@ -119,6 +120,76 @@ class HomepageServiceTests(TestCase):
         )
         self.assertEqual(section_products(section), [curated])
 
+    def test_every_product_section_type_is_exposed_publicly(self):
+        """هیچ نوع بخش محصولی نباید بی‌سروصدا از پاسخ عمومی حذف شود"""
+        from homepage.dto import public_section_dto
+        from homepage.services import PRODUCT_SECTION_FILTERS
+
+        for section_type in PRODUCT_SECTION_FILTERS:
+            with self.subTest(section_type=section_type):
+                section = create_section(section_type=section_type)
+                dto = public_section_dto(section)
+                self.assertIsNotNone(dto)
+                self.assertEqual(dto["type"], section_type)
+                self.assertIn("products", dto["data"])
+
+    def test_all_products_page_is_limited_but_total_counts_catalog(self):
+        """بخش «همه محصولات»: limit یعنی اندازه‌ی صفحه، نه سقف کل کاتالوگ"""
+        for index in range(5):
+            Product.objects.create(
+                title=f"کالا {index}",
+                category=self.category,
+                price=1000,
+                is_active=True,
+            )
+        Product.objects.create(
+            title="غیرفعال", category=self.category, price=1000, is_active=False
+        )
+        section = create_section(
+            section_type=HomepageSection.SectionType.ALL_PRODUCTS, limit=2
+        )
+
+        self.assertEqual(len(section_products(section)), 2)
+        self.assertEqual(section_products_total(section), 5)
+
+    def test_section_products_incredible_uses_curated_flag(self):
+        """بخش شگفت‌انگیزها منتخب مدیر است، نه هر محصول تخفیف‌دار"""
+        Product.objects.create(
+            title="تخفیف‌دار انتخاب‌نشده",
+            category=self.category,
+            price=1000,
+            old_price=2000,
+            is_active=True,
+        )
+        curated = Product.objects.create(
+            title="شگفت‌انگیز منتخب",
+            category=self.category,
+            price=1000,
+            is_active=True,
+            is_incredible=True,
+        )
+        section = create_section(
+            section_type=HomepageSection.SectionType.INCREDIBLE_PRODUCTS
+        )
+        self.assertEqual(section_products(section), [curated])
+
+    def test_section_products_discounted_lists_every_discounted_product(self):
+        """بخش تخفیف‌ها مستقل از انتخاب مدیر، همه‌ی تخفیف‌دارها را می‌آورد"""
+        discounted = Product.objects.create(
+            title="تخفیف‌دار",
+            category=self.category,
+            price=1000,
+            old_price=2000,
+            is_active=True,
+        )
+        Product.objects.create(
+            title="بدون تخفیف", category=self.category, price=1000, is_active=True
+        )
+        section = create_section(
+            section_type=HomepageSection.SectionType.DISCOUNTED_PRODUCTS
+        )
+        self.assertEqual(section_products(section), [discounted])
+
     def test_section_products_product_collection_filters_by_brand(self):
         other_brand = Brand.objects.create(name="برند ب", slug="b")
         matching = Product.objects.create(
@@ -209,6 +280,19 @@ class HomepageAdminApiTests(TestCase):
         self.assertEqual(section["sectionType"], "recently_viewed")
         self.assertEqual(section["resolvedTitle"], "محصولات اخیراً مشاهده‌شده")
         self.assertEqual(section["resolvedLimit"], 12)
+
+    def test_create_all_products_section(self):
+        response = self.client.post(
+            "/api/admin/home/sections",
+            {"sectionType": "all_products", "limit": 8},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        section = response.data["data"]["section"]
+        self.assertEqual(section["sectionType"], "all_products")
+        self.assertEqual(section["resolvedTitle"], "همه محصولات")
+        self.assertEqual(section["resolvedLimit"], 8)
 
     def test_create_banner_section_requires_banner_id(self):
         response = self.client.post(
@@ -437,3 +521,39 @@ class HomepagePublicApiTests(TestCase):
         self.assertEqual(section["title"], "محصولات اخیراً مشاهده‌شده")
         self.assertEqual(section["limit"], 12)
         self.assertEqual(section["data"], {})
+
+    def test_all_products_section_exposes_first_page_and_total(self):
+        """فروشگاه برای صفحه‌بندی، هم کالاهای صفحه‌ی اول را می‌خواهد هم تعداد کل"""
+        for index in range(4):
+            Product.objects.create(
+                title=f"کالا {index}",
+                category=self.category,
+                price=1000,
+                is_active=True,
+            )
+        create_section(
+            section_type=HomepageSection.SectionType.ALL_PRODUCTS, limit=3
+        )
+
+        response = self.client.get("/api/home/sections")
+
+        self.assertEqual(response.status_code, 200)
+        section = response.data["data"]["sections"][0]
+        self.assertEqual(section["type"], "all_products")
+        self.assertEqual(section["title"], "همه محصولات")
+        self.assertEqual(section["limit"], 3)
+        self.assertEqual(len(section["data"]["products"]), 3)
+        self.assertEqual(section["data"]["total"], 4)
+
+    def test_all_products_section_can_be_moved_like_any_other(self):
+        """جای بخش از پنل مدیریت عوض می‌شود — همان مسیر بقیه‌ی بخش‌ها"""
+        create_section(section_type=HomepageSection.SectionType.CATEGORIES)
+        all_products = create_section(
+            section_type=HomepageSection.SectionType.ALL_PRODUCTS
+        )
+        move_section(all_products, "up")
+
+        response = self.client.get("/api/home/sections")
+
+        types = [item["type"] for item in response.data["data"]["sections"]]
+        self.assertEqual(types, ["all_products", "categories"])

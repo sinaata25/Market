@@ -13,6 +13,11 @@ export type ApiResult<T, E = unknown> = {
   retryAfter?: number;
 };
 
+export type PdfDownload = {
+  blob: Blob;
+  filename: string;
+};
+
 export const AUTH_CHANGED_EVENT = "auth:changed";
 const AUTH_BROADCAST_CHANNEL = "market:auth";
 const AUTH_STORAGE_EVENT = "market:auth:changed";
@@ -113,6 +118,129 @@ function getRetryAfter(response: Response): number | undefined {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
+function sanitizeFilename(filename: string): string {
+  const withoutControlCharacters = Array.from(filename, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127 ? "-" : character;
+  }).join("");
+
+  return withoutControlCharacters
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .trim()
+    .replace(/^\.+/, "");
+}
+
+export function pdfFilenameFromDisposition(
+  contentDisposition: string | null,
+  fallbackFilename: string
+): string {
+  let candidate = "";
+
+  if (contentDisposition) {
+    const extendedMatch = /filename\*\s*=\s*([^;]+)/i.exec(
+      contentDisposition
+    );
+    if (extendedMatch) {
+      let encoded = extendedMatch[1].trim().replace(/^"|"$/g, "");
+      const rfc5987Value = /^[^']*'[^']*'(.*)$/.exec(encoded);
+      if (rfc5987Value) encoded = rfc5987Value[1];
+      try {
+        candidate = decodeURIComponent(encoded);
+      } catch {
+        candidate = encoded;
+      }
+    } else {
+      const filenameMatch = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(
+        contentDisposition
+      );
+      candidate = (filenameMatch?.[1] ?? filenameMatch?.[2] ?? "").trim();
+    }
+  }
+
+  const fallback = sanitizeFilename(fallbackFilename) || "invoice.pdf";
+  const safeFallback = fallback.toLowerCase().endsWith(".pdf")
+    ? fallback
+    : `${fallback}.pdf`;
+  const safeCandidate = sanitizeFilename(candidate);
+
+  return safeCandidate.toLowerCase().endsWith(".pdf")
+    ? safeCandidate
+    : safeFallback;
+}
+
+export async function parsePdfDownloadResponse(
+  response: Response,
+  fallbackFilename: string
+): Promise<ApiResult<PdfDownload>> {
+  const contentType = response.headers
+    .get("Content-Type")
+    ?.split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+
+  if (!response.ok || contentType !== "application/pdf") {
+    const json: unknown = await response.json().catch(() => null);
+    const payload =
+      json && typeof json === "object"
+        ? (json as Record<string, unknown>)
+        : null;
+
+    return {
+      ok: false,
+      error:
+        typeof payload?.error === "string"
+          ? payload.error
+          : response.ok
+            ? "پاسخ نامعتبر از سرور"
+            : "دریافت فایل با خطا روبه‌رو شد",
+      errorData: payload?.data,
+      errorCode:
+        typeof payload?.errorCode === "string"
+          ? payload.errorCode
+          : undefined,
+      status: response.status,
+      retryAfter: getRetryAfter(response),
+    };
+  }
+
+  const blob = await response.blob();
+  if (blob.size === 0) {
+    return {
+      ok: false,
+      error: "فایل دریافت‌شده خالی است",
+      status: response.status,
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      blob,
+      filename: pdfFilenameFromDisposition(
+        response.headers.get("Content-Disposition"),
+        fallbackFilename
+      ),
+    },
+    status: response.status,
+  };
+}
+
+async function downloadPdf(
+  path: string,
+  fallbackFilename: string
+): Promise<ApiResult<PdfDownload>> {
+  try {
+    const response = await fetch(path, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    return await parsePdfDownloadResponse(response, fallbackFilename);
+  } catch {
+    return { ok: false, error: "خطا در ارتباط با سرور", status: 0 };
+  }
+}
+
 async function request<T, E = unknown>(
   method: string,
   path: string,
@@ -205,5 +333,6 @@ export const api = {
     request<T, E>("PATCH", path, body),
   delete: <T, E = unknown>(path: string, body?: unknown) =>
     request<T, E>("DELETE", path, body),
+  downloadPdf,
   upload,
 };

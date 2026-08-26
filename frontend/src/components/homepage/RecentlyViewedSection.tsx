@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ProductCard from "@/components/product/ProductCard";
+import ProductRail from "@/components/product/ProductRail";
 import { api } from "@/lib/client-api";
 import type { Product } from "@/lib/products";
 import {
@@ -58,7 +59,7 @@ export default function RecentlyViewedSection({
 
   return (
     <section className="min-w-0">
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-slate-800">{title}</h2>
         <button
           type="button"
@@ -66,18 +67,16 @@ export default function RecentlyViewedSection({
             clearRecentlyViewed();
             setProducts([]);
           }}
-          className="shrink-0 text-xs text-slate-400 transition hover:text-red-500"
+          className="-my-2 inline-flex min-h-11 shrink-0 items-center px-1 text-xs text-slate-400 transition hover:text-red-500 sm:min-h-0 sm:py-0"
         >
           پاک کردن تاریخچه
         </button>
       </div>
-      <div className="max-w-full overflow-x-auto overscroll-x-contain pb-3">
-        <div className="grid w-max grid-flow-col auto-cols-[10.5rem] gap-3 sm:auto-cols-[13rem] lg:auto-cols-[14rem]">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      </div>
+      <ProductRail>
+        {products.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </ProductRail>
     </section>
   );
 }

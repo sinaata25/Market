@@ -77,7 +77,7 @@ export default function SeoRedirects() {
         onSubmit={create}
         className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-100 bg-white p-4"
       >
-        <div className="min-w-40 flex-1">
+        <div className="w-full min-w-0 flex-1 sm:min-w-40">
           <label className="mb-1 block text-[11px] text-slate-500">
             از مسیر
           </label>
@@ -90,7 +90,7 @@ export default function SeoRedirects() {
             className={`${inputCls} w-full`}
           />
         </div>
-        <div className="min-w-40 flex-1">
+        <div className="w-full min-w-0 flex-1 sm:min-w-40">
           <label className="mb-1 block text-[11px] text-slate-500">
             به مسیر
           </label>
@@ -103,14 +103,14 @@ export default function SeoRedirects() {
             className={`${inputCls} w-full`}
           />
         </div>
-        <div>
+        <div className="min-w-0 flex-1 sm:flex-none">
           <label className="mb-1 block text-[11px] text-slate-500">نوع</label>
           <select
             value={form.statusCode}
             onChange={(e) =>
               setForm({ ...form, statusCode: Number(e.target.value) })
             }
-            className={inputCls}
+            className={`${inputCls} w-full`}
           >
             <option value={301}>۳۰۱ دائمی</option>
             <option value={302}>۳۰۲ موقت</option>
@@ -118,7 +118,7 @@ export default function SeoRedirects() {
         </div>
         <button
           type="submit"
-          className="rounded-xl bg-brand-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-brand-700"
+          className="min-h-11 flex-1 rounded-xl bg-brand-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-brand-700 sm:flex-none"
         >
           + افزودن
         </button>

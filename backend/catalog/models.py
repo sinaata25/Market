@@ -112,6 +112,12 @@ class Product(models.Model):
     features = models.JSONField("ویژگی‌ها", null=True, blank=True)  # [str]
     description = models.TextField("توضیحات", blank=True)
     warranty = models.CharField("گارانتی", max_length=100, blank=True)
+    # دو خط اطلاع‌رسانی جعبه‌ی خرید — مثل گارانتی اختیاری‌اند و پیش‌فرض
+    # ندارند؛ خالی یعنی آن خط اصلاً نمایش داده نمی‌شود
+    shipping_note = models.CharField("متن ارسال", max_length=100, blank=True)
+    return_note = models.CharField(
+        "متن بازگشت کالا", max_length=100, blank=True
+    )
     stock = models.PositiveIntegerField("موجودی", default=10)
     is_active = models.BooleanField("نمایش در فروشگاه", default=True)
     is_best_seller = models.BooleanField(
@@ -121,6 +127,14 @@ class Product(models.Model):
     )
     best_seller_position = models.PositiveIntegerField(
         "ترتیب در پرفروش‌ترین‌ها", default=0
+    )
+    is_incredible = models.BooleanField(
+        "شگفت‌انگیز ویژه (انتخاب مدیر)",
+        default=False,
+        help_text="نمایش در بخش «شگفت‌انگیزها» — انتخاب دستی مدیر، مستقل از تخفیف",
+    )
+    incredible_position = models.PositiveIntegerField(
+        "ترتیب در شگفت‌انگیزها", default=0
     )
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 

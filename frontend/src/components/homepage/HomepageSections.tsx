@@ -1,11 +1,14 @@
 import Link from "next/link";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
+import ProductRail from "@/components/product/ProductRail";
 import type {
   HomepageBanner,
   HomepageSection,
   HomepageSectionType,
 } from "@/lib/homepage";
 import RecentlyViewedSection from "@/components/homepage/RecentlyViewedSection";
+import AllProductsSection from "@/components/homepage/AllProductsSection";
 
 const BANNER_THEMES: Record<HomepageBanner["theme"], string> = {
   brand: "from-secondary-700 to-brand-600",
@@ -128,24 +131,27 @@ function BrandsSection({ section }: { section: HomepageSection }) {
 
 const PRODUCT_LINKS: Partial<Record<HomepageSectionType, string>> = {
   best_sellers: "/best-sellers",
-  discounted_products: "/incredible",
+  incredible_products: "/incredible",
+  discounted_products: "/discounts",
 };
 
 function ProductSection({ section }: { section: HomepageSection }) {
   const products = section.data.products ?? [];
   if (!products.length) return null;
-  const isDeals = section.type === "discounted_products";
+  const isDeals =
+    section.type === "discounted_products" ||
+    section.type === "incredible_products";
   const allLink = PRODUCT_LINKS[section.type as HomepageSectionType];
 
   return (
     <section
       className={
         isDeals
-          ? "overflow-hidden rounded-3xl bg-gradient-to-l from-accent-600 to-accent-400 p-5"
+          ? "overflow-hidden rounded-3xl bg-gradient-to-l from-accent-600 to-accent-400 p-3 sm:p-5"
           : ""
       }
     >
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {section.title && (
           <h2
             className={`text-lg font-bold ${isDeals ? "text-secondary-900" : "text-slate-800"}`}
@@ -167,14 +173,46 @@ function ProductSection({ section }: { section: HomepageSection }) {
           </Link>
         )}
       </div>
-      <div
-        className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${isDeals ? "lg:grid-cols-6" : "lg:grid-cols-4"}`}
-      >
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
+      {isDeals ? (
+        <ProductRail>
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </ProductRail>
+      ) : (
+        <ProductGrid>
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </ProductGrid>
+      )}
     </section>
+  );
+}
+
+/**
+ * بخش «همه محصولات» — برخلاف بقیه‌ی بخش‌های محصولی، کل کاتالوگ را
+ * صفحه‌به‌صفحه نشان می‌دهد؛ پس علاوه بر محصولاتِ صفحه‌ی اول، تعداد کل را هم
+ * از API می‌گیرد تا صفحه‌بندی همان‌جا ساخته شود. `limit` این بخش یعنی تعداد
+ * کالای هر صفحه.
+ */
+function AllProductsHomeSection({ section }: { section: HomepageSection }) {
+  const products = section.data.products ?? [];
+  const total = section.data.total ?? products.length;
+  const perPage = section.limit || products.length || 1;
+
+  if (!products.length) return null;
+
+  return (
+    <AllProductsSection
+      title={section.title ?? undefined}
+      perPage={perPage}
+      initial={{
+        items: products,
+        total,
+        pages: Math.ceil(total / perPage),
+      }}
+    />
   );
 }
 
@@ -188,8 +226,10 @@ const SECTION_RENDERERS: Partial<
   categories: (section) => <CategoriesSection section={section} />,
   brands: (section) => <BrandsSection section={section} />,
   best_sellers: (section) => <ProductSection section={section} />,
+  incredible_products: (section) => <ProductSection section={section} />,
   discounted_products: (section) => <ProductSection section={section} />,
   new_products: (section) => <ProductSection section={section} />,
+  all_products: (section) => <AllProductsHomeSection section={section} />,
   product_collection: (section) => <ProductSection section={section} />,
   recently_viewed: (section) => (
     <RecentlyViewedSection

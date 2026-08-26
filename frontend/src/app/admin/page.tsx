@@ -102,12 +102,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* نمودار فروش + وضعیت سفارش‌ها */}
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 lg:col-span-2">
           <h2 className="mb-4 text-sm font-bold text-slate-700">
             فروش ۱۴ روز اخیر
           </h2>
-          <div className="flex h-44 items-end gap-1.5" dir="ltr">
+          <div className="flex h-32 items-end gap-1 sm:h-44 sm:gap-1.5" dir="ltr">
             {stats.salesByDay.map((d) => (
               <div
                 key={d.date}
@@ -173,9 +173,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* سفارش‌های اخیر + هشدار موجودی + پرفروش‌ها */}
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* سفارش‌های اخیر */}
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white lg:col-span-2">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-100 bg-white lg:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-700">سفارش‌های اخیر</h2>
             <Link
@@ -185,36 +185,36 @@ export default function AdminDashboard() {
               مشاهده همه ←
             </Link>
           </div>
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-slate-50">
-              {stats.recentOrders.length === 0 && (
-                <tr>
-                  <td className="px-5 py-8 text-center text-xs text-slate-400">
-                    هنوز سفارشی ثبت نشده است
-                  </td>
-                </tr>
-              )}
+          {stats.recentOrders.length === 0 ? (
+            <p className="px-5 py-8 text-center text-xs text-slate-400">
+              هنوز سفارشی ثبت نشده است
+            </p>
+          ) : (
+            /* این ویجت خلاصه است، نه جدول داده؛ پس به‌جای جدولِ اسکرول‌افقی،
+               روی موبایل در چند سطر می‌پیچد و از md به بعد یک‌سطری می‌شود. */
+            <ul className="divide-y divide-slate-50">
               {stats.recentOrders.map((o) => (
-                <tr key={o.id} className="hover:bg-slate-50/60">
-                  <td className="px-5 py-3 font-num text-xs text-slate-500" dir="ltr">
+                <li
+                  key={o.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 transition hover:bg-slate-50/60 sm:px-5 md:flex-nowrap"
+                >
+                  <code dir="ltr" className="font-num text-xs text-slate-500">
                     {o.code}
-                  </td>
-                  <td className="px-3 py-3 text-xs text-slate-700">
+                  </code>
+                  <StatusBadge status={o.status} />
+                  <span className="w-full min-w-0 truncate text-xs text-slate-700 md:w-auto md:flex-1">
                     {o.fullName}
-                  </td>
-                  <td className="px-3 py-3 text-[11px] text-slate-400 font-num">
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-num">
                     {faDateTime(o.createdAt)}
-                  </td>
-                  <td className="px-3 py-3 text-xs font-bold text-slate-700 font-num">
+                  </span>
+                  <span className="mr-auto shrink-0 text-xs font-bold text-slate-700 font-num">
                     {formatPrice(o.totalPrice)}
-                  </td>
-                  <td className="px-5 py-3 text-left">
-                    <StatusBadge status={o.status} />
-                  </td>
-                </tr>
+                  </span>
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+          )}
         </div>
 
         <div className="space-y-5">

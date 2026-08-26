@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>{{ document_title }}</title>
+  <style>
+    {% if regular_font_uri %}
+    @font-face {
+      font-family: "Vazirmatn Invoice";
+      src: url("{{ regular_font_uri }}") format("woff2");
+      font-style: normal;
+      font-weight: 400;
+    }
+    {% endif %}
+    {% if bold_font_uri %}
+    @font-face {
+      font-family: "Vazirmatn Invoice";
+      src: url("{{ bold_font_uri }}") format("woff2");
+      font-style: normal;
+      font-weight: 700;
+    }
+    {% endif %}
+
+    @page {
+      size: A4;
+      margin: 13mm 11mm 17mm;
+
+      @bottom-center {
+        content: "صفحه " counter(page) " از " counter(pages);
+        color: #64748b;
+        font-family: "Vazirmatn Invoice", "DejaVu Sans", sans-serif;
+        font-size: 8pt;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: #17231a;
+      direction: rtl;
+      font-family: "Vazirmatn Invoice", "DejaVu Sans", sans-serif;
+      font-size: 9pt;
+      line-height: 1.75;
+    }
+
+    .top-accent {
+      height: 3px;
+      margin-bottom: 7mm;
+      border-radius: 3px;
+      background: #47783a;
+    }
+
+    .brand-table,
+    .metadata,
+    .customer-table,
+    .products,
+    .summary {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .brand-table td { vertical-align: middle; }
+    .brand { width: 65%; }
+    .brand-mark { width: 21mm; padding-left: 4mm; }
+    .brand-mark img { display: block; width: 18mm; height: 18mm; object-fit: contain; }
+
+    .store-name {
+      margin: 0 0 1mm;
+      color: #335f2b;
+      font-size: 15pt;
+      font-weight: 700;
+    }
+
+    .invoice-title {
+      margin: 0;
+      color: #0f2416;
+      font-size: 20pt;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .invoice-subtitle {
+      color: #64748b;
+      font-size: 8pt;
+      letter-spacing: .5px;
+      text-align: left;
+    }
+
+    .metadata {
+      margin: 6mm 0 5mm;
+      border: 1px solid #d8e3d5;
+      border-radius: 6px;
+      background: #f7faf6;
+    }
+
+    .metadata td {
+      width: 25%;
+      padding: 3mm;
+      border-left: 1px solid #e1e9df;
+      vertical-align: top;
+    }
+    .metadata td:last-child { border-left: 0; }
+
+    .label {
+      display: block;
+      color: #64748b;
+      font-size: 7.5pt;
+      font-weight: 400;
+    }
+
+    .value { color: #17231a; font-weight: 700; }
+    .ltr { direction: ltr; unicode-bidi: embed; }
+
+    .section-title {
+      margin: 0 0 2mm;
+      color: #335f2b;
+      font-size: 10.5pt;
+      font-weight: 700;
+    }
+
+    .customer-box {
+      margin-bottom: 6mm;
+      padding: 4mm;
+      border: 1px solid #d8e3d5;
+      border-radius: 6px;
+    }
+
+    .customer-table td { padding: 1mm 0; vertical-align: top; }
+    .customer-table .short { width: 34%; padding-left: 5mm; }
+    .address { overflow-wrap: anywhere; word-break: normal; }
+
+    .products {
+      table-layout: fixed;
+      border: 1px solid #ccd9c9;
+    }
+
+    .products thead { display: table-header-group; }
+    .products tr { break-inside: avoid; page-break-inside: avoid; }
+
+    .products th {
+      padding: 2.4mm 1.5mm;
+      border: 1px solid #335f2b;
+      background: #47783a;
+      color: white;
+      font-size: 7.5pt;
+      font-weight: 700;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .products td {
+      padding: 2.6mm 1.5mm;
+      border: 1px solid #dce5da;
+      vertical-align: middle;
+      text-align: center;
+    }
+
+    .products tbody tr:nth-child(even) { background: #f8faf7; }
+    .products .row-number { width: 6%; }
+    .products .product-name { width: 30%; text-align: right; overflow-wrap: anywhere; }
+    .products .qty { width: 8%; }
+    .products .money { width: 14%; }
+    .products .line-total { width: 14%; font-weight: 700; }
+
+    .summary-wrap {
+      width: 52%;
+      margin-top: 5mm;
+      margin-right: auto;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .summary td {
+      padding: 2.2mm 3mm;
+      border-bottom: 1px solid #e2e8e0;
+    }
+    .summary td:last-child { text-align: left; font-weight: 700; }
+
+    .summary .grand-total td {
+      padding-top: 3mm;
+      padding-bottom: 3mm;
+      border: 0;
+      background: #e8f2e5;
+      color: #244c1d;
+      font-size: 11pt;
+      font-weight: 700;
+    }
+
+    .notes {
+      margin-top: 7mm;
+      padding-top: 3mm;
+      border-top: 1px solid #d8e3d5;
+      color: #64748b;
+      font-size: 7.5pt;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-accent"></div>
+
+  <table class="brand-table">
+    <tr>
+      <td class="brand-mark">
+        {% if logo_uri %}<img src="{{ logo_uri }}" alt="{{ store_name }}">{% endif %}
+      </td>
+      <td class="brand">
+        <h2 class="store-name">{{ store_name }}</h2>
+        <span class="label">فروشگاه اینترنتی ابزار و ادوات کشاورزی</span>
+      </td>
+      <td>
+        <h1 class="invoice-title">فاکتور فروش</h1>
+        <div class="invoice-subtitle">INVOICE</div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="metadata">
+    <tr>
+      <td><span class="label">شماره فاکتور</span><span class="value ltr">{{ invoice_number }}</span></td>
+      <td><span class="label">شماره سفارش</span><span class="value ltr">{{ order_code }}</span></td>
+      <td><span class="label">تاریخ صدور</span><span class="value ltr">{{ issued_at }}</span></td>
+      <td><span class="label">تاریخ سفارش</span><span class="value ltr">{{ ordered_at }}</span></td>
+    </tr>
+  </table>
+
+  <h3 class="section-title">مشخصات خریدار</h3>
+  <div class="customer-box">
+    <table class="customer-table">
+      <tr>
+        <td class="short"><span class="label">نام و نام خانوادگی</span><span class="value">{{ customer.full_name }}</span></td>
+        <td class="short"><span class="label">شماره تماس</span><span class="value ltr">{{ customer.phone_display }}</span></td>
+        <td><span class="label">وضعیت سفارش</span><span class="value">{{ status_label }}</span></td>
+      </tr>
+      <tr>
+        <td colspan="2" class="address"><span class="label">آدرس تحویل</span><span class="value">{{ customer.address }}</span></td>
+        <td><span class="label">کد پستی</span><span class="value ltr">{% if customer.postal_code %}{{ customer.postal_code_display }}{% else %}ـ{% endif %}</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <h3 class="section-title">شرح کالاها و خدمات</h3>
+  <table class="products">
+    <thead>
+      <tr>
+        <th class="row-number">ردیف</th>
+        <th class="product-name">شرح کالا</th>
+        <th class="qty">تعداد</th>
+        <th class="money">قیمت واحد<br>(تومان)</th>
+        <th class="money">تخفیف واحد<br>(تومان)</th>
+        <th class="money">قیمت نهایی واحد<br>(تومان)</th>
+        <th class="line-total">مبلغ کل<br>(تومان)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in lines %}
+      <tr>
+        <td>{{ line.position }}</td>
+        <td class="product-name">{{ line.title }}</td>
+        <td>{{ line.qty_display }}</td>
+        <td>{{ line.list_price_display }}</td>
+        <td>{{ line.unit_discount_display }}</td>
+        <td>{{ line.unit_price_display }}</td>
+        <td class="line-total">{{ line.line_total_display }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="summary-wrap">
+    <table class="summary">
+      <tr><td>جمع قیمت کالاها</td><td>{{ summary.items_price_display }} تومان</td></tr>
+      <tr><td>مجموع تخفیف</td><td>{{ summary.discount_display }} تومان</td></tr>
+      <tr><td>هزینه ارسال</td><td>{{ summary.shipping_price_display }} تومان</td></tr>
+      <tr class="grand-total"><td>{{ total_label }}</td><td>{{ summary.total_price_display }} تومان</td></tr>
+    </table>
+  </div>
+
+  <div class="notes">
+    این فاکتور بر اساس اطلاعات ثبت‌شده در زمان سفارش صادر شده است.
+  </div>
+</body>
+</html>

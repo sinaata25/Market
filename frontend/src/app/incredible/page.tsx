@@ -1,8 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getProducts } from "@/lib/catalog";
-import { formatPrice } from "@/lib/products";
+import { discountPercent, formatPrice } from "@/lib/products";
 import { fetchSeo, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import DealCountdown from "@/components/product/DealCountdown";
 import AddToCartButton from "@/components/product/AddToCartButton";
 
@@ -14,29 +16,27 @@ export async function generateMetadata() {
 }
 
 export default async function IncrediblePage() {
-  // فقط کالاهای تخفیف‌دار، بیشترین تخفیف اول
-  const { items } = await getProducts({
-    onlyDiscounted: true,
+  // شگفت‌انگیزها انتخاب دستی مدیر است (مثل پرفروش‌ترین‌ها) — نه هر کالای
+  // تخفیف‌دار. فهرست کامل تخفیف‌ها صفحه‌ی جداگانه‌ی /discounts است.
+  const { items: sorted } = await getProducts({
+    incredible: true,
+    sort: "incredible",
     perPage: 50,
   });
 
-  const sorted = [...items].sort((a, b) => {
-    const da = a.oldPrice ? 1 - a.price / a.oldPrice : 0;
-    const db = b.oldPrice ? 1 - b.price / b.oldPrice : 0;
-    return db - da;
-  });
-
-  const best = sorted[0];
-  const bestDiscount = best?.oldPrice
-    ? Math.round((1 - best.price / best.oldPrice) * 100)
-    : 0;
-  const totalSaving = sorted.reduce(
+  // منتخب‌ها ممکن است تخفیف نداشته باشند؛ آمار فقط وقتی معنا دارد که داشته باشند
+  const discounted = sorted.filter((p) => discountPercent(p) > 0);
+  const best =
+    [...discounted].sort((a, b) => discountPercent(b) - discountPercent(a))[0] ??
+    sorted[0];
+  const bestDiscount = best ? discountPercent(best) : 0;
+  const totalSaving = discounted.reduce(
     (sum, p) => sum + ((p.oldPrice ?? p.price) - p.price),
     0
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       {/* مسیر راهنما */}
       <nav className="mb-4 flex items-center gap-1 text-xs text-slate-400">
         <Link href="/" className="hover:text-brand-600">
@@ -58,7 +58,7 @@ export default async function IncrediblePage() {
                 پیشنهاد شگفت‌انگیز
               </h1>
               <p className="mt-1 text-xs text-secondary-900/90 font-num">
-                {sorted.length.toLocaleString("fa-IR")} کالا با تخفیف ویژه
+                {sorted.length.toLocaleString("fa-IR")} کالای منتخب فروشگاه
               </p>
             </div>
           </div>
@@ -66,11 +66,11 @@ export default async function IncrediblePage() {
         </div>
 
         {/* نوار آمار */}
-        {sorted.length > 0 && (
+        {discounted.length > 0 && (
           <div className="grid grid-cols-2 gap-px border-t border-secondary-900/20 bg-secondary-900/5 sm:grid-cols-3">
             <div className="bg-transparent px-4 py-3 text-center">
               <p className="text-sm font-bold text-secondary-900 font-num">
-                ٪{bestDiscount.toLocaleString("fa-IR")}
+                {bestDiscount.toLocaleString("fa-IR")}٪
               </p>
               <p className="text-[11px] text-secondary-900/80">بیشترین تخفیف</p>
             </div>
@@ -89,7 +89,7 @@ export default async function IncrediblePage() {
       </section>
 
       {/* پیشنهاد ویژه‌ی امروز */}
-      {best && (
+      {best && bestDiscount > 0 && (
         <section className="mb-6 overflow-hidden rounded-3xl border-2 border-accent-100 bg-white transition focus-within:border-accent-400">
           <div className="flex items-center gap-2 bg-accent-50 px-5 py-2.5">
             <span className="text-sm">🔥</span>
@@ -99,12 +99,15 @@ export default async function IncrediblePage() {
           </div>
           <div className="group relative flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
             {best.image && (
-              <div className="h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-50 sm:w-40">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+              // مثل کارت محصول: بهینه‌سازی تصویر Next و object-contain تا
+              // تصویر کالا بریده نشود
+              <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-50 sm:w-40">
+                <Image
                   src={best.image}
                   alt={best.title}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                  fill
+                  sizes="(max-width: 639px) 100vw, 10rem"
+                  className="object-contain p-2 transition duration-300 motion-safe:group-hover:scale-105"
                 />
               </div>
             )}
@@ -120,7 +123,7 @@ export default async function IncrediblePage() {
               <p className="mb-4 text-xs text-slate-400">{best.category}</p>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-lg bg-accent-500 px-2.5 py-1 text-sm font-bold text-secondary-900 font-num">
-                  ٪{bestDiscount.toLocaleString("fa-IR")}
+                  {bestDiscount.toLocaleString("fa-IR")}٪
                 </span>
                 <span className="text-sm text-slate-300 line-through font-num">
                   {formatPrice(best.oldPrice!)}
@@ -153,29 +156,38 @@ export default async function IncrediblePage() {
       {/* گرید محصولات تخفیف‌دار */}
       {sorted.length > 0 ? (
         <>
-          <h2 className="mb-4 text-base font-bold text-slate-800">
-            همه‌ی کالاهای تخفیف‌دار
-          </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-bold text-slate-800">
+              کالاهای شگفت‌انگیز
+            </h2>
+            <Link
+              href="/discounts"
+              className="shrink-0 text-sm text-brand-600 transition hover:text-brand-700"
+            >
+              مشاهده همه تخفیف‌ها ←
+            </Link>
+          </div>
+          <ProductGrid>
             {sorted.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
-          </div>
+          </ProductGrid>
         </>
       ) : (
         <div className="rounded-3xl border border-slate-100 bg-white px-6 py-16 text-center">
           <span className="mb-4 block text-6xl">🏷️</span>
           <h2 className="mb-2 font-bold text-slate-700">
-            در حال حاضر تخفیف فعالی نداریم
+            هنوز کالای شگفت‌انگیزی انتخاب نشده است
           </h2>
           <p className="mb-6 text-sm text-slate-500">
-            به‌زودی پیشنهادهای شگفت‌انگیز جدید اضافه می‌شود.
+            به‌زودی پیشنهادهای شگفت‌انگیز جدید اضافه می‌شود. در این فاصله
+            می‌توانید همه‌ی کالاهای تخفیف‌دار را ببینید.
           </p>
           <Link
-            href="/"
+            href="/discounts"
             className="inline-block rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-brand-700"
           >
-            مشاهده همه محصولات
+            مشاهده همه تخفیف‌ها
           </Link>
         </div>
       )}

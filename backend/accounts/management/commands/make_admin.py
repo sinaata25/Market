@@ -25,6 +25,20 @@ class Command(BaseCommand):
             return
 
         user, created = User.objects.get_or_create(phone=phone)
+        # گرفتن staff از مدیر اجرایی، نقشش را ناسازگار می‌کند
+        if options["revoke"] and user.is_manager_admin:
+            self.stderr.write(
+                "این کاربر مدیر اجرایی است؛ برای لغو دسترسی از "
+                f"«make_manager {phone} --revoke» استفاده کنید"
+            )
+            return
+        # نقش مدیر سئو با داشبورد فروشگاه ناسازگار است
+        if not options["revoke"] and user.is_seo_manager:
+            self.stderr.write(
+                "این کاربر مدیر سئو است؛ ابتدا با "
+                f"«make_seo {phone} --revoke» نقش سئو را لغو کنید"
+            )
+            return
         user.is_staff = not options["revoke"]
         user.save(update_fields=["is_staff"])
 

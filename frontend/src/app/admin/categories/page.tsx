@@ -234,9 +234,9 @@ export default function AdminCategoriesPage() {
 
       <section
         ref={formSection}
-        className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-5"
+        className="scroll-mt-[calc(var(--header-h)+1rem)] rounded-2xl border border-slate-100 bg-white p-5"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <h2 className="font-bold text-slate-700">
             {editing ? `ویرایش «${editing.title}»` : "افزودن دسته‌بندی"}
           </h2>
@@ -251,7 +251,7 @@ export default function AdminCategoriesPage() {
           )}
         </div>
 
-        <form onSubmit={save} className="grid gap-4 lg:grid-cols-2">
+        <form onSubmit={save} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium text-slate-600">
               عنوان دسته‌بندی
@@ -292,11 +292,11 @@ export default function AdminCategoriesPage() {
             />
           </label>
 
-          <fieldset className="lg:col-span-2">
+          <fieldset className="min-w-0 lg:col-span-2">
             <legend className="mb-1.5 text-xs font-medium text-slate-600">
               دسته‌بندی‌های والد (اختیاری)
             </legend>
-            <div className="grid max-h-52 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 max-h-52 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-3">
               {categories.filter((category) => category.id !== editing?.id)
                 .length === 0 ? (
                 <p className="text-xs text-slate-400">
@@ -348,7 +348,7 @@ export default function AdminCategoriesPage() {
             </p>
           </label>
 
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             <button
               disabled={saving}
               className="rounded-xl bg-brand-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"

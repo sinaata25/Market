@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import ProvinceCityFields from "@/components/forms/ProvinceCityFields";
 import { api } from "@/lib/client-api";
 
 type Address = {
@@ -10,6 +11,8 @@ type Address = {
   phone: string;
   province: string;
   city: string;
+  provinceId: string | null;
+  cityId: string | null;
   address: string;
   postalCode: string;
   isDefault: boolean;
@@ -23,6 +26,8 @@ const EMPTY: Form = {
   phone: "",
   province: "",
   city: "",
+  provinceId: null,
+  cityId: null,
   address: "",
   postalCode: "",
   isDefault: false,
@@ -51,6 +56,7 @@ export default function MyAddresses() {
   }, [load]);
 
   function set<K extends keyof Form>(key: K, value: Form[K]) {
+    setError("");
     setForm((f) => (f ? { ...f, [key]: value } : f));
   }
 
@@ -125,7 +131,7 @@ export default function MyAddresses() {
           <h2 className="text-sm font-bold text-slate-700">
             {editingId ? "ویرایش آدرس" : "آدرس جدید"}
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs text-slate-500">
                 عنوان آدرس
@@ -173,28 +179,21 @@ export default function MyAddresses() {
                 className={`${inputCls} text-center font-num`}
               />
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs text-slate-500">
-                استان *
-              </label>
-              <input
-                required
-                value={form.province}
-                onChange={(e) => set("province", e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs text-slate-500">
-                شهر *
-              </label>
-              <input
-                required
-                value={form.city}
-                onChange={(e) => set("city", e.target.value)}
-                className={inputCls}
-              />
-            </div>
+            <ProvinceCityFields
+              province={form.province}
+              city={form.city}
+              provinceId={form.provinceId}
+              cityId={form.cityId}
+              onChange={(location) =>
+                setForm((current) =>
+                  current ? { ...current, ...location } : current
+                )
+              }
+              onClearError={() => setError("")}
+              disabled={saving}
+              className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2"
+              selectClassName={inputCls}
+            />
           </div>
           <div>
             <label className="mb-1.5 block text-xs text-slate-500">
@@ -258,7 +257,7 @@ export default function MyAddresses() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {addresses.map((a) => (
             <div
               key={a.id}

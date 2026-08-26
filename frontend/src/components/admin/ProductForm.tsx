@@ -24,6 +24,8 @@ type FormState = {
   badge: string;
   description: string;
   warranty: string;
+  shippingNote: string;
+  returnNote: string;
 };
 
 const EMPTY: FormState = {
@@ -37,6 +39,8 @@ const EMPTY: FormState = {
   badge: "",
   description: "",
   warranty: "",
+  shippingNote: "",
+  returnNote: "",
 };
 
 function inputCls(hasError = false) {
@@ -114,6 +118,9 @@ export default function ProductForm({ productId }: { productId?: number }) {
   const [changingVisibility, setChangingVisibility] = useState(false);
   const [isBestSeller, setIsBestSeller] = useState(false);
   const [bestSellerPosition, setBestSellerPosition] = useState(0);
+  const [isIncredible, setIsIncredible] = useState(false);
+  const [incrediblePosition, setIncrediblePosition] = useState(0);
+  const [changingIncredible, setChangingIncredible] = useState(false);
   const [changingBestSeller, setChangingBestSeller] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
     null
@@ -164,6 +171,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
               badge: p.badge ?? "",
               description: p.description ?? "",
               warranty: p.warranty ?? "",
+              shippingNote: p.shippingNote ?? "",
+              returnNote: p.returnNote ?? "",
             });
             setSpecifications(draftsFromProduct(p.specifications));
             setRecommendedProducts(p.recommendedProducts ?? []);
@@ -171,6 +180,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
             setIsActive(p.isActive !== false);
             setIsBestSeller(p.isBestSeller ?? false);
             setBestSellerPosition(p.bestSellerPosition ?? 0);
+            setIsIncredible(p.isIncredible ?? false);
+            setIncrediblePosition(p.incrediblePosition ?? 0);
           }
           setLoading(false);
         });
@@ -221,6 +232,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
       badge: form.badge.trim(),
       description: form.description.trim(),
       warranty: form.warranty.trim(),
+      shippingNote: form.shippingNote.trim(),
+      returnNote: form.returnNote.trim(),
       specifications: specifications.map((specification, position) => ({
         keyId: specification.key!.id,
         value: specification.value.trim(),
@@ -388,6 +401,48 @@ export default function ProductForm({ productId }: { productId?: number }) {
     }
   }
 
+  async function toggleIncredible() {
+    if (activeProductId === undefined || changingIncredible) return;
+    setChangingIncredible(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/incredible`,
+      { isIncredible: !isIncredible }
+    );
+    setChangingIncredible(false);
+    if (result.ok && result.data) {
+      setIsIncredible(result.data.product.isIncredible ?? false);
+      setMessage({
+        ok: true,
+        text: result.data.product.isIncredible
+          ? "محصول به شگفت‌انگیزها اضافه شد ✅"
+          : "محصول از شگفت‌انگیزها حذف شد ✅",
+      });
+    } else {
+      setMessage({
+        ok: false,
+        text: result.error ?? "تغییر وضعیت شگفت‌انگیز انجام نشد",
+      });
+    }
+  }
+
+  async function saveIncrediblePosition() {
+    if (activeProductId === undefined || changingIncredible) return;
+    setChangingIncredible(true);
+    setMessage(null);
+    const result = await api.patch<{ product: AdminProduct }>(
+      `/api/admin/products/${activeProductId}/incredible`,
+      { isIncredible, position: incrediblePosition }
+    );
+    setChangingIncredible(false);
+    if (result.ok && result.data) {
+      setIncrediblePosition(result.data.product.incrediblePosition ?? 0);
+      setMessage({ ok: true, text: "ترتیب نمایش ذخیره شد ✅" });
+    } else {
+      setMessage({ ok: false, text: result.error ?? "ذخیره ترتیب انجام نشد" });
+    }
+  }
+
   async function saveBestSellerPosition() {
     if (activeProductId === undefined || changingBestSeller) return;
     setChangingBestSeller(true);
@@ -415,9 +470,9 @@ export default function ProductForm({ productId }: { productId?: number }) {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* ستون اصلی */}
-        <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 lg:col-span-2">
+        <div className="min-w-0 space-y-4 rounded-2xl border border-slate-100 bg-white p-5 lg:col-span-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-600">
               عنوان محصول *
@@ -454,7 +509,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               placeholder="معرفی کامل محصول..."
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
                 گارانتی
@@ -475,6 +530,33 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 onChange={(e) => set("badge", e.target.value)}
                 className={inputCls()}
                 placeholder="پرفروش / تخفیف ویژه"
+              />
+            </div>
+          </div>
+          {/* دو خط اطلاع‌رسانی جعبه‌ی خرید — خالی یعنی آن خط نمایش داده نمی‌شود */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                متن ارسال
+              </label>
+              <input
+                value={form.shippingNote}
+                onChange={(e) => set("shippingNote", e.target.value)}
+                className={inputCls()}
+                maxLength={100}
+                placeholder="اختیاری — مثلا: ارسال به سراسر کشور"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                متن بازگشت کالا
+              </label>
+              <input
+                value={form.returnNote}
+                onChange={(e) => set("returnNote", e.target.value)}
+                className={inputCls()}
+                maxLength={100}
+                placeholder="اختیاری — مثلا: ۷ روز ضمانت بازگشت کالا"
               />
             </div>
           </div>
@@ -601,6 +683,70 @@ export default function ProductForm({ productId }: { productId?: number }) {
             </div>
           )}
 
+          {isEdit && (
+            <div className="rounded-2xl border border-slate-100 bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-slate-600">
+                    بخش شگفت‌انگیزها
+                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                      isIncredible
+                        ? "bg-accent-100 text-accent-800"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isIncredible ? "⚡ شگفت‌انگیز است" : "☆ شگفت‌انگیز نیست"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={changingIncredible}
+                  onClick={toggleIncredible}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isIncredible
+                      ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      : "border-accent-200 text-accent-800 hover:bg-accent-50"
+                  }`}
+                >
+                  {changingIncredible
+                    ? "در حال تغییر..."
+                    : isIncredible
+                      ? "حذف از شگفت‌انگیزها"
+                      : "افزودن به شگفت‌انگیزها"}
+                </button>
+              </div>
+              {isIncredible && (
+                <div className="mt-3 flex items-center gap-2">
+                  <label
+                    htmlFor="incredible-position"
+                    className="shrink-0 text-[11px] text-slate-500"
+                  >
+                    ترتیب نمایش (کوچک‌تر = زودتر)
+                  </label>
+                  <input
+                    id="incredible-position"
+                    type="number"
+                    min={0}
+                    value={incrediblePosition}
+                    onChange={(e) =>
+                      setIncrediblePosition(Number(e.target.value) || 0)
+                    }
+                    onBlur={saveIncrediblePosition}
+                    disabled={changingIncredible}
+                    className={`${inputCls()} font-num w-24 py-1.5`}
+                  />
+                </div>
+              )}
+              <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                انتخابی دستی برای صفحه‌ی «شگفت‌انگیزها» — مستقل از داشتن تخفیف.
+                همه‌ی کالاهای تخفیف‌دار به‌طور خودکار در صفحه‌ی «تخفیف‌ها»
+                نمایش داده می‌شوند.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
@@ -682,7 +828,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">
                   قیمت فروش *
@@ -729,7 +875,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
               <label className="mb-3 block text-xs font-medium text-slate-600">
                 تصاویر محصول
               </label>
-              <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className="mb-3 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
                 {images.map((img) => (
                   <div
                     key={img.id}
@@ -744,7 +890,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
                     <button
                       type="button"
                       onClick={() => removeImage(img)}
-                      className="absolute inset-0 hidden place-items-center bg-black/50 text-lg text-white group-hover:grid"
+                      aria-label="حذف تصویر"
+                      className="absolute inset-0 grid place-items-center bg-black/30 text-lg text-white opacity-100 transition sm:bg-black/50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                       title="حذف"
                     >
                       🗑
@@ -840,7 +987,7 @@ export default function ProductForm({ productId }: { productId?: number }) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          className="action-btn rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
           {saving
             ? !isEdit && pendingImages.length > 0

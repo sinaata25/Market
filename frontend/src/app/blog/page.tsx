@@ -71,7 +71,7 @@ export default async function BlogPage({
   const activeTag = taxonomies.tags.find((item) => item.slug === current.tag);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="site-shell py-8">
       <nav className="mb-5 flex items-center gap-1 text-xs text-slate-400" aria-label="مسیر صفحه">
         <Link href="/" className="hover:text-brand-600">خانه</Link>
         <span>/</span>
@@ -177,11 +177,11 @@ export default async function BlogPage({
             <h2 className="text-lg font-bold text-slate-800">تازه‌ترین نوشته‌ها</h2>
             <span className="text-xs text-slate-400">{result.total.toLocaleString("fa-IR")} مطلب</span>
           </div>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {result.items.map((post) => <BlogCard key={post.id} post={post} />)}
           </div>
           {result.pages > 1 && (
-            <nav className="mt-8 flex justify-center gap-1.5" aria-label="صفحه‌بندی وبلاگ">
+            <nav className="mt-8 flex flex-wrap justify-center gap-1.5" aria-label="صفحه‌بندی وبلاگ">
               {Array.from({ length: result.pages }, (_, index) => index + 1).map((page) => (
                 <Link
                   key={page}

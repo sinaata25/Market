@@ -9,10 +9,27 @@ type User = {
   phone: string;
   name: string | null;
   isStaff: boolean;
+  isManagerAdmin: boolean;
+  isSeoManager: boolean;
+  isSuperuser: boolean;
   isActive: boolean;
   dateJoined: string;
   ordersCount: number;
 };
+
+// این فهرست فقط خواندنی است؛ تغییر نقش‌ها فقط از مسیرهای مخصوص سوپریوزر
+// انجام می‌شود، پس اینجا هیچ کنترل ارتقای نقشی وجود ندارد.
+function roleBadge(user: User): { label: string; className: string } {
+  if (user.isSuperuser)
+    return { label: "مدیر سیستم", className: "bg-rose-50 text-rose-600" };
+  if (user.isManagerAdmin)
+    return { label: "مدیر اجرایی", className: "bg-violet-50 text-violet-600" };
+  if (user.isSeoManager)
+    return { label: "مدیر سئو", className: "bg-amber-50 text-amber-600" };
+  if (user.isStaff)
+    return { label: "کارمند", className: "bg-blue-50 text-blue-600" };
+  return { label: "مشتری", className: "bg-slate-100 text-slate-500" };
+}
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -59,7 +76,7 @@ export default function AdminUsers() {
             setPage(1);
           }}
           placeholder="جستجو: شماره یا نام..."
-          className="w-56 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-56"
         />
       </div>
 
@@ -105,15 +122,11 @@ export default function AdminUsers() {
                     {faNum(u.ordersCount)}
                   </td>
                   <td className="px-5 py-3">
-                    {u.isStaff ? (
-                      <span className="rounded-lg bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-600">
-                        مدیر
-                      </span>
-                    ) : (
-                      <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] text-slate-500">
-                        مشتری
-                      </span>
-                    )}
+                    <span
+                      className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${roleBadge(u).className}`}
+                    >
+                      {roleBadge(u).label}
+                    </span>
                   </td>
                 </tr>
               ))

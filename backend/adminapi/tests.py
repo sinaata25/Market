@@ -31,10 +31,14 @@ PRODUCT_RESPONSE_KEYS = {
     "features",
     "description",
     "warranty",
+    "shippingNote",
+    "returnNote",
     "stock",
     "isActive",
     "isBestSeller",
     "bestSellerPosition",
+    "isIncredible",
+    "incrediblePosition",
 }
 
 
@@ -117,6 +121,51 @@ class AdminApiContractTests(TestCase):
         self.assertEqual(cleared.status_code, 200)
         self.assertIsNone(cleared.data["data"]["product"]["warranty"])
         self.assertEqual(Product.objects.get(pk=product_id).warranty, "")
+
+    def test_product_can_be_created_without_buybox_notes(self):
+        created = self.client.post(
+            "/api/admin/products", self.product_payload(), format="json"
+        )
+
+        self.assertEqual(created.status_code, 201)
+        product_data = created.data["data"]["product"]
+        self.assertIsNone(product_data["shippingNote"])
+        self.assertIsNone(product_data["returnNote"])
+        product = Product.objects.get(pk=product_data["id"])
+        self.assertEqual(product.shipping_note, "")
+        self.assertEqual(product.return_note, "")
+
+    def test_buybox_notes_can_be_set_and_later_cleared(self):
+        created = self.client.post(
+            "/api/admin/products",
+            self.product_payload(
+                shippingNote="ارسال به سراسر کشور",
+                returnNote="۷ روز ضمانت بازگشت کالا",
+            ),
+            format="json",
+        )
+        product_id = created.data["data"]["product"]["id"]
+        self.assertEqual(
+            created.data["data"]["product"]["shippingNote"],
+            "ارسال به سراسر کشور",
+        )
+        self.assertEqual(
+            created.data["data"]["product"]["returnNote"],
+            "۷ روز ضمانت بازگشت کالا",
+        )
+
+        cleared = self.client.patch(
+            f"/api/admin/products/{product_id}",
+            self.product_payload(shippingNote="", returnNote=""),
+            format="json",
+        )
+
+        self.assertEqual(cleared.status_code, 200)
+        self.assertIsNone(cleared.data["data"]["product"]["shippingNote"])
+        self.assertIsNone(cleared.data["data"]["product"]["returnNote"])
+        product = Product.objects.get(pk=product_id)
+        self.assertEqual(product.shipping_note, "")
+        self.assertEqual(product.return_note, "")
 
     def test_product_can_be_assigned_to_multiple_categories(self):
         second_category = Category.objects.create(

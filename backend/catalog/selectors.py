@@ -1,6 +1,6 @@
 """کوئری‌های قابل استفاده‌ی مجدد محصولات — هم برای API عمومی و هم بخش‌های صفحه اصلی"""
 
-from django.db.models import Q, QuerySet
+from django.db.models import F, Q, QuerySet
 
 from .category_tree import descendant_category_ids, visible_category_ids
 from .models import Category, Product
@@ -12,6 +12,8 @@ SORTS = {
     "popular": "-rating_count",
     # ترتیب انتخاب مدیر برای پرفروش‌ترین‌ها — مستقل از آمار فروش/امتیاز واقعی
     "featured": ("best_seller_position", "-created_at"),
+    # ترتیب انتخاب مدیر برای شگفت‌انگیزها
+    "incredible": ("incredible_position", "-created_at"),
 }
 
 
@@ -22,6 +24,7 @@ def filtered_products_queryset(
     search: str | None = None,
     discounted: bool = False,
     best_seller: bool = False,
+    incredible: bool = False,
     sort: str = "newest",
 ) -> QuerySet[Product]:
     """فهرست محصولات فعال با همان فیلترهایی که ProductListView عمومی می‌پذیرد.
@@ -54,12 +57,19 @@ def filtered_products_queryset(
     if search:
         qs = qs.filter(title__contains=search)
 
+    # «تخفیف‌دار» یعنی قیمت قبلی واقعاً بیشتر از قیمت فعلی باشد؛ صرفِ پرشدن
+    # old_price کافی نیست، وگرنه کالایی بدون تخفیفِ واقعی در فهرست تخفیف‌ها
+    # می‌آمد و کارت محصول هیچ درصدی برایش نشان نمی‌داد.
     if discounted:
-        qs = qs.filter(old_price__isnull=False)
+        qs = qs.filter(old_price__isnull=False, old_price__gt=F("price"))
 
     # پرفروش‌ترین‌ها انتخاب دستی مدیر است، نه آمار فروش/امتیاز واقعی
     if best_seller:
         qs = qs.filter(is_best_seller=True)
+
+    # شگفت‌انگیزها هم انتخاب دستی مدیر است — مستقل از داشتن تخفیف
+    if incredible:
+        qs = qs.filter(is_incredible=True)
 
     order = SORTS.get(sort, "-created_at")
     return qs.order_by(*order) if isinstance(order, tuple) else qs.order_by(order)

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCategories, getProducts } from "@/lib/catalog";
 import { breadcrumbSchema, fetchSeo, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import JsonLd from "@/components/seo/JsonLd";
 
 // داده‌ها از دیتابیس (جنگو) خوانده می‌شوند
@@ -81,7 +82,7 @@ export default async function CategoryPage({
   const seo = await fetchSeo("category", slug);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       {/* اسکیمای JSON-LD از پنل سئو */}
       {seo?.schema && <JsonLd data={seo.schema} />}
       {seo?.site.breadcrumbsEnabled && (
@@ -131,7 +132,7 @@ export default async function CategoryPage({
               <Link
                 key={subcategory.slug}
                 href={`/category/${subcategory.slug}`}
-                className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-600 transition hover:border-brand-400 hover:text-brand-700"
+                className="inline-flex min-h-11 items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-600 transition hover:border-brand-400 hover:text-brand-700 sm:min-h-0"
               >
                 {subcategory.title}
               </Link>
@@ -218,11 +219,11 @@ export default async function CategoryPage({
 
       {/* گرید محصولات */}
       {result.items.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <ProductGrid>
           {result.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
-        </div>
+        </ProductGrid>
       ) : (
         <div className="rounded-3xl border border-slate-100 bg-white px-6 py-16 text-center">
           <span className="mb-4 block text-6xl">🔍</span>
@@ -243,7 +244,7 @@ export default async function CategoryPage({
 
       {/* صفحه‌بندی */}
       {result.pages > 1 && (
-        <nav className="mt-8 flex items-center justify-center gap-1.5">
+        <nav className="mt-8 flex flex-wrap items-center justify-center gap-1.5" aria-label="صفحه‌بندی محصولات">
           {page > 1 && (
             <Link
               href={buildUrl(slug, sp, { page: String(page - 1) })}

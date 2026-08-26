@@ -1,12 +1,16 @@
-"""ویوهای پنل مدیریت سئو — دسترسی: staff یا مدیر سئو"""
+"""ویوهای پنل مدیریت سئو — دسترسی: فقط «مدیر سئو»
+
+این ناحیه عمداً برای سوپریوزر و مدیران فروشگاه هم بسته است؛ منطق آن در
+``accounts.permissions.is_seo_admin`` متمرکز شده است.
+"""
 
 import time
 
 import requests as http
 from rest_framework import serializers
-from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
+from accounts.permissions import SeoAdminRequiredMixin
 from catalog.models import ProductImage
 from common.responses import fail, ok
 
@@ -27,26 +31,10 @@ from .services import (
 )
 
 
-class IsSeoOrAdmin(BasePermission):
-    """staff یا مدیر سئو"""
-
-    message = "دسترسی سئو ندارید"
-
-    def has_permission(self, request, view):
-        u = request.user
-        return bool(
-            u and u.is_authenticated and (u.is_staff or u.is_seo_manager)
-        )
-
-
-class SeoMixin:
-    permission_classes = [IsSeoOrAdmin]
-
-
 # ─── نمای کلی ────────────────────────────────────────────────
 
 
-class SeoOverviewView(SeoMixin, APIView):
+class SeoOverviewView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
         pages = all_pages()
         metas = {
@@ -87,7 +75,7 @@ class SeoOverviewView(SeoMixin, APIView):
 # ─── فهرست صفحات و متا ──────────────────────────────────────
 
 
-class SeoPagesView(SeoMixin, APIView):
+class SeoPagesView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
         metas = {
             (m.page_type, m.object_key): m for m in PageMeta.objects.all()
@@ -140,7 +128,7 @@ class MetaSerializer(serializers.Serializer):
     schemaCustom = serializers.CharField(allow_blank=True, default="")
 
 
-class SeoMetaView(SeoMixin, APIView):
+class SeoMetaView(SeoAdminRequiredMixin, APIView):
     """خواندن/ذخیره متای یک صفحه — ?type=product&key=1"""
 
     def _params(self, request):
@@ -227,7 +215,7 @@ class SeoMetaView(SeoMixin, APIView):
         )
 
 
-class MetaRevisionsView(SeoMixin, APIView):
+class MetaRevisionsView(SeoAdminRequiredMixin, APIView):
     """تاریخچه نسخه‌ها + بازگردانی — ?type=&key="""
 
     def get(self, request):
@@ -305,7 +293,7 @@ def redirect_dto(r: Redirect) -> dict:
     }
 
 
-class RedirectListView(SeoMixin, APIView):
+class RedirectListView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
         return ok(
             {"redirects": [redirect_dto(r) for r in Redirect.objects.all()]}
@@ -327,7 +315,7 @@ class RedirectListView(SeoMixin, APIView):
         return ok({"redirect": redirect_dto(r)}, status=201)
 
 
-class RedirectDetailView(SeoMixin, APIView):
+class RedirectDetailView(SeoAdminRequiredMixin, APIView):
     def patch(self, request, pk: int):
         r = Redirect.objects.filter(pk=pk).first()
         if r is None:
@@ -353,7 +341,7 @@ class RedirectDetailView(SeoMixin, APIView):
 # ─── گزارش ۴۰۴ ───────────────────────────────────────────────
 
 
-class NotFoundListView(SeoMixin, APIView):
+class NotFoundListView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
         return ok(
             {
@@ -378,7 +366,7 @@ class NotFoundListView(SeoMixin, APIView):
 # ─── Alt تصاویر ─────────────────────────────────────────────
 
 
-class ImageAltView(SeoMixin, APIView):
+class ImageAltView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
         images = ProductImage.objects.select_related("product").order_by(
             "product_id", "order"
@@ -416,7 +404,7 @@ class ImageAltView(SeoMixin, APIView):
 # ─── اسکن سرعت و لینک شکسته ─────────────────────────────────
 
 
-class ScanView(SeoMixin, APIView):
+class ScanView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
         return ok(
             {
@@ -480,7 +468,7 @@ class ScanView(SeoMixin, APIView):
 # ─── تنظیمات ─────────────────────────────────────────────────
 
 
-class SeoSettingsView(SeoMixin, APIView):
+class SeoSettingsView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
         return ok({"settings": settings_dto(SeoSettings.load())})
 

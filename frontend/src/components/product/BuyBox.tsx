@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatPrice, type Product } from "@/lib/products";
+import { discountPercent, formatPrice, type Product } from "@/lib/products";
 import { api } from "@/lib/client-api";
 
 export default function BuyBox({ product }: { product: Product }) {
@@ -12,9 +12,7 @@ export default function BuyBox({ product }: { product: Product }) {
     text: string;
   } | null>(null);
 
-  const discount = product.oldPrice
-    ? Math.round((1 - product.price / product.oldPrice) * 100)
-    : 0;
+  const discount = discountPercent(product);
 
   const outOfStock = (product.stock ?? 0) < 1;
 
@@ -36,20 +34,24 @@ export default function BuyBox({ product }: { product: Product }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6 lg:sticky lg:top-28">
-      {/* تضمین‌ها */}
-      <ul className="mb-5 space-y-3 text-sm text-slate-600">
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-6 lg:sticky-below-header">
+      {/* تضمین‌ها: هر سه متن اختیاری‌اند؛ بدون مقدار، خط نمایش داده نمی‌شود */}
+      <ul className="space-y-3 text-sm text-slate-600 empty:hidden [&:not(:empty)]:mb-5">
         {product.warranty && (
           <li className="flex items-center gap-2">
             <span className="text-brand-600">✅</span> {product.warranty}
           </li>
         )}
-        <li className="flex items-center gap-2">
-          <span className="text-brand-600">🚚</span> ارسال به سراسر کشور
-        </li>
-        <li className="flex items-center gap-2">
-          <span className="text-brand-600">↩️</span> ۷ روز ضمانت بازگشت کالا
-        </li>
+        {product.shippingNote && (
+          <li className="flex items-center gap-2">
+            <span className="text-brand-600">🚚</span> {product.shippingNote}
+          </li>
+        )}
+        {product.returnNote && (
+          <li className="flex items-center gap-2">
+            <span className="text-brand-600">↩️</span> {product.returnNote}
+          </li>
+        )}
       </ul>
 
       {/* موجودی */}
@@ -66,7 +68,7 @@ export default function BuyBox({ product }: { product: Product }) {
         {product.oldPrice && (
           <div className="mb-1.5 flex items-center gap-2">
             <span className="rounded-md bg-accent-500 px-2 py-1 text-xs font-bold text-secondary-900 font-num">
-              ٪{discount.toLocaleString("fa-IR")}
+              {discount.toLocaleString("fa-IR")}٪
             </span>
             <span className="text-sm text-slate-300 line-through font-num">
               {formatPrice(product.oldPrice)}

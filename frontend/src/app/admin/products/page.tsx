@@ -6,6 +6,21 @@ import { api } from "@/lib/client-api";
 import { formatPrice, type Product } from "@/lib/products";
 import { faNum, Pager, EmptyRow } from "@/components/admin/ui";
 
+// دکمه‌های ستون «عملیات» — هم‌سبک با دکمه‌های ردیف در پنل «صفحه اصلی»:
+// فقط کادر و رنگ متن، بدون پس‌زمینه.
+const ACTION_BASE =
+  "inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-30";
+
+const ACTION_VARIANTS = {
+  neutral: "border-slate-200 text-slate-600 focus-visible:outline-slate-400",
+  edit: "border-brand-200 text-brand-700 focus-visible:outline-brand-600",
+  danger: "border-red-100 text-red-600 focus-visible:outline-red-500",
+} as const;
+
+function actionCls(variant: keyof typeof ACTION_VARIANTS) {
+  return `${ACTION_BASE} ${ACTION_VARIANTS[variant]}`;
+}
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -14,6 +29,9 @@ export default function AdminProducts() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [changingVisibility, setChangingVisibility] = useState<number | null>(
+    null
+  );
+  const [changingIncredible, setChangingIncredible] = useState<number | null>(
     null
   );
   const [changingBestSeller, setChangingBestSeller] = useState<number | null>(
@@ -79,6 +97,31 @@ export default function AdminProducts() {
     setTimeout(() => setMessage(""), 4000);
   }
 
+  async function toggleIncredible(product: Product) {
+    if (changingIncredible !== null) return;
+    setChangingIncredible(product.id);
+    const result = await api.patch<{ product: Product }>(
+      `/api/admin/products/${product.id}/incredible`,
+      { isIncredible: !product.isIncredible }
+    );
+    if (result.ok && result.data) {
+      setProducts((current) =>
+        current.map((item) =>
+          item.id === product.id ? result.data!.product : item
+        )
+      );
+      setMessage(
+        product.isIncredible
+          ? "محصول از شگفت‌انگیزها حذف شد ✅"
+          : "محصول به شگفت‌انگیزها اضافه شد ✅"
+      );
+    } else {
+      setMessage(result.error ?? "تغییر وضعیت شگفت‌انگیز انجام نشد");
+    }
+    setChangingIncredible(null);
+    setTimeout(() => setMessage(""), 4000);
+  }
+
   async function toggleBestSeller(product: Product) {
     if (changingBestSeller !== null) return;
     setChangingBestSeller(product.id);
@@ -113,7 +156,7 @@ export default function AdminProducts() {
             ({faNum(total)})
           </span>
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <input
             value={search}
             onChange={(e) => {
@@ -121,11 +164,11 @@ export default function AdminProducts() {
               setPage(1);
             }}
             placeholder="جستجوی محصول..."
-            className="w-48 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400"
+            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-48 sm:flex-none"
           />
           <Link
             href="/admin/products/new"
-            className="rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-brand-700"
+            className="shrink-0 whitespace-nowrap rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-brand-700"
           >
             + افزودن محصول
           </Link>
@@ -139,7 +182,7 @@ export default function AdminProducts() {
       )}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
-        <table className="w-full min-w-[940px] text-sm">
+        <table className="w-full min-w-[1000px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-right text-[11px] text-slate-400">
               <th className="px-5 py-3 font-medium">محصول</th>
@@ -150,14 +193,15 @@ export default function AdminProducts() {
               <th className="px-3 py-3 font-medium">امتیاز</th>
               <th className="px-3 py-3 font-medium">وضعیت نمایش</th>
               <th className="px-3 py-3 font-medium">پرفروش‌ترین‌ها</th>
+              <th className="px-3 py-3 font-medium">شگفت‌انگیزها</th>
               <th className="px-5 py-3 font-medium">عملیات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={9} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={10} text="در حال بارگذاری..." />
             ) : products.length === 0 ? (
-              <EmptyRow colSpan={9} text="محصولی یافت نشد" />
+              <EmptyRow colSpan={10} text="محصولی یافت نشد" />
             ) : (
               products.map((p) => (
                 <tr
@@ -250,17 +294,28 @@ export default function AdminProducts() {
                       {p.isBestSeller ? "⭐ پرفروش" : "☆ افزودن"}
                     </button>
                   </td>
+                  <td className="px-3 py-3">
+                    <button
+                      type="button"
+                      disabled={changingIncredible !== null}
+                      onClick={() => toggleIncredible(p)}
+                      title="انتخاب دستی برای بخش شگفت‌انگیزها — مستقل از داشتن تخفیف"
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        p.isIncredible
+                          ? "bg-accent-100 text-accent-800 hover:bg-accent-200"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                    >
+                      {p.isIncredible ? "⚡ شگفت‌انگیز" : "☆ افزودن"}
+                    </button>
+                  </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         disabled={changingVisibility !== null}
                         onClick={() => toggleVisibility(p)}
-                        className={`hover:underline disabled:cursor-not-allowed disabled:opacity-50 ${
-                          p.isActive === false
-                            ? "text-emerald-600"
-                            : "text-slate-500"
-                        }`}
+                        className={actionCls("neutral")}
                       >
                         {changingVisibility === p.id
                           ? "در حال تغییر..."
@@ -268,15 +323,18 @@ export default function AdminProducts() {
                             ? "نمایش دادن"
                             : "پنهان کردن"}
                       </button>
+                      {/* ویرایش ناوبری است، پس لینک می‌ماند تا باز کردن در تب
+                          جدید کار کند — فقط ظاهرش دکمه است */}
                       <Link
                         href={`/admin/products/${p.id}`}
-                        className="text-brand-600 hover:underline"
+                        className={actionCls("edit")}
                       >
                         ویرایش
                       </Link>
                       <button
+                        type="button"
                         onClick={() => remove(p)}
-                        className="text-red-400 hover:text-red-600"
+                        className={actionCls("danger")}
                       >
                         حذف
                       </button>

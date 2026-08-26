@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { getCategories, getProducts } from "@/lib/catalog";
-import { formatPrice } from "@/lib/products";
 import { fetchSeo, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
-import AddToCartButton from "@/components/product/AddToCartButton";
+import ProductGrid from "@/components/product/ProductGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +44,7 @@ export default async function BestSellersPage({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       {/* مسیر راهنما */}
       <nav className="mb-4 flex items-center gap-1 text-xs text-slate-400">
         <Link href="/" className="hover:text-brand-600">
@@ -79,7 +78,7 @@ export default async function BestSellersPage({
       <div className="mb-6 flex flex-wrap gap-2">
         <Link
           href={url()}
-          className={`inline-flex items-center rounded-full border px-4 py-1.5 text-xs transition ${
+          className={`inline-flex min-h-11 items-center rounded-full border px-4 py-1.5 text-xs transition sm:min-h-0 ${
             !activeCategory
               ? "border-brand-500 bg-brand-600 font-medium text-white"
               : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
@@ -91,7 +90,7 @@ export default async function BestSellersPage({
           <Link
             key={c.slug}
             href={url(c.slug)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs transition ${
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs transition sm:min-h-0 ${
               activeCategory === c.slug
                 ? "border-brand-500 bg-brand-600 font-medium text-white"
                 : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
@@ -134,58 +133,19 @@ export default async function BestSellersPage({
             <h2 className="mb-4 text-base font-bold text-slate-800">
               🏅 سه محصول برتر
             </h2>
-            <div className="grid gap-3 md:grid-cols-3">
+            {/* همان کارت محصول سایت + مدال رتبه؛ جای مدال با دکمه‌ی
+                علاقه‌مندی تداخل نکند، پس در این بخش نمایش داده نمی‌شود */}
+            <div className="grid grid-cols-2 items-stretch gap-2.5 sm:gap-3 md:grid-cols-3">
               {top3.map((p, i) => (
-                <article
-                  key={p.id}
-                  className="group relative flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-amber-200 hover:shadow-md focus-within:border-amber-300 md:flex-col md:items-stretch lg:flex-row lg:items-center"
-                >
-                  <span className="absolute left-3 top-3 text-2xl">
+                <div key={p.id} className="relative">
+                  <span
+                    aria-label={`رتبه ${(i + 1).toLocaleString("fa-IR")}`}
+                    className="absolute left-1.5 top-1.5 z-30 text-2xl drop-shadow-sm sm:left-2 sm:top-2"
+                  >
                     {MEDALS[i]}
                   </span>
-                  {p.image && (
-                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50 md:h-28 md:w-full lg:h-20 lg:w-20">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.image}
-                        alt={p.title}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                      />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="mb-2 line-clamp-2 text-xs leading-5 text-slate-700 group-hover:text-brand-700">
-                      <Link
-                        href={`/product/${p.id}`}
-                        className="after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-amber-400 focus-visible:after:ring-offset-2"
-                      >
-                        {p.title}
-                      </Link>
-                    </h3>
-                    <div className="mb-1.5 flex items-center gap-1 text-[11px] text-slate-400">
-                      <span className="text-amber-400">★</span>
-                      <span className="font-num text-slate-600">
-                        {p.rating.toLocaleString("fa-IR")}
-                      </span>
-                      <span className="font-num">
-                        ({p.ratingCount.toLocaleString("fa-IR")} دیدگاه)
-                      </span>
-                    </div>
-                    <div className="flex items-end justify-between gap-2">
-                      <p className="text-sm font-bold text-slate-800 font-num">
-                        {formatPrice(p.price)}
-                        <span className="mr-1 text-[11px] font-normal text-slate-400">
-                          تومان
-                        </span>
-                      </p>
-                      <AddToCartButton
-                        productId={p.id}
-                        productTitle={p.title}
-                        stock={p.stock}
-                      />
-                    </div>
-                  </div>
-                </article>
+                  <ProductCard product={p} showFavorite={false} />
+                </div>
               ))}
             </div>
           </section>
@@ -196,11 +156,11 @@ export default async function BestSellersPage({
               <h2 className="mb-4 text-base font-bold text-slate-800">
                 سایر محصولات پرفروش
               </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <ProductGrid>
                 {rest.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
-              </div>
+              </ProductGrid>
             </section>
           )}
         </>

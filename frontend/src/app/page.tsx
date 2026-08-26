@@ -19,7 +19,7 @@ export default async function Home() {
   ]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       {seo?.site.orgSchemaEnabled && <JsonLd data={orgSchema(seo.site)} />}
       <HomepageSections sections={sections} />
     </div>

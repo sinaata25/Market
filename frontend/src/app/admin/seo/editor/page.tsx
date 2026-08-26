@@ -275,9 +275,9 @@ function SeoEditorInner() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* فرم اصلی */}
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5">
             <div>
               <div className="mb-1.5 flex items-center justify-between">
@@ -429,7 +429,7 @@ function SeoEditorInner() {
                 className={`${inputCls()} resize-none`}
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">
                   تصویر OG (آدرس)
@@ -512,7 +512,7 @@ function SeoEditorInner() {
           <button
             onClick={save}
             disabled={saving}
-            className="rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="action-btn rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {saving ? "در حال ذخیره..." : "ذخیره تغییرات سئو"}
           </button>
@@ -520,7 +520,7 @@ function SeoEditorInner() {
 
         {/* ستون امتیاز */}
         <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:sticky lg:top-24">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:sticky-below-header">
             <h2 className="mb-3 text-xs font-bold text-slate-500">
               امتیاز سئوی صفحه
             </h2>

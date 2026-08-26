@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ProvinceCityFields from "@/components/forms/ProvinceCityFields";
 import ProductCard from "@/components/product/ProductCard";
 import { formatPrice, type Product } from "@/lib/products";
 import { api } from "@/lib/client-api";
@@ -37,6 +38,8 @@ type CheckoutInfo = {
   fullName: string;
   province: string;
   city: string;
+  provinceId: string | null;
+  cityId: string | null;
   address: string;
   postalCode: string;
 };
@@ -47,6 +50,8 @@ type SavedAddress = {
   fullName: string;
   province: string;
   city: string;
+  provinceId: string | null;
+  cityId: string | null;
   address: string;
   isDefault: boolean;
 };
@@ -60,6 +65,8 @@ export default function CartPage() {
     fullName: "",
     province: "",
     city: "",
+    provinceId: null,
+    cityId: null,
     address: "",
     postalCode: "",
   });
@@ -100,6 +107,14 @@ export default function CartPage() {
 
   function notifyHeader() {
     window.dispatchEvent(new CustomEvent("cart:updated"));
+  }
+
+  function setCheckoutInfo<K extends keyof CheckoutInfo>(
+    key: K,
+    value: CheckoutInfo[K]
+  ) {
+    setError("");
+    setInfo((current) => ({ ...current, [key]: value }));
   }
 
   async function changeQty(item: CartItem, qty: number) {
@@ -161,7 +176,7 @@ export default function CartPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 text-center text-sm text-slate-400">
+      <div className="site-shell py-16 text-center text-sm text-slate-400">
         در حال بارگذاری سبد خرید...
       </div>
     );
@@ -181,7 +196,7 @@ export default function CartPage() {
               {orderCode}
             </b>
           </p>
-          <div className="flex justify-center gap-3 text-sm">
+          <div className="flex flex-wrap justify-center gap-3 text-sm">
             <Link
               href="/orders"
               className="rounded-xl bg-brand-600 px-5 py-2.5 font-medium text-white transition hover:bg-brand-700"
@@ -221,7 +236,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       <h1 className="mb-5 text-lg font-bold text-slate-800">
         سبد خرید{" "}
         <span className="text-sm font-normal text-slate-400 font-num">
@@ -233,31 +248,36 @@ export default function CartPage() {
         {/* اقلام */}
         <div className="flex-1 space-y-3">
           {cart.items.map((item) => (
-            <div
+            <article
               key={item.id}
-              className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4"
+              className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 sm:flex sm:gap-4 sm:p-4"
             >
-              {item.product.image && (
-                <Link
-                  href={`/product/${item.product.id}`}
-                  className="block h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* سلول تصویر همیشه رندر می‌شود؛ در غیر این صورت عنوان به ستون
+                  ۴rem می‌افتد و روی موبایل له می‌شود. */}
+              <Link
+                href={`/product/${item.product.id}`}
+                aria-label={item.product.title}
+                className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 sm:h-20 sm:w-20"
+              >
+                {item.product.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={item.product.image}
                     alt={item.product.title}
                     className="h-full w-full object-cover"
                   />
-                </Link>
-              )}
+                ) : (
+                  <span aria-hidden="true" className="text-2xl opacity-40">🛠️</span>
+                )}
+              </Link>
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/product/${item.product.id}`}
-                  className="mb-2 block truncate text-sm font-medium text-slate-700 hover:text-brand-700"
+                  className="mb-2 line-clamp-2 text-sm font-medium leading-6 text-slate-700 hover:text-brand-700"
                 >
                   {item.product.title}
                 </Link>
-                <div className="flex items-baseline gap-1 text-sm">
+                <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 text-sm">
                   <span className="font-bold text-slate-800 font-num">
                     {formatPrice(item.product.price * item.qty)}
                   </span>
@@ -271,11 +291,12 @@ export default function CartPage() {
               </div>
 
               {/* کنترل تعداد */}
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1.5">
+              <div className="col-start-2 flex items-center gap-2 justify-self-end rounded-xl border border-slate-200 px-2 py-1.5 sm:col-auto sm:shrink-0">
                 <button
                   disabled={busyItem === item.id}
                   onClick={() => changeQty(item, item.qty + 1)}
-                  className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-brand-600 hover:bg-slate-200 disabled:opacity-50"
+                  aria-label={`افزایش تعداد ${item.product.title}`}
+                  className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-brand-600 hover:bg-slate-200 disabled:opacity-50"
                 >
                   +
                 </button>
@@ -286,7 +307,8 @@ export default function CartPage() {
                   <button
                     disabled={busyItem === item.id}
                     onClick={() => changeQty(item, item.qty - 1)}
-                    className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 disabled:opacity-50"
+                    aria-label={`کاهش تعداد ${item.product.title}`}
+                    className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 disabled:opacity-50"
                   >
                     −
                   </button>
@@ -294,18 +316,19 @@ export default function CartPage() {
                   <button
                     disabled={busyItem === item.id}
                     onClick={() => removeItem(item)}
-                    className="grid h-7 w-7 place-items-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-50"
+                    aria-label={`حذف ${item.product.title} از سبد`}
+                    className="grid h-9 w-9 place-items-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-50"
                     title="حذف از سبد"
                   >
                     🗑
                   </button>
                 )}
               </div>
-            </div>
+            </article>
           ))}
 
           {(cart.recommendations?.length ?? 0) > 0 && (
-            <section className="mt-5 rounded-3xl border border-brand-100 bg-brand-50/40 p-4 sm:p-5">
+            <section className="@container/recommendations mt-5 rounded-3xl border border-brand-100 bg-brand-50/40 p-4 sm:p-5">
               <div className="mb-4">
                 <h2 className="text-base font-bold text-slate-800">
                   پیشنهاد برای خرید شما
@@ -315,15 +338,20 @@ export default function CartPage() {
                   خرید را ادامه دهید.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              <div className="grid grid-cols-1 items-stretch gap-3 @min-[19rem]/recommendations:grid-cols-2 @min-[42rem]/recommendations:grid-cols-3">
                 {cart.recommendations?.map((recommendation) => (
-                  <div key={recommendation.product.id} className="min-w-0">
+                  <div
+                    key={recommendation.product.id}
+                    className="flex min-w-0 flex-col"
+                  >
                     <p className="mb-2 truncate px-1 text-[11px] text-brand-700">
                       پیشنهاد برای {recommendation.recommendedFor
                         .map((product) => product.title)
                         .join("، ")}
                     </p>
-                    <ProductCard product={recommendation.product} />
+                    <div className="flex-1">
+                      <ProductCard product={recommendation.product} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -337,30 +365,30 @@ export default function CartPage() {
 
         {/* خلاصه و ثبت سفارش */}
         <div className="lg:w-80 lg:shrink-0">
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:sticky lg:top-28">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 lg:sticky-below-header">
             <div className="space-y-3 border-b border-slate-100 pb-4 text-sm">
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between gap-3 text-slate-500">
                 <span>
                   قیمت کالاها{" "}
                   <span className="font-num">
                     ({cart.itemsCount.toLocaleString("fa-IR")})
                   </span>
                 </span>
-                <span className="font-num">
+                <span className="shrink-0 text-left font-num">
                   {formatPrice(cart.itemsPrice)} تومان
                 </span>
               </div>
               {cart.discount > 0 && (
-                <div className="flex justify-between text-accent-700">
+                <div className="flex justify-between gap-3 text-accent-700">
                   <span>سود شما از خرید</span>
-                  <span className="font-num">
+                  <span className="shrink-0 text-left font-num">
                     {formatPrice(cart.discount)} تومان
                   </span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-slate-800">
+              <div className="flex justify-between gap-3 font-bold text-slate-800">
                 <span>مبلغ قابل پرداخت</span>
-                <span className="font-num">
+                <span className="shrink-0 text-left font-num">
                   {formatPrice(cart.totalPrice)} تومان
                 </span>
               </div>
@@ -394,10 +422,13 @@ export default function CartPage() {
                           type="radio"
                           name="address"
                           checked={selectedAddress === a.id}
-                          onChange={() => setSelectedAddress(a.id)}
+                          onChange={() => {
+                            setSelectedAddress(a.id);
+                            setError("");
+                          }}
                           className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
                         />
-                        <span className="min-w-0">
+                        <span className="min-w-0 break-words">
                           <span className="block font-medium text-slate-700">
                             {a.title} — {a.fullName}
                           </span>
@@ -422,37 +453,30 @@ export default function CartPage() {
                       placeholder="نام و نام خانوادگی تحویل‌گیرنده"
                       value={info.fullName}
                       onChange={(e) =>
-                        setInfo({ ...info, fullName: e.target.value })
+                        setCheckoutInfo("fullName", e.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
                     />
-                    <div className="flex gap-2">
-                      <input
-                        required
-                        placeholder="استان"
-                        value={info.province}
-                        onChange={(e) =>
-                          setInfo({ ...info, province: e.target.value })
-                        }
-                        className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                      />
-                      <input
-                        required
-                        placeholder="شهر"
-                        value={info.city}
-                        onChange={(e) =>
-                          setInfo({ ...info, city: e.target.value })
-                        }
-                        className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
-                      />
-                    </div>
+                    <ProvinceCityFields
+                      province={info.province}
+                      city={info.city}
+                      provinceId={info.provinceId}
+                      cityId={info.cityId}
+                      onChange={(location) =>
+                        setInfo((current) => ({ ...current, ...location }))
+                      }
+                      onClearError={() => setError("")}
+                      disabled={submitting}
+                      className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                      labelClassName="sr-only"
+                    />
                     <textarea
                       required
                       placeholder="آدرس کامل پستی"
                       rows={3}
                       value={info.address}
                       onChange={(e) =>
-                        setInfo({ ...info, address: e.target.value })
+                        setCheckoutInfo("address", e.target.value)
                       }
                       className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:bg-white"
                     />
@@ -461,7 +485,7 @@ export default function CartPage() {
                       dir="ltr"
                       value={info.postalCode}
                       onChange={(e) =>
-                        setInfo({ ...info, postalCode: e.target.value })
+                        setCheckoutInfo("postalCode", e.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-sm font-num outline-none focus:border-brand-400 focus:bg-white"
                     />

@@ -7,7 +7,13 @@ from catalog.dto import brand_dto, category_dto, category_summary, product_dto
 from catalog.models import Brand, Category
 
 from .models import Banner, HomepageSection
-from .services import resolved_limit, resolved_title, section_products
+from .services import (
+    PRODUCT_SECTION_FILTERS,
+    resolved_limit,
+    resolved_title,
+    section_products,
+    section_products_total,
+)
 
 
 def banner_dto(banner: Banner) -> dict:
@@ -107,24 +113,31 @@ def public_section_dto(section: HomepageSection) -> dict | None:
             "data": {},
         }
 
-    product_types = {
-        HomepageSection.SectionType.BEST_SELLERS,
-        HomepageSection.SectionType.DISCOUNTED_PRODUCTS,
-        HomepageSection.SectionType.NEW_PRODUCTS,
-        HomepageSection.SectionType.PRODUCT_COLLECTION,
+    # از خودِ پیکربندی فیلترها گرفته می‌شود تا افزودن نوع بخش محصولی جدید،
+    # یک‌جا انجام شود و بخش تازه بی‌سروصدا از پاسخ عمومی حذف نشود
+    product_types = set(PRODUCT_SECTION_FILTERS) | {
+        HomepageSection.SectionType.PRODUCT_COLLECTION
     }
     if section_type not in product_types:
         return None
 
-    # بخش‌های محصولی: پرفروش‌ترین‌ها، تخفیف‌دارها، جدیدترین‌ها، مجموعه سفارشی
+    # بخش‌های محصولی: پرفروش‌ترین‌ها، شگفت‌انگیزها، تخفیف‌دارها، جدیدترین‌ها،
+    # همه محصولات، مجموعه سفارشی
     products = section_products(section)
+    data = {"products": [product_dto(product) for product in products]}
+
+    # بخش «همه محصولات» صفحه‌بندی می‌شود: فروشگاه برای ساختن صفحه‌بندی به
+    # تعداد کل نیاز دارد و بقیه‌ی صفحه‌ها را از API عمومی محصولات می‌گیرد.
+    if section_type == HomepageSection.SectionType.ALL_PRODUCTS:
+        data["total"] = section_products_total(section)
+
     return {
         "id": section.id,
         "type": section_type,
         "position": section.position,
         "title": title,
         "limit": resolved_limit(section),
-        "data": {"products": [product_dto(product) for product in products]},
+        "data": data,
     }
 
 

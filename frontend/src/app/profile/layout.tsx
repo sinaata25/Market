@@ -90,26 +90,28 @@ export default function ProfileLayout({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="site-shell py-6">
       <div className="flex flex-col gap-5 lg:flex-row">
         {/* سایدبار */}
-        <aside className="lg:w-64 lg:shrink-0">
-          <div className="lg:sticky lg:top-24">
+        <aside className="min-w-0 lg:w-64 lg:shrink-0">
+          <div className="lg:sticky-below-header">
             {/* کارت کاربر */}
-            <div className="mb-3 rounded-2xl border border-slate-100 bg-white p-5 text-center">
-              <span className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-brand-50 text-3xl">
+            <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-right lg:block lg:p-5 lg:text-center">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-brand-50 text-2xl lg:mx-auto lg:mb-3 lg:h-16 lg:w-16 lg:text-3xl">
                 👤
               </span>
-              <p className="text-sm font-bold text-slate-800">
-                {me.name ?? "کاربر توانا"}
-              </p>
-              <p className="mt-1 text-xs text-slate-400 font-num" dir="ltr">
-                {me.phone}
-              </p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-800">
+                  {me.name ?? "کاربر توانا"}
+                </p>
+                <p className="mt-1 text-xs text-slate-400 font-num" dir="ltr">
+                  {me.phone}
+                </p>
+              </div>
             </div>
 
             {/* منو */}
-            <nav className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-2">
+            <nav aria-label="منوی حساب کاربری" className="responsive-scroll flex gap-1 rounded-2xl border border-slate-100 bg-white p-2 lg:block">
               {NAV.map((item) => {
                 const active =
                   item.href === "/profile"
@@ -119,7 +121,7 @@ export default function ProfileLayout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition ${
+                    className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm transition lg:mb-1 lg:gap-3 lg:px-4 ${
                       active
                         ? "bg-brand-50 font-medium text-brand-700"
                         : "text-slate-600 hover:bg-slate-50"
@@ -134,7 +136,7 @@ export default function ProfileLayout({
               {(me.isStaff || me.isSeoManager) && (
                 <Link
                   href="/admin"
-                  className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-slate-600 transition hover:bg-blue-50"
+                  className="flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-right text-sm text-slate-600 transition hover:bg-blue-50 lg:w-full lg:gap-3 lg:px-4"
                 >
                   <span>🎛️</span> پنل مدیریت
                 </Link>
@@ -142,7 +144,7 @@ export default function ProfileLayout({
 
               <button
                 onClick={logout}
-                className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-red-500 transition hover:bg-red-50"
+                className="flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-right text-sm text-red-500 transition hover:bg-red-50 lg:w-full lg:gap-3 lg:px-4"
               >
                 <span>⏻</span> خروج از حساب
               </button>

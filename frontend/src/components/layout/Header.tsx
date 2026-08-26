@@ -9,35 +9,36 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-white shadow-sm">
       {/* نوار بالا */}
       <div className="border-b border-slate-100">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+        <div className="site-container grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-2.5 lg:flex lg:gap-4 lg:py-3">
           {/* لوگو */}
-          <Link href="/" className="flex shrink-0 items-center gap-2">
+          <Link href="/" className="flex min-w-0 items-center gap-2 lg:shrink-0">
             <Image
               src="/brand/logo.png"
-              alt=""
+              alt="گروه صنعتی توانا"
               width={48}
               height={48}
               priority
-              className="h-11 w-11 object-contain"
+              className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
             />
-            <div className="leading-tight">
-              <span className="block text-lg font-bold text-brand-700">
+            <div className="min-w-0 leading-tight">
+              <span className="block truncate text-sm font-bold text-brand-700 min-[390px]:text-base sm:text-lg">
                 گروه صنعتی توانا
               </span>
-              <span className="block text-[11px] text-slate-400">
+              <span className="hidden text-[11px] text-slate-400 min-[390px]:block">
                 ابزارآلات کشاورزی
               </span>
             </div>
           </Link>
 
           {/* جستجو */}
-          <div className="relative flex-1">
+          <div className="relative col-span-2 row-start-2 min-w-0 lg:order-none lg:col-auto lg:row-auto lg:flex-1">
             <input
+              aria-label="جستجو در فروشگاه"
               type="text"
               placeholder="جستجو در گروه صنعتی توانا..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-11 pl-4 text-sm outline-none transition focus:border-brand-400 focus:bg-white"
+              className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-11 pl-4 text-base outline-none transition focus:border-brand-400 focus:bg-white sm:text-sm"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
               🔍
             </span>
           </div>
@@ -47,39 +48,48 @@ export default function Header() {
         </div>
       </div>
 
-      {/* نوار دسته‌بندی */}
+      {/* نوار دسته‌بندی — در صفحه‌های کوچک فقط دسته‌بندی‌ها و برندها
+          نمایش داده می‌شوند؛ بقیه‌ی لینک‌ها از lg به بالا اضافه می‌شوند */}
       <nav className="border-b border-slate-100 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5 text-sm">
-          <CategoryMenu />
-          <BrandMenu />
+        <div className="site-container">
+          <div className="flex w-full flex-wrap items-center justify-center gap-x-1 py-1 text-sm sm:gap-x-2 sm:py-1.5 lg:flex-nowrap lg:justify-start">
+            <CategoryMenu />
+            <BrandMenu />
 
-          <span className="mx-1 h-5 w-px bg-slate-200" />
+            <span className="mx-1 hidden h-5 w-px shrink-0 bg-slate-200 lg:block" />
 
-          <Link
-            href="/incredible"
-            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-accent-700 transition hover:bg-accent-50"
-          >
-            ⚡ شگفت‌انگیزها
-          </Link>
-          <Link
-            href="/best-sellers"
-            className="whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-          >
-            پرفروش‌ترین‌ها
-          </Link>
-          <Link
-            href="/blog"
-            className="whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-          >
-            وبلاگ کشاورزی
-          </Link>
+            <Link
+              href="/incredible"
+              className="hidden min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-accent-700 transition hover:bg-accent-50 lg:flex"
+            >
+              ⚡ شگفت‌انگیزها
+            </Link>
+            <Link
+              href="/discounts"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:flex"
+            >
+              تخفیف‌ها
+            </Link>
+            <Link
+              href="/best-sellers"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:flex"
+            >
+              پرفروش‌ترین‌ها
+            </Link>
+            <Link
+              href="/blog"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:flex"
+            >
+              وبلاگ کشاورزی
+            </Link>
 
-          <Link
-            href="/support"
-            className="mr-auto whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-          >
-            سوالی دارید؟
-          </Link>
+            <Link
+              href="/support"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:mr-auto lg:flex"
+            >
+              سوالی دارید؟
+            </Link>
+          </div>
         </div>
       </nav>
     </header>

@@ -51,6 +51,12 @@ logic in `apply_address()` ensures only one address is marked default at a time.
 Favorites cascade with user/product and have a database unique constraint on the
 pair; the API treats an existing favorite idempotently.
 
+Province and city display strings remain on `Address` for backward compatibility.
+Nullable `province_code`/`city_code` fields persist the official Statistical Centre
+codes selected through the locations API, including same-name cities. New and
+changed pairs are canonicalized by `locations.validation`; partial updates that do
+not touch an old location intentionally preserve legacy strings and null codes.
+
 ### `Otp`
 
 There is exactly one row per phone. Active fields (`code_hash`, expiry, attempts,
@@ -131,6 +137,8 @@ All paths below are under `/api/auth/`.
 - `POST logout`: end the session.
 - `GET/PATCH profile`: profile summary or name update.
 - `GET/POST addresses`, `PATCH/DELETE addresses/<id>`: owned addresses only.
+  Address responses include `provinceId`/`cityId`; mutations accept those official
+  codes alongside the backward-compatible `province`/`city` names.
 - `GET/POST favorites`, `GET favorites/<product-id>`: list/add/check favorites.
 - `GET/DELETE my-comments`: list or delete the authenticated user's own comments,
   questions, and replies with moderation and verified-purchase state.

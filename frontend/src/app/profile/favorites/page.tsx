@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/client-api";
 import type { Product } from "@/lib/products";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import { faNum } from "@/components/admin/ui";
 
 export default function MyFavorites() {
@@ -21,11 +22,6 @@ export default function MyFavorites() {
   useEffect(() => {
     load();
   }, [load]);
-
-  async function remove(p: Product) {
-    await api.post("/api/auth/favorites", { productId: p.id });
-    setItems((prev) => prev.filter((i) => i.id !== p.id));
-  }
 
   if (loading) {
     return (
@@ -61,20 +57,21 @@ export default function MyFavorites() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <ProductGrid>
           {items.map((p) => (
-            <div key={p.id} className="relative">
-              <ProductCard product={p} />
-              <button
-                onClick={() => remove(p)}
-                title="حذف از علاقه‌مندی‌ها"
-                className="absolute left-4 top-4 z-10 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-sm shadow-sm backdrop-blur transition hover:bg-red-50"
-              >
-                🗑
-              </button>
-            </div>
+            <ProductCard
+              key={p.id}
+              product={p}
+              onFavoriteChange={(favorited) => {
+                if (!favorited) {
+                  setItems((current) =>
+                    current.filter((item) => item.id !== p.id)
+                  );
+                }
+              }}
+            />
           ))}
-        </div>
+        </ProductGrid>
       )}
     </div>
   );

@@ -292,7 +292,7 @@ export default function ProductTabs({ product }: { product: Product }) {
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-white">
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2">
+      <div className="responsive-scroll flex gap-1 border-b border-slate-100 px-2">
         {availableTabs.map((tab) => (
           <button
             key={tab.key}
@@ -309,7 +309,7 @@ export default function ProductTabs({ product }: { product: Product }) {
               }
               setActive(tab.key);
             }}
-            className={`relative shrink-0 px-4 py-3 text-sm font-medium transition ${
+            className={`relative min-h-11 shrink-0 px-4 py-3 text-sm font-medium transition ${
               activeTab === tab.key
                 ? "text-brand-700"
                 : "text-slate-500 hover:text-slate-700"
@@ -323,7 +323,7 @@ export default function ProductTabs({ product }: { product: Product }) {
         ))}
       </div>
 
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         {activeTab === "specs" && hasSpecifications && (
           <section aria-labelledby="product-specifications-heading">
             <h2
@@ -358,7 +358,7 @@ export default function ProductTabs({ product }: { product: Product }) {
 
         {activeTab === "ratings" && (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-6 rounded-xl bg-slate-50 p-5">
+            <div className="flex flex-col items-stretch gap-5 rounded-xl bg-slate-50 p-4 min-[390px]:flex-row min-[390px]:flex-wrap min-[390px]:items-center sm:gap-6 sm:p-5">
               <div className="text-center">
                 <div className="text-3xl font-bold text-slate-800 font-num">
                   {ratingData.average.toLocaleString("fa-IR")}
@@ -368,7 +368,7 @@ export default function ProductTabs({ product }: { product: Product }) {
                   از {ratingData.count.toLocaleString("fa-IR")} امتیاز
                 </div>
               </div>
-              <div className="min-w-64 flex-1">
+              <div className="min-w-0 flex-1 sm:min-w-64">
                 {ratingLoading ? (
                   <p className="text-sm text-slate-400">در حال دریافت...</p>
                 ) : ratingData.canRate ? (

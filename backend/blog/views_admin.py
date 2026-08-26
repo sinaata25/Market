@@ -6,7 +6,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
-from adminapi.views import StaffRequiredMixin
+from accounts.permissions import ShopAdminRequiredMixin
 from common.responses import fail, ok
 
 from .dto import category_dto, post_dto, tag_dto
@@ -35,7 +35,7 @@ def get_post(pk: int) -> BlogPost | None:
     return post_queryset().filter(pk=pk).first()
 
 
-class AdminBlogPostListView(StaffRequiredMixin, APIView):
+class AdminBlogPostListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         operation_id="admin_blog_posts_list",
         parameters=[
@@ -102,7 +102,7 @@ class AdminBlogPostListView(StaffRequiredMixin, APIView):
         )
 
 
-class AdminBlogPostDetailView(StaffRequiredMixin, APIView):
+class AdminBlogPostDetailView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         operation_id="admin_blog_posts_retrieve",
         responses={200: SuccessEnvelopeSerializer, 404: ErrorEnvelopeSerializer},
@@ -144,7 +144,7 @@ class AdminBlogPostDetailView(StaffRequiredMixin, APIView):
         return ok({"deleted": True})
 
 
-class AdminBlogPublishView(StaffRequiredMixin, APIView):
+class AdminBlogPublishView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         request=PublishSerializer,
         responses={200: SuccessEnvelopeSerializer, 404: ErrorEnvelopeSerializer},
@@ -159,7 +159,7 @@ class AdminBlogPublishView(StaffRequiredMixin, APIView):
         return ok({"post": post_dto(get_post(pk), include_admin=True)})
 
 
-class AdminBlogUnpublishView(StaffRequiredMixin, APIView):
+class AdminBlogUnpublishView(ShopAdminRequiredMixin, APIView):
     @extend_schema(request=None, responses={200: SuccessEnvelopeSerializer})
     def post(self, request, pk: int):
         post = get_post(pk)
@@ -169,7 +169,7 @@ class AdminBlogUnpublishView(StaffRequiredMixin, APIView):
         return ok({"post": post_dto(get_post(pk), include_admin=True)})
 
 
-class AdminBlogFeaturedImageView(StaffRequiredMixin, APIView):
+class AdminBlogFeaturedImageView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         request={"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}, "required": ["file"]}},
         responses={201: SuccessEnvelopeSerializer, 404: ErrorEnvelopeSerializer, 422: ErrorEnvelopeSerializer},
@@ -201,7 +201,7 @@ class AdminBlogFeaturedImageView(StaffRequiredMixin, APIView):
         return ok({"post": post_dto(get_post(pk), include_admin=True)})
 
 
-class AdminBlogCategoryListView(StaffRequiredMixin, APIView):
+class AdminBlogCategoryListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: SuccessEnvelopeSerializer})
     def get(self, request):
         return ok({"categories": [category_dto(item) for item in BlogCategory.objects.all()]})
@@ -214,7 +214,7 @@ class AdminBlogCategoryListView(StaffRequiredMixin, APIView):
         return ok({"category": category_dto(category)}, status=201)
 
 
-class AdminBlogCategoryDetailView(StaffRequiredMixin, APIView):
+class AdminBlogCategoryDetailView(ShopAdminRequiredMixin, APIView):
     @extend_schema(request=TaxonomyWriteSerializer, responses={200: SuccessEnvelopeSerializer})
     def patch(self, request, pk: int):
         category = BlogCategory.objects.filter(pk=pk).first()
@@ -234,7 +234,7 @@ class AdminBlogCategoryDetailView(StaffRequiredMixin, APIView):
         return ok({"deleted": True})
 
 
-class AdminBlogTagListView(StaffRequiredMixin, APIView):
+class AdminBlogTagListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: SuccessEnvelopeSerializer})
     def get(self, request):
         return ok({"tags": [tag_dto(item) for item in BlogTag.objects.all()]})
@@ -247,7 +247,7 @@ class AdminBlogTagListView(StaffRequiredMixin, APIView):
         return ok({"tag": tag_dto(tag)}, status=201)
 
 
-class AdminBlogTagDetailView(StaffRequiredMixin, APIView):
+class AdminBlogTagDetailView(ShopAdminRequiredMixin, APIView):
     @extend_schema(request=TagWriteSerializer, responses={200: SuccessEnvelopeSerializer})
     def patch(self, request, pk: int):
         tag = BlogTag.objects.filter(pk=pk).first()

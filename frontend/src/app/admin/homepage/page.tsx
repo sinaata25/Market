@@ -9,8 +9,10 @@ type SectionType =
   | "categories"
   | "brands"
   | "best_sellers"
+  | "incredible_products"
   | "discounted_products"
   | "new_products"
+  | "all_products"
   | "product_collection"
   | "recently_viewed";
 
@@ -66,8 +68,10 @@ const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "categories", label: "دسته‌بندی‌ها" },
   { value: "brands", label: "برندها" },
   { value: "best_sellers", label: "پرفروش‌ترین‌ها" },
-  { value: "discounted_products", label: "تخفیف‌های ویژه" },
+  { value: "incredible_products", label: "شگفت‌انگیزها (منتخب مدیر)" },
+  { value: "discounted_products", label: "همه محصولات تخفیف‌دار" },
   { value: "new_products", label: "جدیدترین محصولات" },
+  { value: "all_products", label: "همه محصولات (صفحه‌بندی‌شده)" },
   { value: "product_collection", label: "مجموعه محصولات سفارشی" },
   { value: "recently_viewed", label: "محصولات اخیراً مشاهده‌شده" },
 ];
@@ -352,9 +356,9 @@ export default function AdminHomepagePage() {
           ترتیب فعلی
         </div>
         {loading ? (
-          <p className="p-8 text-center text-sm text-slate-400">در حال دریافت...</p>
+          <p className="p-6 text-center sm:p-8 text-sm text-slate-400">در حال دریافت...</p>
         ) : sections.length === 0 ? (
-          <p className="p-8 text-center text-sm text-slate-400">هنوز بخشی افزوده نشده است.</p>
+          <p className="p-6 text-center sm:p-8 text-sm text-slate-400">هنوز بخشی افزوده نشده است.</p>
         ) : (
           <div className="divide-y divide-slate-100">
             {sections.map((section, index) => (
@@ -362,7 +366,7 @@ export default function AdminHomepagePage() {
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500">
                   {(index + 1).toLocaleString("fa-IR")}
                 </span>
-                <div className="min-w-44 flex-1">
+                <div className="min-w-0 flex-1 basis-44">
                   <p className="text-sm font-bold text-slate-700">
                     {section.resolvedTitle ?? SECTION_LABELS[section.sectionType]}
                   </p>
@@ -374,7 +378,7 @@ export default function AdminHomepagePage() {
                 <span className={`rounded-full px-2.5 py-1 text-[11px] ${section.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                   {section.isActive ? "فعال" : "غیرفعال"}
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto">
                   <button type="button" disabled={busy || index === 0} onClick={() => moveSection(section, "up")} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs disabled:opacity-30" title="انتقال به بالا">↑</button>
                   <button type="button" disabled={busy || index === sections.length - 1} onClick={() => moveSection(section, "down")} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs disabled:opacity-30" title="انتقال به پایین">↓</button>
                   <button type="button" disabled={busy} onClick={() => toggleSection(section)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600">{section.isActive ? "غیرفعال" : "فعال"}</button>
@@ -387,12 +391,12 @@ export default function AdminHomepagePage() {
         )}
       </section>
 
-      <section ref={sectionEditor} className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-5">
+      <section ref={sectionEditor} className="scroll-mt-[calc(var(--header-h)+1rem)] rounded-2xl border border-slate-100 bg-white p-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-bold text-slate-700">{editingSection ? "ویرایش بخش" : "افزودن بخش"}</h2>
           {editingSection && <button type="button" onClick={resetSection} className="text-xs text-slate-400">انصراف</button>}
         </div>
-        <form onSubmit={saveSection} className="grid gap-4 md:grid-cols-2">
+        <form onSubmit={saveSection} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label>
             <span className="mb-1.5 block text-xs text-slate-600">نوع بخش</span>
             <select disabled={Boolean(editingSection)} value={type} onChange={(event) => setSectionValues((current) => ({ ...current, sectionType: event.target.value as SectionType }))} className={INPUT_CLASS}>
@@ -404,7 +408,7 @@ export default function AdminHomepagePage() {
             <input value={sectionValues.title} onChange={(event) => setSectionValues((current) => ({ ...current, title: event.target.value }))} className={INPUT_CLASS} maxLength={150} placeholder="خالی = عنوان پیش‌فرض" />
           </label>
           {type === "banner" && (
-            <label className="md:col-span-2">
+            <label className="min-w-0 md:col-span-2">
               <span className="mb-1.5 block text-xs text-slate-600">بنر</span>
               <select required value={sectionValues.bannerId} onChange={(event) => setSectionValues((current) => ({ ...current, bannerId: event.target.value }))} className={INPUT_CLASS}>
                 <option value="">انتخاب کنید</option>
@@ -414,7 +418,7 @@ export default function AdminHomepagePage() {
           )}
           {type !== "banner" && (
             <label>
-              <span className="mb-1.5 block text-xs text-slate-600">حداکثر تعداد (۱ تا ۲۴)</span>
+              <span className="mb-1.5 block text-xs text-slate-600">{type === "all_products" ? "تعداد در هر صفحه (۱ تا ۲۴)" : "حداکثر تعداد (۱ تا ۲۴)"}</span>
               <input type="number" min={1} max={24} value={sectionValues.limit} onChange={(event) => setSectionValues((current) => ({ ...current, limit: event.target.value }))} className={INPUT_CLASS} placeholder="پیش‌فرض" />
             </label>
           )}
@@ -438,18 +442,18 @@ export default function AdminHomepagePage() {
             <input type="checkbox" checked={sectionValues.isActive} onChange={(event) => setSectionValues((current) => ({ ...current, isActive: event.target.checked }))} />
             بخش فعال باشد
           </label>
-          <div className="md:col-span-2">
+          <div className="min-w-0 md:col-span-2">
             <button disabled={busy} className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? "در حال ذخیره..." : editingSection ? "ذخیره تغییرات" : "افزودن به انتهای صفحه"}</button>
           </div>
         </form>
       </section>
 
-      <section ref={bannerEditor} className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-5">
+      <section ref={bannerEditor} className="scroll-mt-[calc(var(--header-h)+1rem)] rounded-2xl border border-slate-100 bg-white p-5">
         <div className="mb-4 flex items-center justify-between">
           <div><h2 className="font-bold text-slate-700">{editingBanner ? "ویرایش بنر" : "ساخت بنر"}</h2><p className="mt-1 text-[11px] text-slate-400">یک بنر را می‌توان در چند جای صفحه اصلی استفاده کرد.</p></div>
           {editingBanner && <button type="button" onClick={resetBanner} className="text-xs text-slate-400">انصراف</button>}
         </div>
-        <form onSubmit={saveBanner} className="grid gap-4 md:grid-cols-2">
+        <form onSubmit={saveBanner} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label><span className="mb-1.5 block text-xs text-slate-600">عنوان</span><input value={bannerValues.title} onChange={(event) => setBannerValues((current) => ({ ...current, title: event.target.value }))} className={INPUT_CLASS} maxLength={150} /></label>
           <label><span className="mb-1.5 block text-xs text-slate-600">زیرعنوان</span><input value={bannerValues.subtitle} onChange={(event) => setBannerValues((current) => ({ ...current, subtitle: event.target.value }))} className={INPUT_CLASS} maxLength={300} /></label>
           <label><span className="mb-1.5 block text-xs text-slate-600">لینک مقصد</span><input dir="ltr" value={bannerValues.linkUrl} onChange={(event) => setBannerValues((current) => ({ ...current, linkUrl: event.target.value }))} className={INPUT_CLASS} placeholder="/category/..." /></label>
@@ -457,13 +461,13 @@ export default function AdminHomepagePage() {
           <label><span className="mb-1.5 block text-xs text-slate-600">رنگ زمینه</span><select value={bannerValues.theme} onChange={(event) => setBannerValues((current) => ({ ...current, theme: event.target.value as Banner["theme"] }))} className={INPUT_CLASS}><option value="brand">سبز برند</option><option value="secondary">آبی</option><option value="accent">طلایی</option></select></label>
           <label><span className="mb-1.5 block text-xs text-slate-600">تصویر (اختیاری، حداکثر ۵ مگابایت)</span><input ref={fileInput} type="file" accept="image/*" onChange={(event) => setBannerImage(event.target.files?.[0] ?? null)} className={INPUT_CLASS} /></label>
           <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={bannerValues.isActive} onChange={(event) => setBannerValues((current) => ({ ...current, isActive: event.target.checked }))} />بنر فعال باشد</label>
-          <div className="md:col-span-2"><button disabled={busy} className="rounded-xl bg-secondary-900 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? "در حال ذخیره..." : editingBanner ? "ذخیره بنر" : "ساخت بنر"}</button></div>
+          <div className="min-w-0 md:col-span-2"><button disabled={busy} className="rounded-xl bg-secondary-900 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? "در حال ذخیره..." : editingBanner ? "ذخیره بنر" : "ساخت بنر"}</button></div>
         </form>
       </section>
 
       <section className="rounded-2xl border border-slate-100 bg-white p-5">
         <h2 className="mb-4 font-bold text-slate-700">بنرهای موجود</h2>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {banners.map((banner) => (
             <article key={banner.id} className="flex min-w-0 gap-3 rounded-xl border border-slate-100 p-3">
               {banner.image ? (

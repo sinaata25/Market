@@ -1,8 +1,12 @@
+import logging
 import secrets
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import F
+from django.http import HttpResponse
+from django.utils.cache import patch_vary_headers
+from django.utils.http import content_disposition_header
 from rest_framework import serializers
 from rest_framework.views import APIView
 
@@ -11,10 +15,13 @@ from carts.services import get_current_cart
 from catalog.models import Product
 from common.responses import fail, ok
 from common.utils import normalize_phone
+from locations.validation import validate_location_fields
 
+from .invoice import render_invoice_pdf
 from .models import Order, OrderItem
 
 SHOP = settings.SHOP
+logger = logging.getLogger(__name__)
 
 
 class OutOfStock(Exception):
@@ -39,14 +46,20 @@ class CreateOrderSerializer(serializers.Serializer):
     )
     province = serializers.CharField(
         min_length=2,
+        max_length=50,
         required=False,
-        error_messages={"required": "استان الزامی است"},
+        error_messages={"blank": "استان الزامی است"},
     )
     city = serializers.CharField(
         min_length=2,
+        max_length=50,
         required=False,
-        error_messages={"required": "شهر الزامی است"},
+        error_messages={"blank": "شهر الزامی است"},
     )
+    provinceId = serializers.CharField(
+        max_length=2, required=False, allow_null=True
+    )
+    cityId = serializers.CharField(max_length=4, required=False, allow_null=True)
     address = serializers.CharField(
         min_length=10,
         required=False,
@@ -70,14 +83,13 @@ class CreateOrderSerializer(serializers.Serializer):
                 label
                 for field, label in (
                     ("fullName", "نام تحویل‌گیرنده"),
-                    ("province", "استان"),
-                    ("city", "شهر"),
                     ("address", "آدرس"),
                 )
                 if not data.get(field)
             ]
             if missing:
                 raise serializers.ValidationError(f"{missing[0]} الزامی است")
+            data = validate_location_fields(data)
         return data
 
 
@@ -92,6 +104,8 @@ def order_dto(order: Order) -> dict:
         "phone": order.phone,
         "province": order.province,
         "city": order.city,
+        "provinceId": order.province_code,
+        "cityId": order.city_code,
         "address": order.address,
         "postalCode": order.postal_code,
         "itemsPrice": order.items_price,
@@ -142,6 +156,8 @@ class OrderListCreateView(APIView):
                 "fullName": addr.full_name,
                 "province": addr.province,
                 "city": addr.city,
+                "provinceId": addr.province_code,
+                "cityId": addr.city_code,
                 "address": addr.address,
                 "postalCode": addr.postal_code,
             }
@@ -195,6 +211,8 @@ class OrderListCreateView(APIView):
                     phone=request.user.phone,
                     province=info["province"],
                     city=info["city"],
+                    province_code=info.get("provinceId"),
+                    city_code=info.get("cityId"),
                     address=info["address"],
                     postal_code=info.get("postalCode", ""),
                     items_price=items_price,
@@ -263,3 +281,37 @@ class OrderDetailView(APIView):
             order.save(update_fields=["status"])
 
         return ok({"order": order_dto(order)})
+
+
+class OrderInvoiceView(APIView):
+    """Download a snapshot-backed invoice for its owner or a staff user."""
+
+    def get(self, request, pk: int):
+        if not request.user.is_authenticated:
+            return fail("ابتدا وارد شوید", 401)
+
+        orders = Order.objects.filter(pk=pk).prefetch_related("items")
+        if not request.user.is_staff:
+            orders = orders.filter(user=request.user)
+        order = orders.first()
+        if order is None:
+            # The same response for absent and foreign orders avoids disclosing IDs.
+            return fail("سفارش یافت نشد", 404)
+
+        try:
+            pdf = render_invoice_pdf(order)
+        except Exception:
+            logger.exception("Could not render invoice for order %s", order.pk)
+            return fail("ساخت فایل فاکتور ممکن نشد", 500)
+
+        filename = f"invoice-{order.invoice_number}.pdf"
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = content_disposition_header(
+            as_attachment=True,
+            filename=filename,
+        )
+        response["Content-Length"] = len(pdf)
+        response["Cache-Control"] = "private, no-store"
+        response["Pragma"] = "no-cache"
+        patch_vary_headers(response, ["Cookie"])
+        return response

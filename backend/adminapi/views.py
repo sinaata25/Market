@@ -1,4 +1,4 @@
-"""API های داشبورد مدیریت — فقط برای کاربران is_staff"""
+"""API های داشبورد مدیریت — فقط برای مدیران فروشگاه (نه مدیر سئو)"""
 
 import math
 from datetime import timedelta
@@ -15,9 +15,9 @@ from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
-from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
+from accounts.permissions import ShopAdminRequiredMixin, is_manager_admin
 from catalog.category_tree import visible_category_ids
 from catalog.brand_files import schedule_brand_logo_delete
 from catalog.brand_pricing import adjust_brand_prices
@@ -60,25 +60,6 @@ def positive_page(value) -> int | None:
         return max(1, int(value or 1))
     except (TypeError, ValueError):
         return None
-
-
-class IsStaff(BasePermission):
-    """فقط کاربران staff — خطا با قالب یکسان {ok:false, error} برمی‌گردد"""
-
-    message = "دسترسی مدیریتی ندارید"
-
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.is_staff
-        )
-
-
-class StaffRequiredMixin:
-    """پیش‌شرط همه‌ی ویوهای ادمین: ورود + دسترسی staff"""
-
-    permission_classes = [IsStaff]
 
 
 def admin_product_dto(product: Product) -> dict:
@@ -158,7 +139,7 @@ def order_row(o: Order) -> dict:
 # ─── آمار داشبورد ────────────────────────────────────────────
 
 
-class StatsView(StaffRequiredMixin, APIView):
+class StatsView(ShopAdminRequiredMixin, APIView):
     def get(self, request):
         active_orders = Order.objects.exclude(status=Order.Status.CANCELED)
 
@@ -250,7 +231,7 @@ class StatsView(StaffRequiredMixin, APIView):
 # ─── سفارش‌ها ────────────────────────────────────────────────
 
 
-class AdminOrderListView(StaffRequiredMixin, APIView):
+class AdminOrderListView(ShopAdminRequiredMixin, APIView):
     def get(self, request):
         qs = Order.objects.prefetch_related("items").order_by("-created_at")
 
@@ -283,7 +264,7 @@ class AdminOrderListView(StaffRequiredMixin, APIView):
         )
 
 
-class AdminOrderDetailView(StaffRequiredMixin, APIView):
+class AdminOrderDetailView(ShopAdminRequiredMixin, APIView):
     def patch(self, request, pk: int):
         status = request.data.get("status")
         if status not in VALID_STATUSES:
@@ -375,7 +356,7 @@ def admin_category_dto(
     return data
 
 
-class AdminCategoryListView(StaffRequiredMixin, APIView):
+class AdminCategoryListView(ShopAdminRequiredMixin, APIView):
     def get(self, request):
         visible_ids = visible_category_ids()
         categories = (
@@ -407,7 +388,7 @@ class AdminCategoryListView(StaffRequiredMixin, APIView):
         return ok({"category": admin_category_dto(category)}, status=201)
 
 
-class AdminCategoryDetailView(StaffRequiredMixin, APIView):
+class AdminCategoryDetailView(ShopAdminRequiredMixin, APIView):
     def patch(self, request, pk: int):
         category = Category.objects.filter(pk=pk).first()
         if category is None:
@@ -457,7 +438,7 @@ class AdminCategoryDetailView(StaffRequiredMixin, APIView):
         return ok({"deleted": True})
 
 
-class AdminCategoryIconView(StaffRequiredMixin, APIView):
+class AdminCategoryIconView(ShopAdminRequiredMixin, APIView):
     def _get(self, pk: int) -> Category | None:
         return Category.objects.filter(pk=pk).first()
 
@@ -521,7 +502,7 @@ class BrandWriteSerializer(serializers.ModelSerializer):
         ]
 
 
-class AdminBrandListView(StaffRequiredMixin, APIView):
+class AdminBrandListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         brands = Brand.objects.annotate(product_count=Count("products"))
@@ -538,7 +519,7 @@ class AdminBrandListView(StaffRequiredMixin, APIView):
         return ok({"brand": admin_brand_dto(brand)}, status=201)
 
 
-class AdminBrandDetailView(StaffRequiredMixin, APIView):
+class AdminBrandDetailView(ShopAdminRequiredMixin, APIView):
     @extend_schema(request=BrandWriteSerializer, responses={200: OpenApiTypes.OBJECT})
     def patch(self, request, pk: int):
         brand = Brand.objects.filter(pk=pk).first()
@@ -583,7 +564,7 @@ class BrandLogoUploadSerializer(serializers.Serializer):
     )
 
 
-class AdminBrandLogoView(StaffRequiredMixin, APIView):
+class AdminBrandLogoView(ShopAdminRequiredMixin, APIView):
     def _get(self, pk: int) -> Brand | None:
         return Brand.objects.filter(pk=pk).first()
 
@@ -654,7 +635,7 @@ class BrandPriceAdjustmentSerializer(serializers.Serializer):
         return data
 
 
-class AdminBrandPriceAdjustmentView(StaffRequiredMixin, APIView):
+class AdminBrandPriceAdjustmentView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         request=BrandPriceAdjustmentSerializer,
         responses={200: OpenApiTypes.OBJECT},
@@ -742,7 +723,7 @@ def save_specification_key(
     return key
 
 
-class AdminSpecificationKeyListView(StaffRequiredMixin, APIView):
+class AdminSpecificationKeyListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         queryset = specification_keys_queryset()
@@ -778,7 +759,7 @@ class AdminSpecificationKeyListView(StaffRequiredMixin, APIView):
         )
 
 
-class AdminSpecificationKeyDetailView(StaffRequiredMixin, APIView):
+class AdminSpecificationKeyDetailView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         request=SpecificationKeyWriteSerializer, responses={200: OpenApiTypes.OBJECT}
     )
@@ -844,6 +825,12 @@ class ProductWriteSerializer(serializers.Serializer):
     warranty = serializers.CharField(
         max_length=100, required=False, allow_blank=True, default=""
     )
+    shippingNote = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
+    returnNote = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
     specifications = ProductSpecificationWriteSerializer(
         many=True, required=False, allow_empty=True, max_length=100
     )
@@ -901,7 +888,7 @@ class ProductWriteSerializer(serializers.Serializer):
         return data
 
 
-class AdminProductListView(StaffRequiredMixin, APIView):
+class AdminProductListView(ShopAdminRequiredMixin, APIView):
     def get(self, request):
         qs = (
             Product.objects.select_related("category", "brand")
@@ -959,7 +946,7 @@ class AdminProductListView(StaffRequiredMixin, APIView):
         )
 
 
-class AdminProductDetailView(StaffRequiredMixin, APIView):
+class AdminProductDetailView(ShopAdminRequiredMixin, APIView):
     def _get(self, pk: int) -> Product | None:
         return (
             Product.objects.select_related("category", "brand")
@@ -1021,7 +1008,7 @@ class ProductVisibilitySerializer(serializers.Serializer):
     isActive = serializers.BooleanField()
 
 
-class AdminProductVisibilityView(StaffRequiredMixin, APIView):
+class AdminProductVisibilityView(ShopAdminRequiredMixin, APIView):
     def patch(self, request, pk: int):
         serializer = ProductVisibilitySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1048,7 +1035,7 @@ class ProductBestSellerSerializer(serializers.Serializer):
     position = serializers.IntegerField(min_value=0, required=False)
 
 
-class AdminProductBestSellerView(StaffRequiredMixin, APIView):
+class AdminProductBestSellerView(ShopAdminRequiredMixin, APIView):
     """انتخاب/حذف دستی محصول از بخش «پرفروش‌ترین‌ها» — مستقل از آمار فروش واقعی"""
 
     def patch(self, request, pk: int):
@@ -1076,7 +1063,40 @@ class AdminProductBestSellerView(StaffRequiredMixin, APIView):
         return ok({"product": admin_product_dto(product)})
 
 
-class AdminProductImageView(StaffRequiredMixin, APIView):
+class ProductIncredibleSerializer(serializers.Serializer):
+    isIncredible = serializers.BooleanField()
+    position = serializers.IntegerField(min_value=0, required=False)
+
+
+class AdminProductIncredibleView(ShopAdminRequiredMixin, APIView):
+    """انتخاب/حذف دستی محصول از بخش «شگفت‌انگیزها» — مستقل از داشتن تخفیف"""
+
+    def patch(self, request, pk: int):
+        serializer = ProductIncredibleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = (
+            Product.objects.select_related("category", "brand")
+            .prefetch_related(
+                "categories",
+                "images",
+                product_specification_prefetch(),
+                product_recommendation_prefetch(),
+            )
+            .filter(pk=pk)
+            .first()
+        )
+        if product is None:
+            return fail("محصول یافت نشد", 404)
+        product.is_incredible = serializer.validated_data["isIncredible"]
+        update_fields = ["is_incredible"]
+        if "position" in serializer.validated_data:
+            product.incredible_position = serializer.validated_data["position"]
+            update_fields.append("incredible_position")
+        product.save(update_fields=update_fields)
+        return ok({"product": admin_product_dto(product)})
+
+
+class AdminProductImageView(ShopAdminRequiredMixin, APIView):
     """آپلود تصویر محصول (multipart/form-data با فیلد file)"""
 
     def post(self, request, pk: int):
@@ -1115,7 +1135,7 @@ class AdminProductImageView(StaffRequiredMixin, APIView):
         )
 
 
-class AdminProductImageDetailView(StaffRequiredMixin, APIView):
+class AdminProductImageDetailView(ShopAdminRequiredMixin, APIView):
     def delete(self, request, pk: int, image_id: int):
         img = ProductImage.objects.filter(pk=image_id, product_id=pk).first()
         if img is None:
@@ -1128,11 +1148,20 @@ class AdminProductImageDetailView(StaffRequiredMixin, APIView):
 # ─── کاربران ─────────────────────────────────────────────────
 
 
-class AdminUserListView(StaffRequiredMixin, APIView):
+class AdminUserListView(ShopAdminRequiredMixin, APIView):
     def get(self, request):
         qs = User.objects.annotate(orders_count=Count("orders")).order_by(
             "-date_joined"
         )
+        # مدیر اجرایی فقط مشتری‌ها را می‌بیند؛ حساب‌های مدیریتی (سوپریوزر،
+        # مدیر اجرایی، کارمند و مدیر سئو) از دید او پنهان می‌مانند.
+        if is_manager_admin(request.user):
+            qs = qs.filter(
+                is_staff=False,
+                is_superuser=False,
+                is_manager_admin=False,
+                is_seo_manager=False,
+            )
         search = request.query_params.get("search", "").strip()
         if search:
             qs = qs.filter(
@@ -1154,6 +1183,9 @@ class AdminUserListView(StaffRequiredMixin, APIView):
                         "phone": u.phone,
                         "name": u.name or None,
                         "isStaff": u.is_staff,
+                        "isManagerAdmin": u.is_manager_admin,
+                        "isSeoManager": u.is_seo_manager,
+                        "isSuperuser": u.is_superuser,
                         "isActive": u.is_active,
                         "dateJoined": u.date_joined.isoformat(),
                         "ordersCount": u.orders_count,
@@ -1191,7 +1223,7 @@ def admin_comment_row(
     }
 
 
-class AdminCommentListView(StaffRequiredMixin, APIView):
+class AdminCommentListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         qs = ProductComment.objects.select_related("user", "product").order_by(
@@ -1234,7 +1266,7 @@ class CommentModerationSerializer(serializers.Serializer):
     )
 
 
-class AdminCommentDetailView(StaffRequiredMixin, APIView):
+class AdminCommentDetailView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         request=CommentModerationSerializer,
         responses={200: OpenApiTypes.OBJECT},
@@ -1269,7 +1301,7 @@ class AdminResponseSerializer(serializers.Serializer):
     content = serializers.CharField(min_length=2, max_length=2000)
 
 
-class AdminCommentResponseView(StaffRequiredMixin, APIView):
+class AdminCommentResponseView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         request=AdminResponseSerializer,
         responses={201: OpenApiTypes.OBJECT},

@@ -122,7 +122,7 @@ export default function CategoryMenu() {
         aria-expanded={open}
         aria-controls="product-category-menu"
         aria-haspopup="menu"
-        className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${
+        className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${
           open
             ? "bg-brand-50 text-brand-700"
             : "text-slate-700 hover:bg-slate-50"
@@ -157,22 +157,22 @@ export default function CategoryMenu() {
       {open && active && (
         <div
           id="product-category-menu"
-          className="absolute right-0 top-full z-50 pt-2"
+          className="fixed inset-x-2 below-header z-50 pt-2 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full"
         >
-          <div className="flex h-[min(580px,calc(100vh-9rem))] min-h-96 w-[min(1120px,calc(100vw-2rem))] overflow-hidden rounded-b-2xl rounded-tl-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-18px_rgba(15,23,42,0.35)]">
+          <div className="flex max-h-[min(36rem,calc(100dvh-var(--header-h)-1.5rem))] min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-18px_rgba(15,23,42,0.35)] lg:max-h-[min(580px,calc(100dvh-var(--header-h)-2rem))] lg:w-[min(1120px,calc(100vw-2rem))] lg:flex-row lg:rounded-b-2xl lg:rounded-tl-2xl lg:rounded-tr-none">
             {/* ستون دسته‌های اصلی */}
             <ul
               aria-label="دسته‌بندی‌های اصلی"
-              className="w-60 shrink-0 overflow-y-auto border-l border-slate-200 bg-slate-50/80 py-2"
+              className="flex w-full shrink-0 overflow-x-auto border-b border-slate-200 bg-slate-50/80 p-2 lg:block lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-l lg:py-2"
             >
               {rootCategories.map((c, i) => (
-                <li key={c.slug}>
+                <li key={c.slug} className="shrink-0">
                   <Link
                     href={`/category/${c.slug}`}
                     onMouseEnter={() => setActiveIndex(i)}
                     onFocus={() => setActiveIndex(i)}
                     onClick={() => setOpen(false)}
-                    className={`flex min-h-12 items-center gap-3 border-r-2 px-4 py-3 text-xs transition ${
+                    className={`flex min-h-11 min-w-36 items-center gap-2 rounded-xl border-b-2 px-3 py-2.5 text-xs transition lg:min-h-12 lg:min-w-0 lg:gap-3 lg:rounded-none lg:border-r-2 lg:border-b-0 lg:px-4 lg:py-3 ${
                       activeIndex === i
                         ? "border-brand-600 bg-white font-bold text-brand-700"
                         : "border-transparent text-slate-600 hover:bg-white hover:text-brand-700"
@@ -220,7 +220,7 @@ export default function CategoryMenu() {
 
             {/* ستون زیردسته‌ها */}
             <div className="min-w-0 flex-1 overflow-y-auto bg-white">
-              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-6 py-4 backdrop-blur">
+              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
                 <Link
                   href={`/category/${active.slug}`}
                   onClick={() => setOpen(false)}
@@ -233,9 +233,9 @@ export default function CategoryMenu() {
                 </Link>
               </div>
 
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {sections.length > 0 ? (
-                  <div className="grid grid-cols-2 items-start gap-x-10 gap-y-7 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-10 lg:gap-y-7">
                     {sections.map((section) => (
                       <section key={section.pathKey} className="min-w-0">
                         <Link

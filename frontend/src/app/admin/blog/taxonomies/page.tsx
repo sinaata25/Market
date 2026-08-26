@@ -99,7 +99,7 @@ export default function BlogTaxonomiesPage() {
         <Link href="/admin/blog" className="text-xs text-brand-600 hover:underline">بازگشت به نوشته‌ها</Link>
       </div>
       {message && <p className="rounded-xl bg-slate-800 px-4 py-2.5 text-xs text-white">{message}</p>}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section className="rounded-2xl border border-slate-100 bg-white p-5">
           <h2 className="mb-4 font-bold text-slate-700">دسته‌بندی‌ها</h2>
           <form onSubmit={addCategory} className="space-y-3 border-b border-slate-100 pb-5">

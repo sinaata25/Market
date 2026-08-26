@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import Header from "@/components/layout/Header";
+import HeaderHeightProbe from "@/components/layout/HeaderHeightProbe";
 import Footer from "@/components/layout/Footer";
 import CompareTray from "@/components/product/CompareTray";
 
@@ -32,7 +33,8 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" className={`${vazirmatn.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-background text-foreground antialiased font-sans">
         <Header />
-        <main className="flex-1 pb-20">{children}</main>
+        <HeaderHeightProbe />
+        <main className="site-main flex-1 pb-8">{children}</main>
         <Footer />
         <CompareTray />
       </body>

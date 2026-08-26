@@ -4,7 +4,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework.views import APIView
 
-from adminapi.views import StaffRequiredMixin
+from accounts.permissions import ShopAdminRequiredMixin
 from common.responses import fail, first_error_message, ok
 
 from .banner_files import schedule_banner_image_delete
@@ -35,7 +35,7 @@ def _validation_failure(exc: HomepageValidationError):
     return fail(message, 422, data={"fieldErrors": exc.errors})
 
 
-class AdminHomepageSectionListView(StaffRequiredMixin, APIView):
+class AdminHomepageSectionListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         sections = sections_queryset(active_only=False)
@@ -58,7 +58,7 @@ class AdminHomepageSectionListView(StaffRequiredMixin, APIView):
         return ok({"section": admin_section_dto(section)}, status=201)
 
 
-class AdminHomepageSectionDetailView(StaffRequiredMixin, APIView):
+class AdminHomepageSectionDetailView(ShopAdminRequiredMixin, APIView):
     def _get(self, pk: int) -> HomepageSection | None:
         return sections_queryset(active_only=False).filter(pk=pk).first()
 
@@ -96,7 +96,7 @@ class AdminHomepageSectionDetailView(StaffRequiredMixin, APIView):
         return ok({"deleted": True})
 
 
-class AdminHomepageSectionMoveView(StaffRequiredMixin, APIView):
+class AdminHomepageSectionMoveView(ShopAdminRequiredMixin, APIView):
     @extend_schema(
         request=HomepageSectionMoveSerializer, responses={200: OpenApiTypes.OBJECT}
     )
@@ -111,7 +111,7 @@ class AdminHomepageSectionMoveView(StaffRequiredMixin, APIView):
         return ok({"sections": [admin_section_dto(item) for item in sections]})
 
 
-class AdminBannerListView(StaffRequiredMixin, APIView):
+class AdminBannerListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         banners = banners_queryset()
@@ -130,7 +130,7 @@ class AdminBannerListView(StaffRequiredMixin, APIView):
         return ok({"banner": admin_banner_dto(banner)}, status=201)
 
 
-class AdminBannerDetailView(StaffRequiredMixin, APIView):
+class AdminBannerDetailView(ShopAdminRequiredMixin, APIView):
     def _get(self, pk: int) -> Banner | None:
         return Banner.objects.filter(pk=pk).first()
 
@@ -170,7 +170,7 @@ class AdminBannerDetailView(StaffRequiredMixin, APIView):
         return ok({"deleted": True})
 
 
-class AdminBannerImageView(StaffRequiredMixin, APIView):
+class AdminBannerImageView(ShopAdminRequiredMixin, APIView):
     """آپلود تصویر بنر (multipart/form-data با فیلد file)"""
 
     def post(self, request, pk: int):

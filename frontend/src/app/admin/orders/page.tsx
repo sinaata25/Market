@@ -94,7 +94,7 @@ export default function AdminOrders() {
             setPage(1);
           }}
           placeholder="جستجو: کد، نام، شماره..."
-          className="w-56 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-56"
         />
       </div>
 
@@ -214,7 +214,7 @@ function OrderRow({
       {expanded && (
         <tr className="bg-slate-50/60">
           <td colSpan={6} className="px-5 py-4">
-            <div className="grid gap-4 text-xs sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
               <div>
                 <p className="mb-2 font-bold text-slate-600">اقلام سفارش</p>
                 <ul className="space-y-1.5">

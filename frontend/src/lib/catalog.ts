@@ -31,12 +31,20 @@ export type ProductListParams = {
   categorySlug?: string;
   brandSlug?: string;
   search?: string;
-  sort?: "newest" | "cheapest" | "expensive" | "popular" | "featured";
+  sort?:
+    | "newest"
+    | "cheapest"
+    | "expensive"
+    | "popular"
+    | "featured"
+    | "incredible";
   page?: number;
   perPage?: number;
   onlyDiscounted?: boolean;
   // فقط محصولاتی که مدیر برای بخش «پرفروش‌ترین‌ها» انتخاب کرده — نه آمار فروش واقعی
   bestSeller?: boolean;
+  // فقط محصولاتی که مدیر برای بخش «شگفت‌انگیزها» انتخاب کرده — مستقل از تخفیف
+  incredible?: boolean;
 };
 
 export type ProductListResult = {
@@ -68,6 +76,7 @@ export async function getProducts(
   if (params.perPage) qs.set("perPage", String(params.perPage));
   if (params.onlyDiscounted) qs.set("discounted", "true");
   if (params.bestSeller) qs.set("bestSeller", "true");
+  if (params.incredible) qs.set("incredible", "true");
   const query = qs.toString();
   return apiGet<ProductListResult>(`/api/products${query ? `?${query}` : ""}`);
 }

@@ -55,7 +55,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:pt-8">
+    <div className="site-shell pb-16 pt-6 sm:pt-8">
       <nav
         aria-label="مسیر راهنما"
         className="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-500"
@@ -74,7 +74,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
       {sections.hero && <section className="relative isolate overflow-hidden rounded-[2rem] bg-secondary-900 px-6 py-10 text-white sm:px-10 sm:py-14 lg:px-16 lg:py-16">
         <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_12%_0%,rgba(228,176,40,0.23),transparent_28%),radial-gradient(circle_at_88%_100%,rgba(90,131,73,0.38),transparent_36%)]" />
         <div className="absolute -left-16 top-1/2 -z-10 h-56 w-56 -translate-y-1/2 rounded-full border-[36px] border-white/5" />
-        <div className="grid items-center gap-8 lg:grid-cols-[1fr_auto]">
+        <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[1fr_auto]">
           <div className="max-w-2xl">
             <span className="mb-4 block text-sm font-bold text-accent-300">
               {guide.eyebrow}
@@ -124,7 +124,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
                     {href && step.linkLabel && (
                       <Link
                         href={href}
-                        className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-brand-700 transition hover:text-brand-500"
+                        className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-bold text-brand-700 transition hover:text-brand-500 sm:mt-4 sm:min-h-0"
                       >
                         {step.linkLabel}
                         <span>←</span>
@@ -148,7 +148,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
                 </p>
               )}
             </div>
-            <ul className="grid gap-3 p-5 sm:grid-cols-2 sm:p-8">
+            <ul className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-8">
               {guide.checklist.items.map((item, index) => (
                 <li
                   key={index}
@@ -217,7 +217,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
           </section>}
         </main>}
 
-        {sections.aside && <aside className="space-y-4 lg:sticky lg:top-32">
+        {sections.aside && <aside className="space-y-4 lg:sticky-below-header">
           <div className="rounded-2xl border border-slate-100 bg-white p-3">
             <h2 className="px-3 pb-3 pt-2 text-xs font-bold text-slate-400">
               {guide.aside.relatedTitle}
@@ -252,7 +252,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
             </p>
             <Link
               href="/contact"
-              className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-accent-700"
+              className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-bold text-accent-700 sm:mt-4 sm:min-h-0"
             >
               {guide.aside.supportLabel} <span>←</span>
             </Link>

@@ -161,9 +161,9 @@ export default function AdminSpecificationsPage() {
 
       <section
         ref={formSection}
-        className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-5"
+        className="scroll-mt-[calc(var(--header-h)+1rem)] rounded-2xl border border-slate-100 bg-white p-5"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div>
             <h2 className="font-bold text-slate-700">
               {editing ? `ویرایش «${editing.name}»` : "افزودن مشخصه"}
@@ -187,7 +187,7 @@ export default function AdminSpecificationsPage() {
         </div>
         <form
           onSubmit={save}
-          className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+          className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
         >
           <label>
             <span className="mb-1.5 block text-xs font-medium text-slate-600">

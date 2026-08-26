@@ -68,7 +68,7 @@ export default function SeoReports() {
       </div>
 
       {results.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
           <div className="rounded-2xl border border-slate-100 bg-white p-4 text-center">
             <p className="text-xl font-bold text-slate-800 font-num">
               {faNum(results.length)}
@@ -105,7 +105,7 @@ export default function SeoReports() {
         </div>
       )}
 
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {[
           { key: "", label: "همه" },
           { key: "page", label: "صفحات" },

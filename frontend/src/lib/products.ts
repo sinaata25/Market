@@ -28,11 +28,17 @@ export type Product = {
   specifications?: ProductSpecification[];
   description?: string;
   warranty?: string;
+  // دو خط اطلاع‌رسانی جعبه‌ی خرید — اختیاری و بدون پیش‌فرض
+  shippingNote?: string;
+  returnNote?: string;
   stock?: number;
   isActive?: boolean;
   // انتخاب دستی مدیر برای بخش «پرفروش‌ترین‌ها» — مستقل از rating/ratingCount واقعی
   isBestSeller?: boolean;
   bestSellerPosition?: number;
+  // انتخاب دستی مدیر برای بخش «شگفت‌انگیزها» — مستقل از داشتن تخفیف
+  isIncredible?: boolean;
+  incrediblePosition?: number;
 };
 
 export type Brand = {
@@ -250,8 +256,30 @@ export const products: Product[] = [
   },
 ];
 
+/** تعداد کالاهای هر صفحه‌ی بخش «همه محصولات» صفحه اصلی */
+export const HOME_PRODUCTS_PER_PAGE = 6;
+
+/** صفحه‌ی کامل فهرست محصولات — مقصد دکمه‌های «مشاهده همه» */
+export const ALL_PRODUCTS_PATH = "/products";
+
 export function formatPrice(value: number) {
   return value.toLocaleString("fa-IR");
+}
+
+/** آیا محصول تخفیف واقعی دارد؟ (قیمت قبل باید بیشتر از قیمت فعلی باشد) */
+export function hasDiscount(product: Pick<Product, "price" | "oldPrice">) {
+  return typeof product.oldPrice === "number" && product.oldPrice > product.price;
+}
+
+/**
+ * درصد تخفیف — تنها جای محاسبه‌ی آن در فرانت.
+ * بک‌اند فقط price و oldPrice می‌دهد و درصد را محاسبه نمی‌کند.
+ */
+export function discountPercent(
+  product: Pick<Product, "price" | "oldPrice">
+): number {
+  if (!hasDiscount(product)) return 0;
+  return Math.round((1 - product.price / product.oldPrice!) * 100);
 }
 
 // توجه: کوئری‌های محصولات از دیتابیس در src/lib/catalog.ts هستند.

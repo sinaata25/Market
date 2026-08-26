@@ -55,18 +55,18 @@ export function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5">
+    <div className="@container/stat flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 @min-[15rem]/stat:flex-row @min-[15rem]/stat:items-center @min-[15rem]/stat:gap-4 @min-[15rem]/stat:p-5">
       <span
-        className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl text-2xl ${accent}`}
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-xl @min-[15rem]/stat:h-12 @min-[15rem]/stat:w-12 @min-[15rem]/stat:text-2xl ${accent}`}
       >
         {icon}
       </span>
       <div className="min-w-0">
         <p className="text-xs text-slate-400">{label}</p>
-        <p className="mt-1 truncate text-lg font-bold text-slate-800 font-num">
+        <p className="mt-1 text-base font-bold text-slate-800 font-num @min-[15rem]/stat:text-lg">
           {value}
         </p>
-        {sub && <p className="mt-0.5 text-[11px] text-slate-400">{sub}</p>}
+        {sub && <p className="mt-0.5 text-[11px] leading-5 text-slate-400">{sub}</p>}
       </div>
     </div>
   );
@@ -82,22 +82,57 @@ export function Pager({
   onPage: (p: number) => void;
 }) {
   if (pages <= 1) return null;
+
+  // روی موبایل جا برای ده‌ها دکمه نیست؛ فقط پنجره‌ای around صفحه‌ی جاری
+  // به‌همراه صفحه‌ی اول و آخر نمایش داده می‌شود.
+  const nearby = new Set([1, pages, page, page - 1, page + 1]);
+  const shown = [...nearby].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+
+  const cell =
+    "grid h-9 min-w-9 place-items-center rounded-lg border px-2 text-xs font-num transition sm:h-8 sm:min-w-8";
+
   return (
-    <div className="mt-4 flex items-center justify-center gap-1.5">
-      {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
-        <button
-          key={n}
-          onClick={() => onPage(n)}
-          className={`grid h-8 w-8 place-items-center rounded-lg border text-xs font-num transition ${
-            n === page
-              ? "border-brand-600 bg-brand-600 font-bold text-white"
-              : "border-slate-200 bg-white text-slate-600 hover:border-brand-400"
-          }`}
-        >
-          {faNum(n)}
-        </button>
+    <nav
+      aria-label="صفحه‌بندی"
+      className="mt-4 flex flex-wrap items-center justify-center gap-1.5"
+    >
+      <button
+        onClick={() => onPage(page - 1)}
+        disabled={page <= 1}
+        aria-label="صفحه‌ی قبل"
+        className={`${cell} border-slate-200 bg-white text-slate-600 hover:border-brand-400 disabled:opacity-40 disabled:hover:border-slate-200`}
+      >
+        ›
+      </button>
+
+      {shown.map((n, i) => (
+        <span key={n} className="flex items-center gap-1.5">
+          {i > 0 && shown[i - 1] !== n - 1 && (
+            <span className="px-0.5 text-xs text-slate-300">…</span>
+          )}
+          <button
+            onClick={() => onPage(n)}
+            aria-current={n === page ? "page" : undefined}
+            className={`${cell} ${
+              n === page
+                ? "border-brand-600 bg-brand-600 font-bold text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:border-brand-400"
+            }`}
+          >
+            {faNum(n)}
+          </button>
+        </span>
       ))}
-    </div>
+
+      <button
+        onClick={() => onPage(page + 1)}
+        disabled={page >= pages}
+        aria-label="صفحه‌ی بعد"
+        className={`${cell} border-slate-200 bg-white text-slate-600 hover:border-brand-400 disabled:opacity-40 disabled:hover:border-slate-200`}
+      >
+        ‹
+      </button>
+    </nav>
   );
 }
 

@@ -757,8 +757,8 @@ export default function LoginPage() {
     .join(" ");
 
   return (
-    <div className="flex min-h-[calc(100vh-200px)] items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
+    <div className="flex min-h-[calc(100dvh-var(--header-h)-3rem)] items-center justify-center px-4 py-6 sm:min-h-[calc(100dvh-var(--header-h)-2rem)] sm:py-10">
+      <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-5 shadow-sm min-[390px]:p-6 sm:p-8">
         <div className="mb-6 flex flex-col items-center text-center">
           <Image
             src="/brand/logo.png"

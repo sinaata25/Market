@@ -239,9 +239,9 @@ export default function AdminBrandsPage() {
 
       <section
         ref={formSection}
-        className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-5"
+        className="scroll-mt-[calc(var(--header-h)+1rem)] rounded-2xl border border-slate-100 bg-white p-5"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <h2 className="font-bold text-slate-700">
             {editing ? `ویرایش «${editing.name}»` : "افزودن برند"}
           </h2>
@@ -255,7 +255,7 @@ export default function AdminBrandsPage() {
             </button>
           )}
         </div>
-        <form onSubmit={save} className="grid gap-4 lg:grid-cols-2">
+        <form onSubmit={save} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <label>
             <span className="mb-1.5 block text-xs font-medium text-slate-600">
               نام برند
@@ -318,7 +318,7 @@ export default function AdminBrandsPage() {
               className={`${INPUT_CLASS} file:ml-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:text-brand-700`}
             />
           </label>
-          <label className="lg:col-span-2">
+          <label className="min-w-0 lg:col-span-2">
             <span className="mb-1.5 block text-xs font-medium text-slate-600">
               توضیحات (اختیاری)
             </span>
@@ -334,7 +334,7 @@ export default function AdminBrandsPage() {
               className={`${INPUT_CLASS} resize-none leading-7`}
             />
           </label>
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             <button
               disabled={saving}
               className="rounded-xl bg-brand-600 px-5 py-2.5 text-xs font-bold text-white disabled:opacity-60"
@@ -355,7 +355,7 @@ export default function AdminBrandsPage() {
           قیمت فروش و قیمت قبل همه محصولات برند انتخاب‌شده با گرد کردن به نزدیک‌ترین
           تومان تغییر می‌کند.
         </p>
-        <form onSubmit={adjustPrices} className="mt-4 grid gap-3 sm:grid-cols-4">
+        <form onSubmit={adjustPrices} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
           <label>
             <span className="mb-1.5 block text-xs text-slate-600">برند</span>
             <select

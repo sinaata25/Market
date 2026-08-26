@@ -165,6 +165,8 @@ def save_product_with_specifications(
     product.badge = data.get("badge", "")
     product.description = data.get("description", "")
     product.warranty = data.get("warranty", "")
+    product.shipping_note = data.get("shippingNote", "")
+    product.return_note = data.get("returnNote", "")
     product.save()
     product.categories.set(categories)
     if specification_items is not None:

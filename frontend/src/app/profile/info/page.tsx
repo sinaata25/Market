@@ -136,7 +136,7 @@ export default function AccountInfo() {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          className="action-btn rounded-xl bg-brand-600 px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
           {saving ? "در حال ذخیره..." : "ذخیره تغییرات"}
         </button>

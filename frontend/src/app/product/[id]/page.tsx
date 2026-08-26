@@ -12,6 +12,7 @@ import ProductGallery from "@/components/product/ProductGallery";
 import BuyBox from "@/components/product/BuyBox";
 import ProductTabs from "@/components/product/ProductTabs";
 import ProductCard from "@/components/product/ProductCard";
+import ProductGrid from "@/components/product/ProductGrid";
 import FavoriteButton from "@/components/product/FavoriteButton";
 import CompareButton from "@/components/product/CompareButton";
 import JsonLd from "@/components/seo/JsonLd";
@@ -73,7 +74,7 @@ export default async function ProductPage({
   const breadcrumbCategory = productCategories[0];
 
   return (
-    <div className="mx-auto max-w-[90rem] px-4 py-5 lg:px-6">
+    <div className="site-container py-4 sm:py-5">
       <RecentlyViewedTracker productId={product.id} />
       {/* اسکیمای JSON-LD (محصول + بردکرامب) از پنل سئو */}
       {seo?.schema && <JsonLd data={seo.schema} />}
@@ -95,7 +96,7 @@ export default async function ProductPage({
       )}
 
       {/* مسیر راهنما (breadcrumb) */}
-      <nav className="mb-4 flex flex-wrap items-center gap-1 text-xs text-slate-400">
+      <nav aria-label="مسیر صفحه" className="mb-4 flex min-w-0 flex-wrap items-center gap-1 text-xs text-slate-400">
         <Link href="/" className="hover:text-brand-600">
           خانه
         </Link>
@@ -111,7 +112,7 @@ export default async function ProductPage({
           </>
         )}
         <span>/</span>
-        <span className="text-slate-600">{product.title}</span>
+        <span className="min-w-0 break-words text-slate-600">{product.title}</span>
       </nav>
 
       {/* بخش اصلی: گالری / اطلاعات / خرید */}
@@ -127,13 +128,16 @@ export default async function ProductPage({
 
         {/* اطلاعات محصول */}
         <div className={hasImages ? "lg:col-span-5" : "lg:col-span-8"}>
-          <div className="mb-2 flex items-start justify-between gap-3">
-            <h1 className="text-xl font-bold leading-9 text-slate-800 sm:text-2xl">
+          <div className="mb-2 flex flex-col-reverse items-start gap-3 min-[390px]:flex-row min-[390px]:justify-between">
+            <h1 className="min-w-0 break-words text-xl font-bold leading-8 text-slate-800 sm:text-2xl sm:leading-9">
               {product.title}
             </h1>
             <div className="flex shrink-0 items-center gap-2">
               <CompareButton product={product} />
-              <FavoriteButton productId={product.id} />
+              <FavoriteButton
+                productId={product.id}
+                productTitle={product.title}
+              />
             </div>
           </div>
           {product.titleEn && (
@@ -210,7 +214,7 @@ export default async function ProductPage({
           )}
 
           {/* ویژگی‌های کلیدی */}
-          <div className="rounded-xl bg-slate-50 p-5 sm:p-6">
+          <div className="rounded-xl bg-slate-50 p-4 sm:p-6">
             <h2 className="mb-4 text-base font-bold text-slate-700">
               ویژگی‌های کلیدی
             </h2>
@@ -245,11 +249,11 @@ export default async function ProductPage({
           <h2 className="mb-4 text-lg font-bold text-slate-800">
             محصولات مشابه
           </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <ProductGrid>
             {related.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
-          </div>
+          </ProductGrid>
         </section>
       )}
     </div>

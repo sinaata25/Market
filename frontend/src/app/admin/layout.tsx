@@ -8,17 +8,21 @@ import {
   notifyAuthChanged,
   subscribeAuthChanged,
 } from "@/lib/client-api";
+import {
+  adminRedirectFor,
+  isDeveloperAdmin,
+  isDeveloperRoute,
+  isManagerAdmin,
+  isSeoAdmin,
+  isSeoRoute,
+  isShopAdmin,
+  type Me,
+} from "@/lib/admin-roles";
 
-type Me = {
-  id: number;
-  phone: string;
-  name: string | null;
-  isStaff?: boolean;
-  isSeoManager?: boolean;
-} | null;
+type NavItem = { href: string; icon: string; label: string };
 
-// منوی مدیران فروشگاه (staff)
-const SHOP_NAV = [
+// منوی مدیران فروشگاه (staff) — مدیر سئو هیچ‌کدام را نمی‌بیند
+const SHOP_NAV: NavItem[] = [
   { href: "/admin", icon: "📊", label: "داشبورد" },
   { href: "/admin/orders", icon: "📦", label: "سفارش‌ها" },
   { href: "/admin/products", icon: "🛠️", label: "محصولات" },
@@ -36,8 +40,14 @@ const SHOP_NAV = [
   { href: "/admin/content", icon: "📄", label: "محتوای صفحات" },
 ];
 
-// منوی سئو (staff و مدیر سئو)
-const SEO_NAV = [
+// ناحیه‌ی توسعه‌دهنده/سیستمی — فقط سوپریوزر؛ مدیر اجرایی این‌ها را نمی‌بیند
+const DEVELOPER_NAV: NavItem[] = [
+  { href: "/admin/managers", icon: "🛡️", label: "مدیران اجرایی" },
+  { href: "/admin/seo-admins", icon: "🔑", label: "مدیران سئو" },
+];
+
+// منوی ناحیه‌ی سئو — فقط برای «مدیر سئو»
+const SEO_NAV: NavItem[] = [
   { href: "/admin/seo", icon: "🎯", label: "نمای کلی سئو" },
   { href: "/admin/seo/pages", icon: "📝", label: "متای صفحات" },
   { href: "/admin/seo/redirects", icon: "↪️", label: "ریدایرکت‌ها" },
@@ -47,6 +57,11 @@ const SEO_NAV = [
   { href: "/admin/seo/settings", icon: "⚙️", label: "تنظیمات سئو" },
 ];
 
+function isActiveNav(pathname: string, href: string): boolean {
+  if (href === "/admin" || href === "/admin/seo") return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function AdminLayout({
   children,
 }: {
@@ -54,13 +69,13 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [me, setMe] = useState<Me>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [checked, setChecked] = useState(false);
   const meRequest = useRef(0);
 
   const refreshMe = useCallback(() => {
     const requestId = ++meRequest.current;
-    api.get<{ user: Me }>("/api/auth/me").then((res) => {
+    api.get<{ user: Me | null }>("/api/auth/me").then((res) => {
       if (requestId !== meRequest.current) return;
       if (res.ok) setMe(res.data?.user ?? null);
       setChecked(true);
@@ -78,6 +93,12 @@ export default function AdminLayout({
       unsubscribeAuth();
     };
   }, [refreshMe]);
+
+  // اگر نقش کاربر با مسیر جور نیست (مثلاً تغییر نقش در نشست باز)، جابه‌جا شود
+  const misroutedTo = checked ? adminRedirectFor(me, pathname) : null;
+  useEffect(() => {
+    if (misroutedTo) router.replace(misroutedTo);
+  }, [misroutedTo, router]);
 
   async function logout() {
     const response = await api.post("/api/auth/logout");
@@ -116,8 +137,11 @@ export default function AdminLayout({
     );
   }
 
-  // نه staff است نه مدیر سئو
-  if (!me.isStaff && !me.isSeoManager) {
+  const seoAdmin = isSeoAdmin(me);
+  const shopAdmin = isShopAdmin(me);
+
+  // نه مدیر فروشگاه است نه مدیر سئو
+  if (!seoAdmin && !shopAdmin) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <span className="mb-4 block text-5xl">⛔</span>
@@ -141,80 +165,68 @@ export default function AdminLayout({
     );
   }
 
-  // مدیر سئو فقط بخش سئو را می‌بیند؛ staff همه را
-  const showShopNav = Boolean(me.isStaff);
-  const seoOnlyBlocked =
-    !me.isStaff && me.isSeoManager && !pathname.startsWith("/admin/seo");
+  // منوی هر نقش کاملاً جداست؛ لینکی به ناحیه‌ی دیگر نمایش داده نمی‌شود
+  const developer = isDeveloperAdmin(me);
+  const nav: NavItem[] = seoAdmin
+    ? SEO_NAV
+    : [...SHOP_NAV, ...(developer ? DEVELOPER_NAV : [])];
+  const panelTitle = seoAdmin ? "پنل سئو" : "پنل مدیریت";
+  const panelRole = seoAdmin
+    ? "SEO Administration"
+    : developer
+      ? "مدیر سیستم"
+      : isManagerAdmin(me)
+        ? "مدیر اجرایی"
+        : "مدیر فروشگاه";
 
   return (
-    <div className="mx-auto flex max-w-7xl gap-5 px-4 py-6">
-      {/* سایدبار */}
-      <aside className="w-56 shrink-0">
-        <div className="sticky top-24 overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200">
+    <div className="site-shell flex flex-col gap-5 py-4 sm:py-6 lg:flex-row">
+      {/* سایدبار — عمداً چسبان/اسکرول‌دار نیست: منو خودش نوار اسکرول جدا
+          ندارد و بلندتر که شد، کل صفحه اسکرول می‌شود */}
+      <aside className="min-w-0 lg:w-56 lg:shrink-0">
+        <div className="overflow-hidden rounded-2xl bg-secondary-900 text-secondary-200">
           <div className="border-b border-secondary-700/60 px-5 py-4">
-            <p className="text-sm font-bold text-white">پنل مدیریت</p>
+            <p className="text-sm font-bold text-white">{panelTitle}</p>
+            <p className="mt-0.5 text-[10px] font-medium text-brand-300">
+              {panelRole}
+            </p>
             <p className="mt-1 text-[11px] text-slate-400 font-num" dir="ltr">
               {me.name ?? me.phone}
             </p>
           </div>
-          <nav className="p-2">
-            {showShopNav &&
-              SHOP_NAV.map((item) => {
-                const active =
-                  item.href === "/admin"
-                    ? pathname === "/admin"
-                    : pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition ${
-                      active
-                        ? "bg-brand-600 font-medium text-white"
-                        : "hover:bg-secondary-800 hover:text-white"
-                    }`}
-                  >
-                    <span>{item.icon}</span>
-                    {item.label}
-                  </Link>
-                );
-              })}
-
-            <p className="mb-1 mt-3 px-4 text-[10px] font-bold tracking-wide text-slate-500">
-              سئو
-            </p>
-            {SEO_NAV.map((item) => {
-              const active =
-                item.href === "/admin/seo"
-                  ? pathname === "/admin/seo"
-                  : pathname.startsWith(item.href);
+          <nav
+            aria-label={seoAdmin ? "منوی سئو" : "منوی مدیریت"}
+            className="grid grid-cols-2 gap-1 p-2 sm:grid-cols-3 lg:block"
+          >
+            {nav.map((item) => {
+              const active = isActiveNav(pathname, item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`mb-1 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition ${
+                  className={`flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm leading-5 transition lg:mb-1 lg:gap-3 lg:whitespace-nowrap lg:px-4 ${
                     active
                       ? "bg-brand-600 font-medium text-white"
-                    : "hover:bg-secondary-800 hover:text-white"
+                      : "hover:bg-secondary-800 hover:text-white"
                   }`}
                 >
-                  <span>{item.icon}</span>
+                  <span className="shrink-0">{item.icon}</span>
                   {item.label}
                 </Link>
               );
             })}
           </nav>
-          <div className="border-t border-secondary-700/60 p-2">
+          <div className="flex gap-1 border-t border-secondary-700/60 p-2 lg:block">
             <Link
               href="/"
-              className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm transition hover:bg-secondary-800 hover:text-white"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm transition hover:bg-secondary-800 hover:text-white lg:justify-start lg:gap-3 lg:px-4"
             >
               <span>🏬</span> مشاهده فروشگاه
             </Link>
             <button
               onClick={logout}
               data-admin-navigation
-              className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-right text-sm text-red-400 transition hover:bg-secondary-800"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-right text-sm text-red-400 transition hover:bg-secondary-800 lg:w-full lg:justify-start lg:gap-3 lg:px-4"
             >
               <span>⏻</span> خروج
             </button>
@@ -222,19 +234,25 @@ export default function AdminLayout({
         </div>
       </aside>
 
-      {/* محتوا — مدیر سئو به بخش‌های فروشگاهی دسترسی ندارد */}
+      {/* محتوا — مسیر خارج از ناحیه‌ی نقش رندر نمی‌شود */}
       <main className="min-w-0 flex-1">
-        {seoOnlyBlocked ? (
-          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-8 text-center">
+        {misroutedTo ? (
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-6 text-center sm:p-8">
             <span className="mb-3 block text-4xl">🔒</span>
             <p className="mb-4 text-sm text-slate-600">
-              نقش شما «مدیر سئو» است و به این بخش دسترسی ندارید.
+              {seoAdmin
+                ? "نقش شما «مدیر سئو» است و فقط به پنل سئو دسترسی دارید."
+                : isSeoRoute(pathname)
+                  ? "پنل سئو ناحیه‌ای جداست و فقط «مدیر سئو» به آن دسترسی دارد."
+                  : isDeveloperRoute(pathname)
+                    ? "این بخش سطح‌سیستمی است و فقط مدیر سیستم به آن دسترسی دارد."
+                    : "به این بخش دسترسی ندارید."}
             </p>
             <Link
-              href="/admin/seo"
+              href={misroutedTo}
               className="inline-block rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white"
             >
-              رفتن به پنل سئو
+              رفتن به بخش مجاز
             </Link>
           </div>
         ) : (

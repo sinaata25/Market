@@ -50,6 +50,8 @@ export default function OrderDetail({
   const [order, setOrder] = useState<Order | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
 
   const load = useCallback(() => {
     api.get<{ order: Order }>(`/api/orders/${id}`).then((res) => {
@@ -97,6 +99,40 @@ export default function OrderDetail({
 
   const isCanceled = order.status === "CANCELED";
   const currentStep = STEPS.findIndex((s) => s.key === order.status);
+  const invoiceFallbackFilename = `invoice-${order.code}.pdf`;
+
+  async function downloadInvoice() {
+    setDownloadingInvoice(true);
+    setInvoiceError("");
+
+    try {
+      const result = await api.downloadPdf(
+        `/api/orders/${id}/invoice`,
+        invoiceFallbackFilename
+      );
+      if (!result.ok || !result.data) {
+        setInvoiceError(result.error ?? "دریافت فاکتور با خطا روبه‌رو شد");
+        return;
+      }
+
+      const objectUrl = window.URL.createObjectURL(result.data.blob);
+      const link = document.createElement("a");
+      try {
+        link.href = objectUrl;
+        link.download = result.data.filename;
+        link.hidden = true;
+        document.body.appendChild(link);
+        link.click();
+      } finally {
+        link.remove();
+        window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1_000);
+      }
+    } catch {
+      setInvoiceError("ذخیره فاکتور در مرورگر با خطا روبه‌رو شد");
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -123,8 +159,9 @@ export default function OrderDetail({
 
       {/* نوار پیشرفت */}
       {!isCanceled ? (
-        <div className="rounded-2xl border border-slate-100 bg-white p-6">
-          <div className="flex items-center">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-6">
+          <div className="responsive-scroll pb-2 sm:pb-0">
+          <div className="flex min-w-[32rem] items-center sm:min-w-0">
             {STEPS.map((step, i) => {
               const done = i <= currentStep;
               return (
@@ -158,6 +195,7 @@ export default function OrderDetail({
               );
             })}
           </div>
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-red-100 bg-red-50 p-5 text-center text-sm text-red-500">
@@ -165,15 +203,15 @@ export default function OrderDetail({
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* اقلام */}
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white lg:col-span-2">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-100 bg-white lg:col-span-2">
           <h2 className="border-b border-slate-100 px-5 py-4 text-sm font-bold text-slate-700">
             کالاهای سفارش
           </h2>
           <ul className="divide-y divide-slate-50">
             {order.items.map((it) => (
-              <li key={it.id} className="flex items-center gap-3 px-5 py-4">
+              <li key={it.id} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:px-5">
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/product/${it.productId}`}
@@ -185,7 +223,7 @@ export default function OrderDetail({
                     {faNum(it.qty)} عدد × {formatPrice(it.price)} تومان
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-bold text-slate-700 font-num">
+                <span className="mr-auto shrink-0 text-sm font-bold text-slate-700 font-num sm:mr-0">
                   {formatPrice(it.price * it.qty)}
                 </span>
               </li>
@@ -229,6 +267,31 @@ export default function OrderDetail({
                 </span>
               </li>
             </ul>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={downloadInvoice}
+                disabled={downloadingInvoice}
+                aria-busy={downloadingInvoice}
+                aria-describedby={
+                  invoiceError ? "invoice-download-error" : undefined
+                }
+                className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+              >
+                {downloadingInvoice
+                  ? "در حال آماده‌سازی فاکتور..."
+                  : "دانلود فاکتور"}
+              </button>
+              {invoiceError && (
+                <p
+                  id="invoice-download-error"
+                  role="alert"
+                  className="mt-2 text-xs leading-5 text-red-500"
+                >
+                  {invoiceError}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white p-5">

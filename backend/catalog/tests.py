@@ -34,10 +34,14 @@ PRODUCT_RESPONSE_KEYS = {
     "features",
     "description",
     "warranty",
+    "shippingNote",
+    "returnNote",
     "stock",
     "isActive",
     "isBestSeller",
     "bestSellerPosition",
+    "isIncredible",
+    "incrediblePosition",
 }
 
 
@@ -86,6 +90,28 @@ class ProductApiContractTests(TestCase):
         )
         self.assertIsNone(listed["warranty"])
         self.assertIsNone(detail_response.data["data"]["product"]["warranty"])
+
+    def test_buybox_notes_default_to_empty_and_return_null(self):
+        """متن ارسال و بازگشت کالا پیش‌فرض ندارند — نبودشان یعنی null"""
+        self.assertEqual(self.product.shipping_note, "")
+        self.assertEqual(self.product.return_note, "")
+
+        response = self.client.get(f"/api/products/{self.product.id}")
+
+        product = response.data["data"]["product"]
+        self.assertIsNone(product["shippingNote"])
+        self.assertIsNone(product["returnNote"])
+
+    def test_buybox_notes_return_their_actual_values(self):
+        self.product.shipping_note = "ارسال به سراسر کشور"
+        self.product.return_note = "۷ روز ضمانت بازگشت کالا"
+        self.product.save(update_fields=["shipping_note", "return_note"])
+
+        response = self.client.get(f"/api/products/{self.product.id}")
+
+        product = response.data["data"]["product"]
+        self.assertEqual(product["shippingNote"], "ارسال به سراسر کشور")
+        self.assertEqual(product["returnNote"], "۷ روز ضمانت بازگشت کالا")
 
     def test_product_with_warranty_returns_its_actual_value(self):
         self.product.warranty = "۱۸ ماه گارانتی شرکتی"

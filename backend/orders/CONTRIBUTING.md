@@ -12,6 +12,9 @@ customer cancellation with exactly-once stock restoration.
 - `views.py`: validation, checkout transaction, DTOs, listing/detail/cancellation.
 - `admin.py`: Django admin inspection of orders and inline items.
 - `tests.py`: cancellation and stock-restoration invariants.
+- `invoice.py`: immutable invoice context and in-process PDF rendering.
+- `templates/orders/invoice.html`: print-friendly A4/RTL invoice presentation.
+- `test_invoices.py`: invoice snapshot, permission, response, and rendering tests.
 
 ## Data model
 
@@ -21,6 +24,11 @@ history. `items_price`, `discount`, `shipping_price`, and `total_price` are inte
 toman snapshots. Status choices are the allowed state vocabulary; canceled is
 terminal in current behavior.
 
+Delivery snapshots also include nullable official `province_code` and `city_code`
+values. Existing orders retain their historic strings with null codes. New manual
+checkout locations are validated by the application-owned 1404 reference dataset;
+saved legacy addresses remain usable and copy their strings/codes as-is.
+
 `OrderItem` stores the product foreign key plus copied `title` and `price`. The
 copies preserve what was purchased if catalog title/price later changes. Product
 deletion is protected/nullable according to the model relationship; contributor
@@ -28,11 +36,11 @@ code should use snapshot fields for historical display and accounting.
 
 ## Input validation
 
-`CreateOrderSerializer` validates recipient, canonical Iranian phone, province,
-city, sufficiently detailed address, optional postal code, and payment method.
-Cross-field validation rejects unsupported payment choices. Input serializers are
-the trust boundary for shape, but product price/stock and totals always come from
-the database.
+`CreateOrderSerializer` validates recipient, province/city membership,
+sufficiently detailed address, and optional postal code. It accepts official
+`provinceId`/`cityId` codes while retaining validated name-only compatibility.
+Input serializers are the trust boundary for shape, but product price/stock and
+totals always come from the database.
 
 ## Checkout transaction
 
@@ -74,6 +82,30 @@ fields sourced from `OrderItem`, not current product data.
 - `POST /api/orders`: create from the current cart.
 - `GET /api/orders/<id>`: retrieve only an order owned by the user.
 - `POST /api/orders/<id>`: cancel an eligible owned order.
+- `GET /api/orders/<id>/invoice`: download the owner's invoice PDF; staff may
+  download any order using the same endpoint.
+
+## Official PDF invoices
+
+Invoices are rendered locally with WeasyPrint; no order/customer data is sent to
+an external service. Install Python packages from `requirements.txt` and ensure
+the deployment image includes Pango, Fontconfig, and HarfBuzz (including the
+HarfBuzz subset library used for embedded fonts). The renderer requires the
+configured logo plus regular/bold Vazirmatn font files. Monorepo defaults point
+to `frontend/public`; separately packaged deployments must set the absolute
+`INVOICE_LOGO_PATH`, `INVOICE_FONT_REGULAR_PATH`, and
+`INVOICE_FONT_BOLD_PATH`. `INVOICE_STORE_NAME` overrides the storefront name.
+
+The invoice number is `INV-<order code>`. The underlying order code is database
+unique, unguessable, and read-only in Django admin, so all existing and future
+orders receive a stable unique invoice number without a migration or a write at
+download time. The order timestamp is the deterministic issue date.
+
+Every financial value comes from `Order` and `OrderItem`: header subtotal,
+discount, shipping, total, item title, old/list unit price, final unit price, and
+quantity. Current `Product` values are never read. Tax, payment transaction, and
+legal registration details are deliberately absent because this project has no
+such persisted fields.
 
 All ownership queries must include `user=request.user`. Staff management uses the
 separate `/api/admin/orders` surface.
@@ -87,4 +119,3 @@ separate `/api/admin/orders` surface.
 5. Keep user queries ownership-scoped.
 6. Design payment integrations around idempotency and short transactions.
 7. Run `./.venv/bin/python manage.py test orders --verbosity 2`.
-

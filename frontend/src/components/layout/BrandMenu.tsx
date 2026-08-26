@@ -49,7 +49,7 @@ export default function BrandMenu() {
         aria-expanded={open}
         aria-controls="product-brand-menu"
         aria-haspopup="menu"
-        className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${
+        className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${
           open
             ? "bg-brand-50 text-brand-700"
             : "text-slate-700 hover:bg-slate-50"
@@ -74,9 +74,9 @@ export default function BrandMenu() {
       {open && (
         <div
           id="product-brand-menu"
-          className="absolute right-0 top-full z-50 pt-2"
+          className="fixed inset-x-4 below-header z-50 pt-2 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full"
         >
-          <div className="w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_18px_50px_-16px_rgba(15,23,42,0.35)]">
+          <div className="mr-auto flex h-under-header w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_18px_50px_-16px_rgba(15,23,42,0.35)] lg:w-80">
             <p className="border-b border-slate-100 px-2 pb-3 text-xs font-bold text-slate-700">
               انتخاب بر اساس برند
             </p>
@@ -85,7 +85,7 @@ export default function BrandMenu() {
                 برند فعالی برای نمایش وجود ندارد
               </p>
             ) : (
-              <ul className="mt-2 grid max-h-80 grid-cols-2 gap-1 overflow-y-auto">
+              <ul className="mt-2 grid min-h-0 grid-cols-2 gap-1 overflow-y-auto lg:max-h-80">
                 {brands.map((brand) => (
                   <li key={brand.slug}>
                     <Link

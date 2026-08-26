@@ -77,7 +77,7 @@ async function ManagedFooterColumns() {
 export default function Footer() {
   return (
     <footer className="mt-12 border-t border-slate-200 bg-white">
-      <div className="mx-auto max-w-7xl px-4 py-10">
+      <div className="site-shell py-10">
         {/* مزیت‌ها */}
         <div className="grid grid-cols-2 gap-4 border-b border-slate-100 pb-8 text-center sm:grid-cols-4">
           {[
