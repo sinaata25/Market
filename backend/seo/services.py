@@ -10,6 +10,7 @@ from .models import PageMeta, SeoSettings
 # صفحات ثابت سایت
 STATIC_PAGES = [
     {"key": "/", "title": "صفحه اصلی"},
+    {"key": "/products", "title": "همه محصولات"},
     {"key": "/blog", "title": "وبلاگ کشاورزی"},
     {"key": "/incredible", "title": "شگفت‌انگیزها"},
     {"key": "/best-sellers", "title": "پرفروش‌ترین‌ها"},

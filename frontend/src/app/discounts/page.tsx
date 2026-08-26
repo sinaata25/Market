@@ -64,7 +64,7 @@ export default async function DiscountsPage() {
           <div className="grid grid-cols-2 gap-px border-t border-white/20 bg-white/10">
             <div className="px-4 py-3 text-center">
               <p className="text-sm font-bold text-white font-num">
-                ٪{bestDiscount.toLocaleString("fa-IR")}
+                {bestDiscount.toLocaleString("fa-IR")}٪
               </p>
               <p className="text-[11px] text-white/80">بیشترین تخفیف</p>
             </div>

@@ -12,6 +12,7 @@ type SectionType =
   | "incredible_products"
   | "discounted_products"
   | "new_products"
+  | "all_products"
   | "product_collection"
   | "recently_viewed";
 
@@ -70,6 +71,7 @@ const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "incredible_products", label: "شگفت‌انگیزها (منتخب مدیر)" },
   { value: "discounted_products", label: "همه محصولات تخفیف‌دار" },
   { value: "new_products", label: "جدیدترین محصولات" },
+  { value: "all_products", label: "همه محصولات (صفحه‌بندی‌شده)" },
   { value: "product_collection", label: "مجموعه محصولات سفارشی" },
   { value: "recently_viewed", label: "محصولات اخیراً مشاهده‌شده" },
 ];
@@ -416,7 +418,7 @@ export default function AdminHomepagePage() {
           )}
           {type !== "banner" && (
             <label>
-              <span className="mb-1.5 block text-xs text-slate-600">حداکثر تعداد (۱ تا ۲۴)</span>
+              <span className="mb-1.5 block text-xs text-slate-600">{type === "all_products" ? "تعداد در هر صفحه (۱ تا ۲۴)" : "حداکثر تعداد (۱ تا ۲۴)"}</span>
               <input type="number" min={1} max={24} value={sectionValues.limit} onChange={(event) => setSectionValues((current) => ({ ...current, limit: event.target.value }))} className={INPUT_CLASS} placeholder="پیش‌فرض" />
             </label>
           )}

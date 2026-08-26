@@ -8,6 +8,7 @@ import type {
   HomepageSectionType,
 } from "@/lib/homepage";
 import RecentlyViewedSection from "@/components/homepage/RecentlyViewedSection";
+import AllProductsSection from "@/components/homepage/AllProductsSection";
 
 const BANNER_THEMES: Record<HomepageBanner["theme"], string> = {
   brand: "from-secondary-700 to-brand-600",
@@ -189,6 +190,32 @@ function ProductSection({ section }: { section: HomepageSection }) {
   );
 }
 
+/**
+ * بخش «همه محصولات» — برخلاف بقیه‌ی بخش‌های محصولی، کل کاتالوگ را
+ * صفحه‌به‌صفحه نشان می‌دهد؛ پس علاوه بر محصولاتِ صفحه‌ی اول، تعداد کل را هم
+ * از API می‌گیرد تا صفحه‌بندی همان‌جا ساخته شود. `limit` این بخش یعنی تعداد
+ * کالای هر صفحه.
+ */
+function AllProductsHomeSection({ section }: { section: HomepageSection }) {
+  const products = section.data.products ?? [];
+  const total = section.data.total ?? products.length;
+  const perPage = section.limit || products.length || 1;
+
+  if (!products.length) return null;
+
+  return (
+    <AllProductsSection
+      title={section.title ?? undefined}
+      perPage={perPage}
+      initial={{
+        items: products,
+        total,
+        pages: Math.ceil(total / perPage),
+      }}
+    />
+  );
+}
+
 const SECTION_RENDERERS: Partial<
   Record<HomepageSectionType, (section: HomepageSection) => React.ReactNode>
 > = {
@@ -202,6 +229,7 @@ const SECTION_RENDERERS: Partial<
   incredible_products: (section) => <ProductSection section={section} />,
   discounted_products: (section) => <ProductSection section={section} />,
   new_products: (section) => <ProductSection section={section} />,
+  all_products: (section) => <AllProductsHomeSection section={section} />,
   product_collection: (section) => <ProductSection section={section} />,
   recently_viewed: (section) => (
     <RecentlyViewedSection

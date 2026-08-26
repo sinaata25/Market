@@ -417,3 +417,63 @@ class ManagerRoleInvariantTests(TestCase):
             with self.subTest(payload=payload):
                 with self.assertRaises(IntegrityError), transaction.atomic():
                     User.objects.filter(pk=manager.pk).update(**payload)
+
+
+class ManagerUserListingScopeTests(TestCase):
+    """فهرست کاربران برای مدیر اجرایی فقط مشتری‌هاست، نه حساب‌های مدیریتی"""
+
+    USERS_URL = "/api/admin/users"
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            phone="09120000901", password="x", name="مدیر سیستم"
+        )
+        self.manager = User.objects.create_user(
+            phone="09120000902",
+            name="مدیر اجرایی",
+            is_staff=True,
+            is_manager_admin=True,
+        )
+        self.staff = User.objects.create_user(
+            phone="09120000903", name="کارمند", is_staff=True
+        )
+        self.seo_admin = User.objects.create_user(
+            phone="09120000904", name="مدیر سئو", is_seo_manager=True
+        )
+        self.customer = User.objects.create_user(
+            phone="09120000905", name="مشتری"
+        )
+
+    def listing(self, user, **params) -> dict:
+        client = APIClient()
+        client.force_authenticate(user)
+        response = client.get(self.USERS_URL, params)
+        self.assertEqual(response.status_code, 200)
+        return response.json()["data"]
+
+    def test_manager_sees_only_customers(self):
+        data = self.listing(self.manager)
+        self.assertEqual(
+            [u["phone"] for u in data["users"]], [self.customer.phone]
+        )
+        self.assertEqual(data["total"], 1)
+
+    def test_manager_cannot_reach_admins_through_search(self):
+        """جستجو هم نباید حساب مدیریتی را لو بدهد"""
+        for admin in (self.superuser, self.staff, self.seo_admin):
+            with self.subTest(phone=admin.phone):
+                data = self.listing(self.manager, search=admin.phone)
+                self.assertEqual(data["users"], [])
+                self.assertEqual(data["total"], 0)
+
+    def test_superuser_still_sees_everyone(self):
+        data = self.listing(self.superuser)
+        self.assertEqual(data["total"], User.objects.count())
+        self.assertIn(
+            self.manager.phone, [u["phone"] for u in data["users"]]
+        )
+
+    def test_staff_listing_is_unchanged(self):
+        """کارمند ساده همان دید تاریخی خودش را دارد"""
+        data = self.listing(self.staff)
+        self.assertEqual(data["total"], User.objects.count())

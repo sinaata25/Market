@@ -70,7 +70,7 @@ export default async function IncrediblePage() {
           <div className="grid grid-cols-2 gap-px border-t border-secondary-900/20 bg-secondary-900/5 sm:grid-cols-3">
             <div className="bg-transparent px-4 py-3 text-center">
               <p className="text-sm font-bold text-secondary-900 font-num">
-                ٪{bestDiscount.toLocaleString("fa-IR")}
+                {bestDiscount.toLocaleString("fa-IR")}٪
               </p>
               <p className="text-[11px] text-secondary-900/80">بیشترین تخفیف</p>
             </div>
@@ -123,7 +123,7 @@ export default async function IncrediblePage() {
               <p className="mb-4 text-xs text-slate-400">{best.category}</p>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-lg bg-accent-500 px-2.5 py-1 text-sm font-bold text-secondary-900 font-num">
-                  ٪{bestDiscount.toLocaleString("fa-IR")}
+                  {bestDiscount.toLocaleString("fa-IR")}٪
                 </span>
                 <span className="text-sm text-slate-300 line-through font-num">
                   {formatPrice(best.oldPrice!)}

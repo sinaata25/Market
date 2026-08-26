@@ -42,6 +42,7 @@ DEFAULT_TITLES: dict[str, str] = {
     HomepageSection.SectionType.INCREDIBLE_PRODUCTS: "شگفت‌انگیزها",
     HomepageSection.SectionType.DISCOUNTED_PRODUCTS: "همه تخفیف‌ها",
     HomepageSection.SectionType.NEW_PRODUCTS: "جدیدترین محصولات",
+    HomepageSection.SectionType.ALL_PRODUCTS: "همه محصولات",
     HomepageSection.SectionType.PRODUCT_COLLECTION: "منتخب فروشگاه",
     HomepageSection.SectionType.RECENTLY_VIEWED: "محصولات اخیراً مشاهده‌شده",
 }
@@ -53,6 +54,8 @@ DEFAULT_LIMITS: dict[str, int] = {
     HomepageSection.SectionType.INCREDIBLE_PRODUCTS: 6,
     HomepageSection.SectionType.DISCOUNTED_PRODUCTS: 6,
     HomepageSection.SectionType.NEW_PRODUCTS: 8,
+    # این بخش صفحه‌بندی می‌شود؛ عدد یعنی تعداد کالای هر صفحه
+    HomepageSection.SectionType.ALL_PRODUCTS: 6,
     HomepageSection.SectionType.PRODUCT_COLLECTION: 8,
     HomepageSection.SectionType.RECENTLY_VIEWED: 10,
 }
@@ -67,6 +70,8 @@ PRODUCT_SECTION_FILTERS = {
     },
     HomepageSection.SectionType.DISCOUNTED_PRODUCTS: {"discounted": True, "sort": "newest"},
     HomepageSection.SectionType.NEW_PRODUCTS: {"sort": "newest"},
+    # بدون هیچ فیلتری: کل کاتالوگ، همان چیزی که صفحه‌ی /products نشان می‌دهد
+    HomepageSection.SectionType.ALL_PRODUCTS: {"sort": "newest"},
 }
 
 
@@ -78,24 +83,39 @@ def resolved_limit(section: HomepageSection) -> int:
     return section.limit or DEFAULT_LIMITS.get(section.section_type, 8)
 
 
-def section_products(section: HomepageSection) -> list[Product]:
-    """محصولات این بخش را برمی‌گرداند — منطق فیلتر از catalog.selectors است."""
-    limit = resolved_limit(section)
+def _section_queryset(section: HomepageSection):
+    """کوئری‌ست محصولات این بخش — پایه‌ی هم فهرست و هم شمارش کل
+
+    برای بخش‌های غیرمحصولی None برمی‌گرداند. منطق فیلتر از catalog.selectors
+    می‌آید تا با API عمومی محصولات یکی بماند.
+    """
     section_type = section.section_type
 
     if section_type == HomepageSection.SectionType.PRODUCT_COLLECTION:
-        qs = filtered_products_queryset(
+        return filtered_products_queryset(
             category_slug=section.category.slug if section.category_id else None,
             brand_slug=section.brand.slug if section.brand_id else None,
             sort=section.sort or "newest",
         )
-        return list(qs[:limit])
 
     filters = PRODUCT_SECTION_FILTERS.get(section_type)
     if filters is None:
+        return None
+    return filtered_products_queryset(**filters)
+
+
+def section_products(section: HomepageSection) -> list[Product]:
+    """محصولات این بخش را برمی‌گرداند — منطق فیلتر از catalog.selectors است."""
+    qs = _section_queryset(section)
+    if qs is None:
         return []
-    qs = filtered_products_queryset(**filters)
-    return list(qs[:limit])
+    return list(qs[: resolved_limit(section)])
+
+
+def section_products_total(section: HomepageSection) -> int:
+    """تعداد کل محصولات این بخش — بخش صفحه‌بندی‌شده به آن نیاز دارد"""
+    qs = _section_queryset(section)
+    return 0 if qs is None else qs.count()
 
 
 @transaction.atomic

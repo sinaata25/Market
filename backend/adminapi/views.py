@@ -17,7 +17,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
-from accounts.permissions import ShopAdminRequiredMixin
+from accounts.permissions import ShopAdminRequiredMixin, is_manager_admin
 from catalog.category_tree import visible_category_ids
 from catalog.brand_files import schedule_brand_logo_delete
 from catalog.brand_pricing import adjust_brand_prices
@@ -1147,6 +1147,15 @@ class AdminUserListView(ShopAdminRequiredMixin, APIView):
         qs = User.objects.annotate(orders_count=Count("orders")).order_by(
             "-date_joined"
         )
+        # مدیر اجرایی فقط مشتری‌ها را می‌بیند؛ حساب‌های مدیریتی (سوپریوزر،
+        # مدیر اجرایی، کارمند و مدیر سئو) از دید او پنهان می‌مانند.
+        if is_manager_admin(request.user):
+            qs = qs.filter(
+                is_staff=False,
+                is_superuser=False,
+                is_manager_admin=False,
+                is_seo_manager=False,
+            )
         search = request.query_params.get("search", "").strip()
         if search:
             qs = qs.filter(

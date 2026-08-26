@@ -253,6 +253,12 @@ export const products: Product[] = [
   },
 ];
 
+/** تعداد کالاهای هر صفحه‌ی بخش «همه محصولات» صفحه اصلی */
+export const HOME_PRODUCTS_PER_PAGE = 6;
+
+/** صفحه‌ی کامل فهرست محصولات — مقصد دکمه‌های «مشاهده همه» */
+export const ALL_PRODUCTS_PATH = "/products";
+
 export function formatPrice(value: number) {
   return value.toLocaleString("fa-IR");
 }

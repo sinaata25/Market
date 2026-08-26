@@ -21,6 +21,8 @@ _TYPE_ALLOWED_FIELDS: dict[str, set[str]] = {
     "incredible_products": {"limit"},
     "discounted_products": {"limit"},
     "new_products": {"limit"},
+    # limit اینجا یعنی «تعداد در هر صفحه»، چون این بخش صفحه‌بندی می‌شود
+    "all_products": {"limit"},
     "product_collection": {"category", "brand", "sort", "limit"},
     "recently_viewed": {"limit"},
 }
@@ -84,6 +86,7 @@ class HomepageSection(models.Model):
         INCREDIBLE_PRODUCTS = "incredible_products", "شگفت‌انگیزها (منتخب مدیر)"
         DISCOUNTED_PRODUCTS = "discounted_products", "همه محصولات تخفیف‌دار"
         NEW_PRODUCTS = "new_products", "جدیدترین محصولات"
+        ALL_PRODUCTS = "all_products", "همه محصولات (صفحه‌بندی‌شده)"
         PRODUCT_COLLECTION = "product_collection", "مجموعه محصولات سفارشی"
         RECENTLY_VIEWED = "recently_viewed", "محصولات اخیراً مشاهده‌شده"
 

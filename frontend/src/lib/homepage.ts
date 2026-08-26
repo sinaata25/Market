@@ -19,6 +19,7 @@ export type HomepageSectionType =
   | "incredible_products"
   | "discounted_products"
   | "new_products"
+  | "all_products"
   | "product_collection"
   | "recently_viewed";
 
@@ -44,6 +45,8 @@ export type HomepageSection = {
     categories?: CategoryDTO[];
     brands?: BrandDTO[];
     products?: ProductDTO[];
+    // فقط بخش «همه محصولات»: تعداد کل کاتالوگ برای ساخت صفحه‌بندی
+    total?: number;
   };
 };
 
