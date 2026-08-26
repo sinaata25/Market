@@ -14,6 +14,8 @@ type SectionType =
   | "new_products"
   | "all_products"
   | "product_collection"
+  | "brand_products"
+  | "category_products"
   | "recently_viewed";
 
 type Banner = {
@@ -103,8 +105,21 @@ const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "new_products", label: "جدیدترین محصولات" },
   { value: "all_products", label: "همه محصولات (صفحه‌بندی‌شده)" },
   { value: "product_collection", label: "مجموعه محصولات سفارشی" },
+  { value: "brand_products", label: "محصولات یک برند" },
+  { value: "category_products", label: "محصولات یک دسته‌بندی" },
   { value: "recently_viewed", label: "محصولات اخیراً مشاهده‌شده" },
 ];
+
+/**
+ * نوع بخش پس از ایجاد قابل تغییر نیست، جز این دو که فقط در مرجعشان فرق
+ * دارند — مدیر می‌تواند بدون از دست دادن جای بخش، برند را با دسته‌بندی عوض کند.
+ * هم‌تراز با INTERCHANGEABLE_SECTION_TYPES در بک‌اند.
+ */
+const INTERCHANGEABLE_TYPES: SectionType[] = ["brand_products", "category_products"];
+
+function isInterchangeable(type: SectionType) {
+  return INTERCHANGEABLE_TYPES.includes(type);
+}
 
 const SECTION_LABELS = Object.fromEntries(
   SECTION_TYPES.map((item) => [item.value, item.label])
@@ -301,6 +316,24 @@ export default function AdminHomepagePage() {
       payload.brandSlug = sectionValues.brandSlug || null;
       payload.sort = sectionValues.sort;
     }
+    if (type === "brand_products") {
+      if (!sectionValues.brandSlug) {
+        notify("برای ردیف محصولات برند، یک برند انتخاب کنید");
+        return;
+      }
+      payload.brandSlug = sectionValues.brandSlug;
+    }
+    if (type === "category_products") {
+      if (!sectionValues.categorySlug) {
+        notify("برای ردیف محصولات دسته‌بندی، یک دسته‌بندی انتخاب کنید");
+        return;
+      }
+      payload.categorySlug = sectionValues.categorySlug;
+    }
+    // تعویض برند ↔ دسته‌بندی روی بخش موجود؛ بقیه‌ی انواع تغییرناپذیرند
+    if (editingSection && type !== editingSection.sectionType) {
+      payload.sectionType = type;
+    }
 
     setBusy(true);
     const result = editingSection
@@ -474,6 +507,8 @@ export default function AdminHomepagePage() {
                   </p>
                   <p className="mt-1 text-[11px] text-slate-400">
                     {SECTION_LABELS[section.sectionType]}
+                    {section.sectionType === "brand_products" && section.brand ? ` · ${section.brand.name}` : ""}
+                    {section.sectionType === "category_products" && section.category ? ` · ${section.category.title}` : ""}
                     {section.limit ? ` · حداکثر ${section.limit.toLocaleString("fa-IR")}` : ""}
                   </p>
                 </div>
@@ -501,8 +536,11 @@ export default function AdminHomepagePage() {
         <form onSubmit={saveSection} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label>
             <span className="mb-1.5 block text-xs text-slate-600">نوع بخش</span>
-            <select disabled={Boolean(editingSection)} value={type} onChange={(event) => setSectionValues((current) => ({ ...current, sectionType: event.target.value as SectionType }))} className={INPUT_CLASS}>
-              {SECTION_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            <select disabled={editingSection !== null && !isInterchangeable(editingSection.sectionType)} value={type} onChange={(event) => setSectionValues((current) => ({ ...current, sectionType: event.target.value as SectionType }))} className={INPUT_CLASS}>
+              {(editingSection && isInterchangeable(editingSection.sectionType)
+                ? SECTION_TYPES.filter((item) => isInterchangeable(item.value))
+                : SECTION_TYPES
+              ).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>
           </label>
           <label>
@@ -521,7 +559,25 @@ export default function AdminHomepagePage() {
           {type !== "banner" && (
             <label>
               <span className="mb-1.5 block text-xs text-slate-600">{type === "all_products" ? "تعداد در هر صفحه (۱ تا ۲۴)" : "حداکثر تعداد (۱ تا ۲۴)"}</span>
-              <input type="number" min={1} max={24} value={sectionValues.limit} onChange={(event) => setSectionValues((current) => ({ ...current, limit: event.target.value }))} className={INPUT_CLASS} placeholder="پیش‌فرض" />
+              <input type="number" min={1} max={24} value={sectionValues.limit} onChange={(event) => setSectionValues((current) => ({ ...current, limit: event.target.value }))} className={INPUT_CLASS} placeholder={isInterchangeable(type) ? "۶ (پیش‌فرض)" : "پیش‌فرض"} />
+            </label>
+          )}
+          {type === "brand_products" && (
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-xs text-slate-600">برند</span>
+              <select required value={sectionValues.brandSlug} onChange={(event) => setSectionValues((current) => ({ ...current, brandSlug: event.target.value }))} className={INPUT_CLASS}>
+                <option value="">انتخاب کنید</option>
+                {brands.map((brand) => <option key={brand.slug} value={brand.slug}>{brand.name}</option>)}
+              </select>
+            </label>
+          )}
+          {type === "category_products" && (
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-xs text-slate-600">دسته‌بندی</span>
+              <select required value={sectionValues.categorySlug} onChange={(event) => setSectionValues((current) => ({ ...current, categorySlug: event.target.value }))} className={INPUT_CLASS}>
+                <option value="">انتخاب کنید</option>
+                {categories.map((category) => <option key={category.slug} value={category.slug}>{category.title}</option>)}
+              </select>
             </label>
           )}
           {type === "product_collection" && (

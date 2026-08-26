@@ -21,6 +21,8 @@ export type HomepageSectionType =
   | "new_products"
   | "all_products"
   | "product_collection"
+  | "brand_products"
+  | "category_products"
   | "recently_viewed";
 
 export type HomepageBanner = {
@@ -47,6 +49,9 @@ export type HomepageSection = {
     categories?: CategoryDTO[];
     brands?: BrandDTO[];
     products?: ProductDTO[];
+    // ردیف برند/دسته‌بندی: مرجع بخش، برای لینک «مشاهده همه»
+    brand?: BrandDTO;
+    category?: { slug: string; title: string };
     // فقط بخش «همه محصولات»: تعداد کل کاتالوگ برای ساخت صفحه‌بندی
     total?: number;
   };

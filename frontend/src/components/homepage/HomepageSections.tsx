@@ -8,6 +8,7 @@ import type {
   HomepageSectionType,
 } from "@/lib/homepage";
 import { bannerImageSources } from "@/lib/banner-image";
+import { sectionAllLink } from "@/lib/homepage-links";
 import RecentlyViewedSection from "@/components/homepage/RecentlyViewedSection";
 import AllProductsSection from "@/components/homepage/AllProductsSection";
 
@@ -136,11 +137,13 @@ function BrandsSection({ section }: { section: HomepageSection }) {
   );
 }
 
-const PRODUCT_LINKS: Partial<Record<HomepageSectionType, string>> = {
-  best_sellers: "/best-sellers",
-  incredible_products: "/incredible",
-  discounted_products: "/discounts",
-};
+/** ردیف‌هایی که مثل «شگفت‌انگیزها» روی موبایل افقی اسکرول می‌شوند */
+const RAIL_SECTIONS = new Set<string>([
+  "discounted_products",
+  "incredible_products",
+  "brand_products",
+  "category_products",
+]);
 
 function ProductSection({ section }: { section: HomepageSection }) {
   const products = section.data.products ?? [];
@@ -148,7 +151,8 @@ function ProductSection({ section }: { section: HomepageSection }) {
   const isDeals =
     section.type === "discounted_products" ||
     section.type === "incredible_products";
-  const allLink = PRODUCT_LINKS[section.type as HomepageSectionType];
+  const isRail = RAIL_SECTIONS.has(section.type);
+  const allLink = sectionAllLink(section);
 
   return (
     <section
@@ -180,7 +184,7 @@ function ProductSection({ section }: { section: HomepageSection }) {
           </Link>
         )}
       </div>
-      {isDeals ? (
+      {isRail ? (
         <ProductRail>
           {products.map((product) => (
             <ProductCard key={product.id} product={product} />
@@ -238,6 +242,8 @@ const SECTION_RENDERERS: Partial<
   new_products: (section) => <ProductSection section={section} />,
   all_products: (section) => <AllProductsHomeSection section={section} />,
   product_collection: (section) => <ProductSection section={section} />,
+  brand_products: (section) => <ProductSection section={section} />,
+  category_products: (section) => <ProductSection section={section} />,
   recently_viewed: (section) => (
     <RecentlyViewedSection
       title={section.title ?? "محصولات اخیراً مشاهده‌شده"}

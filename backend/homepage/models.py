@@ -30,8 +30,41 @@ _TYPE_ALLOWED_FIELDS: dict[str, set[str]] = {
     # limit اینجا یعنی «تعداد در هر صفحه»، چون این بخش صفحه‌بندی می‌شود
     "all_products": {"limit"},
     "product_collection": {"category", "brand", "sort", "limit"},
+    # ردیف محصولات یک برند / یک دسته‌بندی — برخلاف مجموعه‌ی سفارشی، مرجعش
+    # الزامی است و همان مرجع، مقصد دکمه‌ی «مشاهده همه» را هم تعیین می‌کند
+    "brand_products": {"brand", "limit"},
+    "category_products": {"category", "limit"},
     "recently_viewed": {"limit"},
 }
+
+# مرجع‌هایی که بدون آن‌ها این نوع بخش اصلاً معنا ندارد
+_TYPE_REQUIRED_FIELDS: dict[str, set[str]] = {
+    "banner": {"banner"},
+    "brand_products": {"brand"},
+    "category_products": {"category"},
+}
+
+# نام فیلد مدل → کلید خطا در API (camelCase)
+_FIELD_ERROR_KEYS: dict[str, str] = {
+    "banner": "bannerId",
+    "category": "categorySlug",
+    "brand": "brandSlug",
+}
+
+_REQUIRED_FIELD_MESSAGES: dict[str, str] = {
+    "banner": "برای بخش بنر انتخاب بنر الزامی است",
+    "brand": "برای بخش محصولات برند، انتخاب برند الزامی است",
+    "category": "برای بخش محصولات دسته‌بندی، انتخاب دسته‌بندی الزامی است",
+}
+
+# نوع بخش پس از ایجاد ثابت است؛ تنها استثنا این دو که فقط در مرجعشان فرق
+# دارند، تا مدیر بتواند بدون از دست دادن جای بخش، برند را با دسته‌بندی عوض کند
+INTERCHANGEABLE_SECTION_TYPES = {"brand_products", "category_products"}
+
+
+def allowed_fields(section_type: str) -> set[str]:
+    """فیلدهای معنادار برای این نوع بخش — خالی اگر نوع ناشناخته باشد"""
+    return _TYPE_ALLOWED_FIELDS.get(section_type, set())
 
 
 class Banner(models.Model):
@@ -101,6 +134,8 @@ class HomepageSection(models.Model):
         NEW_PRODUCTS = "new_products", "جدیدترین محصولات"
         ALL_PRODUCTS = "all_products", "همه محصولات (صفحه‌بندی‌شده)"
         PRODUCT_COLLECTION = "product_collection", "مجموعه محصولات سفارشی"
+        BRAND_PRODUCTS = "brand_products", "محصولات یک برند"
+        CATEGORY_PRODUCTS = "category_products", "محصولات یک دسته‌بندی"
         RECENTLY_VIEWED = "recently_viewed", "محصولات اخیراً مشاهده‌شده"
 
     section_type = models.CharField(
@@ -166,8 +201,15 @@ class HomepageSection(models.Model):
         if allowed is None:
             raise ValidationError({"sectionType": "نوع بخش پشتیبانی نمی‌شود"})
 
-        if "banner" in allowed and self.banner_id is None:
-            raise ValidationError({"bannerId": "برای بخش بنر انتخاب بنر الزامی است"})
+        for field_name in _TYPE_REQUIRED_FIELDS.get(self.section_type, set()):
+            if getattr(self, f"{field_name}_id") is None:
+                raise ValidationError(
+                    {
+                        _FIELD_ERROR_KEYS[field_name]: _REQUIRED_FIELD_MESSAGES[
+                            field_name
+                        ]
+                    }
+                )
 
         if "banner" not in allowed and self.banner_id is not None:
             raise ValidationError(

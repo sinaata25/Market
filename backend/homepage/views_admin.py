@@ -76,7 +76,11 @@ class AdminHomepageSectionDetailView(ShopAdminRequiredMixin, APIView):
         section = self._get(pk)
         if section is None:
             return fail("بخش یافت نشد", 404)
-        serializer = HomepageSectionUpdateSerializer(data=request.data, partial=True)
+        serializer = HomepageSectionUpdateSerializer(
+            data=request.data,
+            partial=True,
+            context={"section_type": section.section_type},
+        )
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         if "isActive" in data:

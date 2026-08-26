@@ -4,6 +4,8 @@ from io import BytesIO
 
 from PIL import Image
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -18,6 +20,8 @@ from .services import (
     create_section,
     delete_section,
     move_section,
+    resolved_limit,
+    resolved_title,
     section_products,
     section_products_total,
     update_section,
@@ -142,11 +146,22 @@ class HomepageServiceTests(TestCase):
     def test_every_product_section_type_is_exposed_publicly(self):
         """هیچ نوع بخش محصولی نباید بی‌سروصدا از پاسخ عمومی حذف شود"""
         from homepage.dto import public_section_dto
-        from homepage.services import PRODUCT_SECTION_FILTERS
+        from homepage.services import PRODUCT_SECTION_TYPES
 
-        for section_type in PRODUCT_SECTION_FILTERS:
+        # مرجع الزامی هر نوع — بقیه‌ی انواع بدون مرجع ساخته می‌شوند
+        required_reference = {
+            HomepageSection.SectionType.BRAND_PRODUCTS: {"brand": self.brand},
+            HomepageSection.SectionType.CATEGORY_PRODUCTS: {
+                "category": self.category
+            },
+        }
+
+        for section_type in PRODUCT_SECTION_TYPES:
             with self.subTest(section_type=section_type):
-                section = create_section(section_type=section_type)
+                section = create_section(
+                    section_type=section_type,
+                    **required_reference.get(section_type, {}),
+                )
                 dto = public_section_dto(section)
                 self.assertIsNotNone(dto)
                 self.assertEqual(dto["type"], section_type)
@@ -262,6 +277,217 @@ class HomepageServiceTests(TestCase):
         self.assertEqual(appended.position, 3)
 
 
+class BrandAndCategorySectionTests(TestCase):
+    """ردیف محصولات یک برند / یک دسته‌بندی — اعتبارسنجی و انتخاب محصول"""
+
+    def setUp(self):
+        HomepageSection.objects.all().delete()
+        self.ronix = Brand.objects.create(name="رونیکس", slug="ronix")
+        self.bosch = Brand.objects.create(name="بوش", slug="bosch")
+        self.power_tools = Category.objects.create(
+            slug="power-tools", title="ابزار برقی"
+        )
+        self.pumps = Category.objects.create(slug="pumps", title="پمپ آب")
+
+    def product(self, title, **kwargs):
+        kwargs.setdefault("category", self.power_tools)
+        kwargs.setdefault("price", 1000)
+        kwargs.setdefault("is_active", True)
+        return Product.objects.create(title=title, **kwargs)
+
+    def test_brand_section_requires_a_brand(self):
+        section = HomepageSection(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS
+        )
+        with self.assertRaises(ValidationError):
+            section.save()
+
+    def test_category_section_requires_a_category(self):
+        section = HomepageSection(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS
+        )
+        with self.assertRaises(ValidationError):
+            section.save()
+
+    def test_brand_section_rejects_a_category_reference(self):
+        """برند و دسته‌بندی نمی‌توانند هم‌زمان انتخاب فعال باشند"""
+        section = HomepageSection(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+            category=self.power_tools,
+        )
+        with self.assertRaises(ValidationError):
+            section.save()
+
+    def test_category_section_rejects_a_brand_reference(self):
+        section = HomepageSection(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.power_tools,
+            brand=self.ronix,
+        )
+        with self.assertRaises(ValidationError):
+            section.save()
+
+    def test_brand_section_lists_only_that_brands_products(self):
+        mine = self.product("دریل رونیکس", brand=self.ronix)
+        self.product("دریل بوش", brand=self.bosch)
+        self.product("بدون برند")
+
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+
+        self.assertEqual(section_products(section), [mine])
+
+    def test_category_section_lists_only_that_categorys_products(self):
+        mine = self.product("اره برقی", category=self.power_tools)
+        self.product("پمپ کفکش", category=self.pumps)
+
+        section = create_section(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.power_tools,
+        )
+
+        self.assertEqual(section_products(section), [mine])
+
+    def test_category_section_includes_subcategory_products(self):
+        """همان قاعده‌ی صفحه‌ی دسته‌بندی: زیرشاخه‌ها هم شمرده می‌شوند"""
+        drills = Category.objects.create(slug="drills", title="دریل")
+        drills.parents.add(self.power_tools)
+        nested = self.product("دریل چکشی", category=drills)
+
+        section = create_section(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.power_tools,
+        )
+
+        self.assertIn(nested, section_products(section))
+
+    def test_default_limit_is_six_products(self):
+        for index in range(10):
+            self.product(f"رونیکس {index}", brand=self.ronix)
+
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+
+        self.assertEqual(resolved_limit(section), 6)
+        self.assertEqual(len(section_products(section)), 6)
+
+    def test_storefront_rules_exclude_hidden_products(self):
+        """فقط کالاهایی که در فروشگاه هم دیده می‌شوند — همان قواعد موجود"""
+        visible = self.product("رونیکس فعال", brand=self.ronix)
+        self.product("رونیکس غیرفعال", brand=self.ronix, is_active=False)
+
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+
+        self.assertEqual(section_products(section), [visible])
+
+    def test_products_of_an_inactive_brand_are_excluded(self):
+        self.product("رونیکس", brand=self.ronix)
+        self.ronix.is_active = False
+        self.ronix.save()
+
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+
+        self.assertEqual(section_products(section), [])
+
+    def test_products_of_an_inactive_category_are_excluded(self):
+        self.product("ابزار", category=self.power_tools)
+        self.power_tools.is_active = False
+        self.power_tools.save()
+
+        section = create_section(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.power_tools,
+        )
+
+        self.assertEqual(section_products(section), [])
+
+    def test_switching_the_brand_swaps_the_products(self):
+        """تغییر برند نباید نیاز به ساختن دوباره‌ی بخش داشته باشد"""
+        ronix_product = self.product("دریل رونیکس", brand=self.ronix)
+        bosch_product = self.product("دریل بوش", brand=self.bosch)
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+        self.assertEqual(section_products(section), [ronix_product])
+
+        update_section(section, brand=self.bosch)
+
+        self.assertEqual(section_products(section), [bosch_product])
+
+    def test_switching_from_brand_to_category_clears_the_brand(self):
+        self.product("دریل رونیکس", brand=self.ronix, category=self.pumps)
+        category_product = self.product("ابزار برقی", category=self.power_tools)
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+
+        update_section(
+            section,
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.power_tools,
+        )
+
+        section.refresh_from_db()
+        self.assertIsNone(section.brand_id)
+        self.assertEqual(section.category_id, self.power_tools.id)
+        self.assertEqual(section_products(section), [category_product])
+
+    def test_default_title_falls_back_to_the_brand_or_category_name(self):
+        brand_section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+        category_section = create_section(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.power_tools,
+        )
+
+        self.assertEqual(resolved_title(brand_section), "رونیکس")
+        self.assertEqual(resolved_title(category_section), "ابزار برقی")
+
+    def test_custom_title_wins_over_the_brand_name(self):
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+            title="محصولات رونیکس",
+        )
+        self.assertEqual(resolved_title(section), "محصولات رونیکس")
+
+    def test_deleting_the_brand_removes_the_section(self):
+        """مرجع حذف‌شده نباید ردیف را بی‌سروصدا به «همه محصولات» تبدیل کند"""
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS,
+            brand=self.ronix,
+        )
+
+        self.ronix.delete()
+
+        self.assertFalse(HomepageSection.objects.filter(pk=section.pk).exists())
+
+    def test_deleting_the_category_removes_the_section(self):
+        section = create_section(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.power_tools,
+        )
+
+        self.power_tools.delete()
+
+        self.assertFalse(HomepageSection.objects.filter(pk=section.pk).exists())
+
+
 class HomepageAdminApiTests(TempMediaRootMixin, TestCase):
     def setUp(self):
         HomepageSection.objects.all().delete()
@@ -375,6 +601,189 @@ class HomepageAdminApiTests(TempMediaRootMixin, TestCase):
         }
         self.assertEqual(positions[second.id], 0)
         self.assertEqual(positions[first.id], 1)
+
+    def test_create_brand_section(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+
+        response = self.client.post(
+            "/api/admin/home/sections",
+            {
+                "sectionType": "brand_products",
+                "brandSlug": "ronix",
+                "title": "محصولات رونیکس",
+                "limit": 6,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        section = response.data["data"]["section"]
+        self.assertEqual(section["sectionType"], "brand_products")
+        self.assertEqual(section["brand"]["slug"], brand.slug)
+        self.assertEqual(section["title"], "محصولات رونیکس")
+        self.assertEqual(section["resolvedLimit"], 6)
+
+    def test_create_category_section(self):
+        response = self.client.post(
+            "/api/admin/home/sections",
+            {"sectionType": "category_products", "categorySlug": "tools"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        section = response.data["data"]["section"]
+        self.assertEqual(section["sectionType"], "category_products")
+        self.assertEqual(section["category"]["slug"], "tools")
+        # بدون عنوان سفارشی، نام دسته‌بندی به‌عنوان عنوان استفاده می‌شود
+        self.assertEqual(section["resolvedTitle"], "ابزار")
+        self.assertEqual(section["resolvedLimit"], 6)
+
+    def test_brand_section_without_brand_is_rejected(self):
+        response = self.client.post(
+            "/api/admin/home/sections", {"sectionType": "brand_products"}, format="json"
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("brandSlug", response.data["data"]["fieldErrors"])
+
+    def test_category_section_without_category_is_rejected(self):
+        response = self.client.post(
+            "/api/admin/home/sections",
+            {"sectionType": "category_products"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("categorySlug", response.data["data"]["fieldErrors"])
+
+    def test_brand_section_rejects_a_category_at_the_same_time(self):
+        Brand.objects.create(name="رونیکس", slug="ronix")
+        response = self.client.post(
+            "/api/admin/home/sections",
+            {
+                "sectionType": "brand_products",
+                "brandSlug": "ronix",
+                "categorySlug": "tools",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("categorySlug", response.data["data"]["fieldErrors"])
+
+    def test_edit_brand_section_title_and_limit(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        response = self.client.patch(
+            f"/api/admin/home/sections/{section.id}",
+            {"title": "ابزارهای رونیکس", "limit": 4},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["section"]["title"], "ابزارهای رونیکس")
+        self.assertEqual(response.data["data"]["section"]["resolvedLimit"], 4)
+
+    def test_switching_the_selected_brand_over_the_api(self):
+        ronix = Brand.objects.create(name="رونیکس", slug="ronix")
+        Brand.objects.create(name="بوش", slug="bosch")
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=ronix
+        )
+
+        response = self.client.patch(
+            f"/api/admin/home/sections/{section.id}",
+            {"brandSlug": "bosch"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["section"]["brand"]["slug"], "bosch")
+
+    def test_switching_a_brand_section_to_a_category_section(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        response = self.client.patch(
+            f"/api/admin/home/sections/{section.id}",
+            {"sectionType": "category_products", "categorySlug": "tools"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.data["data"]["section"]
+        self.assertEqual(data["sectionType"], "category_products")
+        self.assertEqual(data["category"]["slug"], "tools")
+        self.assertIsNone(data["brand"])
+        # جای بخش در ترتیب صفحه حفظ می‌شود
+        self.assertEqual(data["position"], section.position)
+
+    def test_brand_section_cannot_become_an_unrelated_type(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        response = self.client.patch(
+            f"/api/admin/home/sections/{section.id}",
+            {"sectionType": "best_sellers"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_disable_and_reenable_a_brand_section(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        disabled = self.client.patch(
+            f"/api/admin/home/sections/{section.id}",
+            {"isActive": False},
+            format="json",
+        )
+        self.assertFalse(disabled.data["data"]["section"]["isActive"])
+
+        enabled = self.client.patch(
+            f"/api/admin/home/sections/{section.id}",
+            {"isActive": True},
+            format="json",
+        )
+        self.assertTrue(enabled.data["data"]["section"]["isActive"])
+
+    def test_reordering_a_brand_section(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        first = create_section(section_type=HomepageSection.SectionType.CATEGORIES)
+        brand_section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        response = self.client.post(
+            f"/api/admin/home/sections/{brand_section.id}/move",
+            {"direction": "up"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        positions = {
+            item["id"]: item["position"] for item in response.data["data"]["sections"]
+        }
+        self.assertEqual(positions[brand_section.id], 0)
+        self.assertEqual(positions[first.id], 1)
+
+    def test_delete_a_brand_section(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        response = self.client.delete(f"/api/admin/home/sections/{section.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(HomepageSection.objects.filter(pk=section.id).exists())
 
     def test_banner_crud_and_image_upload(self):
         create_response = self.client.post(
@@ -667,6 +1076,141 @@ class HomepagePublicApiTests(TempMediaRootMixin, TestCase):
         self.assertEqual(section["limit"], 3)
         self.assertEqual(len(section["data"]["products"]), 3)
         self.assertEqual(section["data"]["total"], 4)
+
+    def test_brand_section_public_output(self):
+        """پاسخ فروشگاه: عنوان، سقف، محصولات و مرجع برند برای دکمه‌ی مشاهده همه"""
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        product = Product.objects.create(
+            title="دریل رونیکس",
+            category=self.category,
+            brand=brand,
+            price=1000,
+            is_active=True,
+        )
+        create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        response = self.client.get("/api/home/sections")
+
+        self.assertEqual(response.status_code, 200)
+        section = response.data["data"]["sections"][0]
+        self.assertEqual(section["type"], "brand_products")
+        self.assertEqual(section["title"], "رونیکس")
+        self.assertEqual(section["limit"], 6)
+        self.assertEqual(
+            [item["id"] for item in section["data"]["products"]], [product.id]
+        )
+        self.assertEqual(section["data"]["brand"]["slug"], "ronix")
+
+    def test_category_section_public_output(self):
+        product = Product.objects.create(
+            title="اره برقی", category=self.category, price=1000, is_active=True
+        )
+        create_section(
+            section_type=HomepageSection.SectionType.CATEGORY_PRODUCTS,
+            category=self.category,
+            title="محصولات ابزار",
+        )
+
+        response = self.client.get("/api/home/sections")
+
+        section = response.data["data"]["sections"][0]
+        self.assertEqual(section["type"], "category_products")
+        self.assertEqual(section["title"], "محصولات ابزار")
+        self.assertEqual(
+            [item["id"] for item in section["data"]["products"]], [product.id]
+        )
+        self.assertEqual(section["data"]["category"]["slug"], self.category.slug)
+
+    def test_public_brand_section_is_capped_at_its_limit(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        for index in range(9):
+            Product.objects.create(
+                title=f"رونیکس {index}",
+                category=self.category,
+                brand=brand,
+                price=1000,
+                is_active=True,
+            )
+        create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        response = self.client.get("/api/home/sections")
+
+        self.assertEqual(
+            len(response.data["data"]["sections"][0]["data"]["products"]), 6
+        )
+
+    def test_inactive_brand_section_is_hidden_from_the_storefront(self):
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+        update_section(section, is_active=False)
+
+        response = self.client.get("/api/home/sections")
+
+        self.assertEqual(response.data["data"]["sections"], [])
+
+    def test_switching_the_brand_changes_the_storefront_row(self):
+        ronix = Brand.objects.create(name="رونیکس", slug="ronix")
+        bosch = Brand.objects.create(name="بوش", slug="bosch")
+        Product.objects.create(
+            title="دریل رونیکس",
+            category=self.category,
+            brand=ronix,
+            price=1000,
+            is_active=True,
+        )
+        bosch_product = Product.objects.create(
+            title="دریل بوش",
+            category=self.category,
+            brand=bosch,
+            price=1000,
+            is_active=True,
+        )
+        section = create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=ronix
+        )
+
+        update_section(section, brand=bosch)
+
+        response = self.client.get("/api/home/sections")
+        data = response.data["data"]["sections"][0]["data"]
+        self.assertEqual([item["id"] for item in data["products"]], [bosch_product.id])
+        self.assertEqual(data["brand"]["slug"], "bosch")
+
+    def test_brand_row_does_not_issue_one_query_per_product(self):
+        """محافظ N+1: افزودن محصول نباید تعداد کوئری‌ها را بالا ببرد"""
+        brand = Brand.objects.create(name="رونیکس", slug="ronix")
+        create_section(
+            section_type=HomepageSection.SectionType.BRAND_PRODUCTS, brand=brand
+        )
+
+        def add_products(count, offset):
+            for index in range(count):
+                Product.objects.create(
+                    title=f"رونیکس {offset + index}",
+                    category=self.category,
+                    brand=brand,
+                    price=1000,
+                    is_active=True,
+                )
+
+        add_products(2, 0)
+        with CaptureQueriesContext(connection) as few:
+            self.client.get("/api/home/sections")
+
+        add_products(4, 2)
+        with CaptureQueriesContext(connection) as many:
+            response = self.client.get("/api/home/sections")
+
+        self.assertEqual(
+            len(response.data["data"]["sections"][0]["data"]["products"]), 6
+        )
+        self.assertEqual(len(many.captured_queries), len(few.captured_queries))
 
     def test_all_products_section_can_be_moved_like_any_other(self):
         """جای بخش از پنل مدیریت عوض می‌شود — همان مسیر بقیه‌ی بخش‌ها"""
