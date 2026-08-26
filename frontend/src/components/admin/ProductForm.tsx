@@ -24,6 +24,8 @@ type FormState = {
   badge: string;
   description: string;
   warranty: string;
+  shippingNote: string;
+  returnNote: string;
 };
 
 const EMPTY: FormState = {
@@ -37,6 +39,8 @@ const EMPTY: FormState = {
   badge: "",
   description: "",
   warranty: "",
+  shippingNote: "",
+  returnNote: "",
 };
 
 function inputCls(hasError = false) {
@@ -167,6 +171,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
               badge: p.badge ?? "",
               description: p.description ?? "",
               warranty: p.warranty ?? "",
+              shippingNote: p.shippingNote ?? "",
+              returnNote: p.returnNote ?? "",
             });
             setSpecifications(draftsFromProduct(p.specifications));
             setRecommendedProducts(p.recommendedProducts ?? []);
@@ -226,6 +232,8 @@ export default function ProductForm({ productId }: { productId?: number }) {
       badge: form.badge.trim(),
       description: form.description.trim(),
       warranty: form.warranty.trim(),
+      shippingNote: form.shippingNote.trim(),
+      returnNote: form.returnNote.trim(),
       specifications: specifications.map((specification, position) => ({
         keyId: specification.key!.id,
         value: specification.value.trim(),
@@ -522,6 +530,33 @@ export default function ProductForm({ productId }: { productId?: number }) {
                 onChange={(e) => set("badge", e.target.value)}
                 className={inputCls()}
                 placeholder="پرفروش / تخفیف ویژه"
+              />
+            </div>
+          </div>
+          {/* دو خط اطلاع‌رسانی جعبه‌ی خرید — خالی یعنی آن خط نمایش داده نمی‌شود */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                متن ارسال
+              </label>
+              <input
+                value={form.shippingNote}
+                onChange={(e) => set("shippingNote", e.target.value)}
+                className={inputCls()}
+                maxLength={100}
+                placeholder="اختیاری — مثلا: ارسال به سراسر کشور"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                متن بازگشت کالا
+              </label>
+              <input
+                value={form.returnNote}
+                onChange={(e) => set("returnNote", e.target.value)}
+                className={inputCls()}
+                maxLength={100}
+                placeholder="اختیاری — مثلا: ۷ روز ضمانت بازگشت کالا"
               />
             </div>
           </div>

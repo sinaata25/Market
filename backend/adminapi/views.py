@@ -825,6 +825,12 @@ class ProductWriteSerializer(serializers.Serializer):
     warranty = serializers.CharField(
         max_length=100, required=False, allow_blank=True, default=""
     )
+    shippingNote = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
+    returnNote = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
     specifications = ProductSpecificationWriteSerializer(
         many=True, required=False, allow_empty=True, max_length=100
     )

@@ -28,6 +28,9 @@ export type Product = {
   specifications?: ProductSpecification[];
   description?: string;
   warranty?: string;
+  // دو خط اطلاع‌رسانی جعبه‌ی خرید — اختیاری و بدون پیش‌فرض
+  shippingNote?: string;
+  returnNote?: string;
   stock?: number;
   isActive?: boolean;
   // انتخاب دستی مدیر برای بخش «پرفروش‌ترین‌ها» — مستقل از rating/ratingCount واقعی
