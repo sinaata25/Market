@@ -48,7 +48,8 @@ export default function Header() {
         </div>
       </div>
 
-      {/* نوار دسته‌بندی */}
+      {/* نوار دسته‌بندی — در صفحه‌های کوچک فقط دسته‌بندی‌ها و برندها
+          نمایش داده می‌شوند؛ بقیه‌ی لینک‌ها از lg به بالا اضافه می‌شوند */}
       <nav className="border-b border-slate-100 bg-white">
         <div className="site-container">
           <div className="flex w-full flex-wrap items-center justify-center gap-x-1 py-1 text-sm sm:gap-x-2 sm:py-1.5 lg:flex-nowrap lg:justify-start">
@@ -59,32 +60,32 @@ export default function Header() {
 
             <Link
               href="/incredible"
-              className="flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-accent-700 transition hover:bg-accent-50"
+              className="hidden min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 font-medium text-accent-700 transition hover:bg-accent-50 lg:flex"
             >
               ⚡ شگفت‌انگیزها
             </Link>
             <Link
               href="/discounts"
-              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:flex"
             >
               تخفیف‌ها
             </Link>
             <Link
               href="/best-sellers"
-              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:flex"
             >
               پرفروش‌ترین‌ها
             </Link>
             <Link
               href="/blog"
-              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:flex"
             >
               وبلاگ کشاورزی
             </Link>
 
             <Link
               href="/support"
-              className="flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:mr-auto"
+              className="hidden min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 lg:mr-auto lg:flex"
             >
               سوالی دارید؟
             </Link>
