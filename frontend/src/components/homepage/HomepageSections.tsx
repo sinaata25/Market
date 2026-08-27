@@ -9,7 +9,7 @@ import type {
 } from "@/lib/homepage";
 import { bannerImageSources } from "@/lib/banner-image";
 import { sectionAllLink } from "@/lib/homepage-links";
-import RecentlyViewedSection from "@/components/homepage/RecentlyViewedSection";
+import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 import AllProductsSection from "@/components/homepage/AllProductsSection";
 
 const BANNER_THEMES: Record<HomepageBanner["theme"], string> = {

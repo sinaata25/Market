@@ -17,6 +17,7 @@ import FavoriteButton from "@/components/product/FavoriteButton";
 import CompareButton from "@/components/product/CompareButton";
 import JsonLd from "@/components/seo/JsonLd";
 import RecentlyViewedTracker from "@/components/product/RecentlyViewedTracker";
+import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 
 // موجودی و امتیاز لحظه‌ای از دیتابیس خوانده می‌شود
 export const dynamic = "force-dynamic";
@@ -256,6 +257,11 @@ export default async function ProductPage({
           </ProductGrid>
         </section>
       )}
+
+      <RecentlyViewedSection
+        excludeProductId={product.id}
+        className="mt-10"
+      />
     </div>
   );
 }

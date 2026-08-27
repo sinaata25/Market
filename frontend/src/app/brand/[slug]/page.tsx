@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
 import ProductGrid from "@/components/product/ProductGrid";
+import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 import { getBrands, getProducts } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
@@ -221,6 +222,8 @@ export default async function BrandPage({
           </div>
         </section>
       )}
+
+      <RecentlyViewedSection className="mt-12" />
     </div>
   );
 }

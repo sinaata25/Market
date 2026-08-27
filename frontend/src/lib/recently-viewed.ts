@@ -11,7 +11,9 @@ export function parseRecentlyViewedIds(raw: string | null): number[] {
     if (!Array.isArray(parsed)) return [];
     const ids = parsed.filter(
       (value): value is number =>
-        Number.isInteger(value) && typeof value === "number" && value > 0
+        typeof value === "number" &&
+        Number.isSafeInteger(value) &&
+        value > 0
     );
     return [...new Set(ids)].slice(0, MAX_RECENTLY_VIEWED);
   } catch {
@@ -23,7 +25,7 @@ export function nextRecentlyViewedIds(
   current: number[],
   productId: number
 ): number[] {
-  if (!Number.isInteger(productId) || productId < 1) return current;
+  if (!Number.isSafeInteger(productId) || productId < 1) return current;
   return [productId, ...current.filter((id) => id !== productId)].slice(
     0,
     MAX_RECENTLY_VIEWED
@@ -43,7 +45,9 @@ export function replaceRecentlyViewedIds(ids: number[]): void {
   if (typeof window === "undefined") return;
   const normalized = parseRecentlyViewedIds(JSON.stringify(ids));
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    const serialized = JSON.stringify(normalized);
+    if (window.localStorage.getItem(STORAGE_KEY) === serialized) return;
+    window.localStorage.setItem(STORAGE_KEY, serialized);
     window.dispatchEvent(new CustomEvent(UPDATED_EVENT));
   } catch {
     // Storage can be disabled or full; browsing must continue normally.
@@ -57,6 +61,7 @@ export function recordRecentlyViewed(productId: number): void {
 export function clearRecentlyViewed(): void {
   if (typeof window === "undefined") return;
   try {
+    if (window.localStorage.getItem(STORAGE_KEY) === null) return;
     window.localStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new CustomEvent(UPDATED_EVENT));
   } catch {
@@ -65,10 +70,29 @@ export function clearRecentlyViewed(): void {
 }
 
 export function subscribeRecentlyViewed(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === STORAGE_KEY) callback();
+  };
   window.addEventListener(UPDATED_EVENT, callback);
-  window.addEventListener("storage", callback);
+  window.addEventListener("storage", handleStorage);
   return () => {
     window.removeEventListener(UPDATED_EVENT, callback);
-    window.removeEventListener("storage", callback);
+    window.removeEventListener("storage", handleStorage);
   };
+}
+
+export function visibleRecentlyViewedProducts<T extends { id: number }>(
+  products: T[],
+  excludeProductId: number | undefined,
+  limit: number
+): T[] {
+  const safeLimit =
+    Number.isSafeInteger(limit) && limit > 0
+      ? Math.min(limit, MAX_RECENTLY_VIEWED)
+      : MAX_RECENTLY_VIEWED;
+  return products
+    .filter((product) => product.id !== excludeProductId)
+    .slice(0, safeLimit);
 }

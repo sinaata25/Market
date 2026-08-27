@@ -5,6 +5,7 @@ import { breadcrumbSchema, fetchSeo, toMetadata } from "@/lib/seo";
 import ProductCard from "@/components/product/ProductCard";
 import ProductGrid from "@/components/product/ProductGrid";
 import JsonLd from "@/components/seo/JsonLd";
+import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 
 // داده‌ها از دیتابیس (جنگو) خوانده می‌شوند
 export const dynamic = "force-dynamic";
@@ -351,6 +352,8 @@ export default async function CategoryPage({
             ))}
         </div>
       </section>
+
+      <RecentlyViewedSection className="mt-12" />
     </div>
   );
 }

@@ -10,15 +10,24 @@ import {
   getRecentlyViewedIds,
   replaceRecentlyViewedIds,
   subscribeRecentlyViewed,
+  visibleRecentlyViewedProducts,
 } from "@/lib/recently-viewed";
 
+type RecentlyViewedSectionProps = {
+  title?: string;
+  limit?: number;
+  excludeProductId?: number;
+  className?: string;
+};
+
+const DEFAULT_VISIBLE_PRODUCTS = 5;
+
 export default function RecentlyViewedSection({
-  title,
-  limit,
-}: {
-  title: string;
-  limit: number;
-}) {
+  title = "محصولات اخیراً مشاهده‌شده",
+  limit = DEFAULT_VISIBLE_PRODUCTS,
+  excludeProductId,
+  className = "",
+}: RecentlyViewedSectionProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const requestId = useRef(0);
 
@@ -29,6 +38,7 @@ export default function RecentlyViewedSection({
       setProducts([]);
       return;
     }
+
     const result = await api.get<{ items: Product[] }>(
       `/api/products/by-ids?ids=${ids.join(",")}`
     );
@@ -37,15 +47,22 @@ export default function RecentlyViewedSection({
       setProducts([]);
       return;
     }
+
     const currentProducts = result.data.items;
-    setProducts(currentProducts.slice(0, limit));
     const validIds = currentProducts.map((product) => product.id);
-    if (validIds.length !== ids.length) {
+    setProducts(currentProducts);
+
+    // Keep the current product in history while removing deleted/inactive IDs.
+    if (
+      validIds.length !== ids.length ||
+      validIds.some((productId, index) => productId !== ids[index])
+    ) {
       replaceRecentlyViewedIds(validIds);
     }
-  }, [limit]);
+  }, []);
 
   useEffect(() => {
+    // Deferring the first read lets the product-page tracker record its ID first.
     const timer = window.setTimeout(() => void load(), 0);
     const unsubscribe = subscribeRecentlyViewed(() => void load());
     return () => {
@@ -55,10 +72,15 @@ export default function RecentlyViewedSection({
     };
   }, [load]);
 
-  if (products.length === 0) return null;
+  const visibleProducts = visibleRecentlyViewedProducts(
+    products,
+    excludeProductId,
+    limit
+  );
+  if (visibleProducts.length === 0) return null;
 
   return (
-    <section className="min-w-0">
+    <section className={`min-w-0 ${className}`}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-slate-800">{title}</h2>
         <button
@@ -73,7 +95,7 @@ export default function RecentlyViewedSection({
         </button>
       </div>
       <ProductRail>
-        {products.map((product) => (
+        {visibleProducts.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </ProductRail>

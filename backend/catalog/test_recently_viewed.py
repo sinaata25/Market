@@ -53,11 +53,15 @@ class ProductBulkApiTests(TestCase):
 
     def test_bulk_endpoint_validates_ids_and_limit(self):
         malformed = self.client.get("/api/products/by-ids?ids=1,nope")
+        oversized = self.client.get(
+            "/api/products/by-ids?ids=999999999999999999999999999999"
+        )
         too_many = self.client.get(
             "/api/products/by-ids?ids=" + ",".join(str(i) for i in range(1, 17))
         )
 
         self.assertEqual(malformed.status_code, 422)
+        self.assertEqual(oversized.status_code, 422)
         self.assertEqual(too_many.status_code, 422)
 
     def test_bulk_endpoint_uses_a_constant_number_of_product_queries(self):

@@ -176,6 +176,7 @@ class ProductBulkView(APIView):
     """Current public product DTOs for up to 15 IDs, preserving request order."""
 
     MAX_IDS = 15
+    MAX_PRODUCT_ID = 9_223_372_036_854_775_807
 
     def get(self, request):
         raw_ids = request.query_params.get("ids", "")
@@ -188,7 +189,10 @@ class ProductBulkView(APIView):
             ids = [int(part) for part in parts]
         except ValueError:
             return fail("شناسه محصولات نامعتبر است", 422)
-        if any(product_id < 1 for product_id in ids):
+        if any(
+            product_id < 1 or product_id > self.MAX_PRODUCT_ID
+            for product_id in ids
+        ):
             return fail("شناسه محصولات نامعتبر است", 422)
 
         # Deduplicate without changing the visitor's newest-first order.
