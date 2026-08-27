@@ -144,6 +144,29 @@ class BlogApiTests(TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertFalse(response.data["ok"])
 
+    def test_search_normalizes_persian_and_searches_related_taxonomies(self):
+        self.published.title = "راهنمای کشاورزی مدل 12"
+        self.published.save()
+
+        for query in ("كشاورزي", "۱۲", self.category.name, self.tag.name):
+            with self.subTest(query=query):
+                response = self.client.get("/api/blog/posts", {"search": query})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["data"]["total"], 1)
+                self.assertEqual(
+                    response.data["data"]["items"][0]["id"], self.published.id
+                )
+
+    def test_public_and_admin_search_reject_oversized_input(self):
+        query = "x" * 201
+        public = self.client.get("/api/blog/posts", {"search": query})
+        admin = self.admin_client().get(
+            "/api/admin/blog/posts", {"search": query}
+        )
+
+        self.assertEqual(public.status_code, 422)
+        self.assertEqual(admin.status_code, 422)
+
     def test_public_taxonomies_only_include_values_used_by_visible_posts(self):
         categories = self.client.get("/api/blog/categories")
         tags = self.client.get("/api/blog/tags")

@@ -4,6 +4,7 @@ import json
 
 from catalog.models import Category, Product
 from catalog.category_tree import visible_category_ids
+from common.search import filter_by_search, normalize_search_text
 
 from .models import PageMeta, SeoSettings
 
@@ -18,6 +19,95 @@ STATIC_PAGES = [
     {"key": "/login", "title": "ورود | ثبت‌نام"},
     {"key": "/cart", "title": "سبد خرید"},
 ]
+
+
+def page_inventory(
+    *, search: str = "", page_type: str = "", page: int = 1, per_page: int = 20
+) -> tuple[list[dict], int]:
+    """Return one database-backed slice of the SEO-manageable page inventory."""
+
+    normalized_search = normalize_search_text(search)
+    tokens = normalized_search.split(" ") if normalized_search else []
+    sources: list[tuple[int, object]] = []
+
+    if page_type in ("", "static"):
+        static_rows = [
+            {
+                "pageType": "static",
+                "objectKey": item["key"],
+                "title": item["title"],
+                "path": item["key"],
+            }
+            for item in STATIC_PAGES
+            if not tokens
+            or all(
+                token
+                in normalize_search_text(f'{item["title"]} {item["key"]}')
+                for token in tokens
+            )
+        ]
+        sources.append((len(static_rows), static_rows))
+
+    if page_type in ("", "category"):
+        categories = Category.objects.only("id", "slug", "title").order_by("id")
+        if normalized_search:
+            categories = filter_by_search(
+                categories, normalized_search, fields=("title", "slug")
+            )
+        sources.append((categories.count(), categories))
+
+    if page_type in ("", "product"):
+        products = Product.objects.only("id", "title", "created_at").order_by(
+            "-created_at", "-id"
+        )
+        if normalized_search:
+            products = filter_by_search(
+                products,
+                normalized_search,
+                fields=("title", "title_en"),
+                include_pk=True,
+            )
+        sources.append((products.count(), products))
+
+    total = sum(count for count, _source in sources)
+    start = (page - 1) * per_page
+    remaining = per_page
+    rows: list[dict] = []
+
+    for count, source in sources:
+        if remaining <= 0:
+            break
+        if start >= count:
+            start -= count
+            continue
+        take = min(remaining, count - start)
+        selected = source[start : start + take]
+        if isinstance(source, list):
+            rows.extend(selected)
+        elif source.model is Category:
+            rows.extend(
+                {
+                    "pageType": "category",
+                    "objectKey": category.slug,
+                    "title": category.title,
+                    "path": f"/category/{category.slug}",
+                }
+                for category in selected
+            )
+        else:
+            rows.extend(
+                {
+                    "pageType": "product",
+                    "objectKey": str(product.id),
+                    "title": product.title,
+                    "path": f"/product/{product.id}",
+                }
+                for product in selected
+            )
+        remaining -= take
+        start = 0
+
+    return rows, total
 
 
 def all_pages() -> list[dict]:

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { EmptyRow, faDateTime, faNum, Pager } from "@/components/admin/ui";
 import type { BlogPost } from "@/lib/blog-types";
 import { api } from "@/lib/client-api";
+import { useDebouncedValue } from "@/components/admin/useDebouncedValue";
 
 const STATUS = {
   DRAFT: { label: "پیش‌نویس", className: "bg-amber-50 text-amber-700" },
@@ -20,24 +21,41 @@ export default function AdminBlogPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const requestId = useRef(0);
+  const debouncedSearch = useDebouncedValue(search);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
+    if (search !== debouncedSearch) return;
+    const currentRequest = ++requestId.current;
+    await Promise.resolve();
+    if (currentRequest !== requestId.current) return;
+    setLoading(true);
+    setLoadError("");
     const query = new URLSearchParams({ page: String(page) });
-    if (search.trim()) query.set("search", search.trim());
+    if (debouncedSearch.trim()) query.set("search", debouncedSearch.trim());
     if (status) query.set("status", status);
-    api.get<{ posts: BlogPost[]; pages: number; total: number }>(`/api/admin/blog/posts?${query}`).then((result) => {
-      if (result.ok && result.data) {
-        setPosts(result.data.posts);
-        setPages(result.data.pages);
-        setTotal(result.data.total);
-      } else {
-        setMessage(result.error ?? "دریافت نوشته‌ها انجام نشد");
-      }
-      setLoading(false);
-    });
-  }, [page, search, status]);
+    const result = await api.get<{
+      posts: BlogPost[];
+      pages: number;
+      total: number;
+    }>(`/api/admin/blog/posts?${query}`);
+    if (currentRequest !== requestId.current) return;
+    if (result.ok && result.data) {
+      setPosts(result.data.posts);
+      setPages(result.data.pages);
+      setTotal(result.data.total);
+    } else {
+      setPosts([]);
+      setLoadError(result.error ?? "دریافت نوشته‌ها انجام نشد");
+    }
+    setLoading(false);
+  }, [page, search, debouncedSearch, status]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   function notify(text: string) {
     setMessage(text);
@@ -73,8 +91,8 @@ export default function AdminBlogPage() {
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-100 bg-white p-3">
-        <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="جستجوی نوشته..." className="w-full min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs outline-none focus:border-brand-400 sm:min-w-48" />
-        <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none">
+        <input type="search" maxLength={200} value={search} onChange={(event) => { requestId.current += 1; setLoading(true); setSearch(event.target.value); setPage(1); }} placeholder="جستجوی نوشته..." className="w-full min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs outline-none focus:border-brand-400 sm:min-w-48" />
+        <select value={status} onChange={(event) => { requestId.current += 1; setLoading(true); setStatus(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none">
           <option value="">همه وضعیت‌ها</option>
           <option value="DRAFT">پیش‌نویس</option>
           <option value="PUBLISHED">منتشرشده</option>
@@ -89,7 +107,7 @@ export default function AdminBlogPage() {
             <th className="px-5 py-3 font-medium">عنوان</th><th className="px-3 py-3 font-medium">دسته</th><th className="px-3 py-3 font-medium">وضعیت</th><th className="px-3 py-3 font-medium">زمان انتشار</th><th className="px-5 py-3 font-medium">عملیات</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-50">
-            {loading ? <EmptyRow colSpan={5} text="در حال بارگذاری..." /> : posts.length === 0 ? <EmptyRow colSpan={5} text="نوشته‌ای یافت نشد" /> : posts.map((post) => {
+            {loading ? <EmptyRow colSpan={5} text="در حال بارگذاری..." /> : loadError ? <EmptyRow colSpan={5} text={loadError} /> : posts.length === 0 ? <EmptyRow colSpan={5} text="نوشته‌ای یافت نشد" /> : posts.map((post) => {
               const badge = STATUS[post.status];
               return (
                 <tr key={post.id} className="hover:bg-slate-50/60">
@@ -109,7 +127,7 @@ export default function AdminBlogPage() {
           </tbody>
         </table>
       </div>
-      <Pager page={page} pages={pages} onPage={setPage} />
+      <Pager page={page} pages={pages} onPage={(nextPage) => { requestId.current += 1; setLoading(true); setPage(nextPage); }} />
     </div>
   );
 }

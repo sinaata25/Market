@@ -20,19 +20,26 @@ export default function ProductRecommendationPicker({
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const requestId = useRef(0);
 
   useEffect(() => {
     const currentRequest = ++requestId.current;
     const timer = window.setTimeout(() => {
       setLoading(true);
+      setError("");
       const query = new URLSearchParams({ page: "1" });
       if (search.trim()) query.set("search", search.trim());
       api
         .get<{ products: Product[] }>(`/api/admin/products?${query}`)
         .then((result) => {
           if (requestId.current !== currentRequest) return;
-          setResults(result.ok ? (result.data?.products ?? []) : []);
+          if (result.ok) {
+            setResults(result.data?.products ?? []);
+          } else {
+            setResults([]);
+            setError(result.error ?? "جستجوی محصولات انجام نشد");
+          }
           setLoading(false);
         });
     }, 250);
@@ -49,6 +56,7 @@ export default function ProductRecommendationPicker({
 
   function add(product: Product) {
     if (disabled || selected.length >= MAX_RECOMMENDATIONS) return;
+    requestId.current += 1;
     onChange([...selected, product]);
     setSearch("");
   }
@@ -116,8 +124,16 @@ export default function ProductRecommendationPicker({
           جستجو و انتخاب محصول
         </span>
         <input
+          type="search"
+          maxLength={200}
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            requestId.current += 1;
+            setSearch(event.target.value);
+            setLoading(true);
+            setError("");
+            setResults([]);
+          }}
           disabled={disabled || selected.length >= MAX_RECOMMENDATIONS}
           placeholder={
             selected.length >= MAX_RECOMMENDATIONS
@@ -132,6 +148,8 @@ export default function ProductRecommendationPicker({
         <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-100">
           {loading ? (
             <p className="p-4 text-center text-xs text-slate-400">در حال جستجو...</p>
+          ) : error ? (
+            <p className="p-4 text-center text-xs text-red-500">{error}</p>
           ) : candidates.length === 0 ? (
             <p className="p-4 text-center text-xs text-slate-400">
               محصول دیگری یافت نشد

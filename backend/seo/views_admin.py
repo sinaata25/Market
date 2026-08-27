@@ -4,6 +4,7 @@
 ``accounts.permissions.is_seo_admin`` متمرکز شده است.
 """
 
+import math
 import time
 
 import requests as http
@@ -13,6 +14,7 @@ from rest_framework.views import APIView
 from accounts.permissions import SeoAdminRequiredMixin
 from catalog.models import ProductImage
 from common.responses import fail, ok
+from common.search import SearchQueryTooLong
 
 from .models import (
     MetaRevision,
@@ -27,6 +29,7 @@ from .services import (
     meta_dto,
     meta_to_snapshot,
     parse_schema_custom,
+    page_inventory,
     settings_dto,
 )
 
@@ -77,11 +80,38 @@ class SeoOverviewView(SeoAdminRequiredMixin, APIView):
 
 class SeoPagesView(SeoAdminRequiredMixin, APIView):
     def get(self, request):
+        page_type = request.query_params.get("type", "")
+        if page_type not in ("", "static", "category", "product"):
+            return fail("نوع صفحه نامعتبر است", 422)
+        try:
+            page = int(request.query_params.get("page", 1))
+            if not 1 <= page <= 1_000_000:
+                raise ValueError
+        except (TypeError, ValueError):
+            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
+        per_page = 20
+        try:
+            inventory, total = page_inventory(
+                search=request.query_params.get("search", ""),
+                page_type=page_type,
+                page=page,
+                per_page=per_page,
+            )
+        except SearchQueryTooLong as exc:
+            return fail(str(exc), 422)
+
+        inventory_keys = {
+            (item["pageType"], item["objectKey"]) for item in inventory
+        }
         metas = {
-            (m.page_type, m.object_key): m for m in PageMeta.objects.all()
+            (m.page_type, m.object_key): m
+            for m in PageMeta.objects.filter(
+                page_type__in={key[0] for key in inventory_keys},
+                object_key__in={key[1] for key in inventory_keys},
+            )
         }
         rows = []
-        for p in all_pages():
+        for p in inventory:
             meta = metas.get((p["pageType"], p["objectKey"]))
             rows.append(
                 {
@@ -96,7 +126,14 @@ class SeoPagesView(SeoAdminRequiredMixin, APIView):
                     "slug": meta.slug if meta else "",
                 }
             )
-        return ok({"pages": rows})
+        return ok(
+            {
+                "pages": rows,
+                "total": total,
+                "page": page,
+                "pagesCount": math.ceil(total / per_page) or 1,
+            }
+        )
 
 
 class MetaSerializer(serializers.Serializer):

@@ -8,7 +8,8 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from rest_framework.test import APIClient
 
-from catalog.models import Category, Product, ProductComment
+from catalog.models import Brand, Category, Product, ProductComment
+from orders.models import Order
 
 
 PRODUCT_RESPONSE_KEYS = {
@@ -74,6 +75,78 @@ class AdminApiContractTests(TestCase):
 
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.data["ok"], False)
+
+    def test_admin_product_search_uses_related_fields_and_persian_normalization(self):
+        brand = Brand.objects.create(name="Ronix", slug="ronix")
+        category = Category.objects.create(
+            slug="farming", title="کشاورزی حرفه‌ای"
+        )
+        product = Product.objects.create(
+            title="پمپ مدل 12",
+            title_en="Water Pump",
+            category=category,
+            brand=brand,
+            price=100,
+            is_active=False,
+        )
+        product.categories.add(category)
+
+        for query in ("WATER", "ronix", "كشاورزي", "۱۲", str(product.id)):
+            with self.subTest(query=query):
+                response = self.client.get(
+                    "/api/admin/products", {"search": query}
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["data"]["total"], 1)
+                self.assertEqual(
+                    response.data["data"]["products"][0]["id"], product.id
+                )
+
+    def test_admin_order_and_user_search_normalize_digits_and_preserve_filters(self):
+        customer = get_user_model().objects.create_user(
+            phone="09123456789", name="علی کشاورز"
+        )
+        order = Order.objects.create(
+            code="TW-1200",
+            status=Order.Status.PAID,
+            user=customer,
+            full_name="علی کشاورز",
+            phone=customer.phone,
+            province="تهران",
+            city="تهران",
+            address="نشانی آزمایشی",
+            items_price=100,
+            total_price=100,
+        )
+
+        user_response = self.client.get(
+            "/api/admin/users", {"search": "۰۹۱۲۳۴۵۶۷۸۹"}
+        )
+        order_response = self.client.get(
+            "/api/admin/orders",
+            {"search": "tw ۱۲۰۰", "status": Order.Status.PAID},
+        )
+
+        self.assertEqual(user_response.status_code, 200)
+        self.assertEqual(user_response.data["data"]["users"][0]["id"], customer.id)
+        self.assertEqual(order_response.status_code, 200)
+        self.assertEqual(order_response.data["data"]["orders"][0]["id"], order.id)
+
+    def test_admin_search_endpoints_reject_oversized_queries(self):
+        for endpoint in (
+            "/api/admin/products",
+            "/api/admin/orders",
+            "/api/admin/users",
+            "/api/admin/specifications",
+        ):
+            with self.subTest(endpoint=endpoint):
+                response = self.client.get(endpoint, {"search": "x" * 201})
+                self.assertEqual(response.status_code, 422)
+
+        bad_limit = self.client.get(
+            "/api/admin/specifications", {"limit": "not-a-number"}
+        )
+        self.assertEqual(bad_limit.status_code, 422)
 
     def test_product_create_and_list_use_current_contract(self):
         created = self.client.post(

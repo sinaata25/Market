@@ -11,6 +11,8 @@ from django.db.utils import IntegrityError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from catalog.models import Category, Product
+
 from .models import PageMeta, Redirect, SeoSettings
 
 User = get_user_model()
@@ -112,6 +114,52 @@ class SeoPanelAccessTests(SeoRoleTestMixin, TestCase):
             with self.subTest(method=method, url=url):
                 response = call(client, method, url, payload)
                 self.assertLess(response.status_code, 400, response.data)
+
+    def test_page_inventory_search_is_server_paginated_and_normalized(self):
+        category = Category.objects.create(slug="farming", title="کشاورزی")
+        Product.objects.bulk_create(
+            [
+                Product(title=f"پمپ کشاورزی {index}", category=category, price=100)
+                for index in range(25)
+            ]
+        )
+        client = self.client_for(self.seo_admin)
+
+        first = client.get(
+            "/api/admin/seo/pages",
+            {"type": "product", "search": "كشاورزي", "page": 1},
+        )
+        second = client.get(
+            "/api/admin/seo/pages",
+            {"type": "product", "search": "كشاورزي", "page": 2},
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.data["data"]["total"], 25)
+        self.assertEqual(first.data["data"]["pagesCount"], 2)
+        self.assertEqual(len(first.data["data"]["pages"]), 20)
+        self.assertEqual(len(second.data["data"]["pages"]), 5)
+        self.assertTrue(
+            all(
+                row["pageType"] == "product"
+                for row in first.data["data"]["pages"]
+            )
+        )
+
+    def test_page_inventory_rejects_malformed_search_parameters(self):
+        client = self.client_for(self.seo_admin)
+
+        too_long = client.get(
+            "/api/admin/seo/pages", {"search": "x" * 201}
+        )
+        bad_type = client.get("/api/admin/seo/pages", {"type": "private"})
+        huge_page = client.get(
+            "/api/admin/seo/pages", {"page": "9" * 100}
+        )
+
+        self.assertEqual(too_long.status_code, 422)
+        self.assertEqual(bad_type.status_code, 422)
+        self.assertEqual(huge_page.status_code, 422)
 
     def test_every_other_role_is_rejected_from_every_seo_endpoint(self):
         for role, client in self.denied_roles.items():

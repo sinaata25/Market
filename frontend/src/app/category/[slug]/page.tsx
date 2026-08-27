@@ -28,15 +28,21 @@ const SORTS = [
 ] as const;
 
 type Search = {
-  sort?: string;
-  page?: string;
-  search?: string;
-  discounted?: string;
+  sort?: string | string[];
+  page?: string | string[];
+  search?: string | string[];
+  discounted?: string | string[];
 };
 
+type CleanSearch = { [Key in keyof Search]?: string };
+
+function single(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 // ساخت آدرس با حفظ بقیه‌ی پارامترها
-function buildUrl(slug: string, params: Search, patch: Partial<Search>) {
-  const merged: Search = { ...params, ...patch };
+function buildUrl(slug: string, params: CleanSearch, patch: Partial<CleanSearch>) {
+  const merged = { ...params, ...patch };
   const qs = new URLSearchParams();
   if (merged.sort && merged.sort !== "newest") qs.set("sort", merged.sort);
   if (merged.search) qs.set("search", merged.search);
@@ -55,31 +61,62 @@ export default async function CategoryPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
+  const current: CleanSearch = {
+    sort: single(sp.sort),
+    page: single(sp.page),
+    search: single(sp.search)?.trim().slice(0, 200),
+    discounted: single(sp.discounted),
+  };
 
-  const categories = await getCategories();
+  const categoriesResult = await Promise.allSettled([getCategories()]);
+  if (categoriesResult[0].status === "rejected") {
+    return (
+      <div className="site-shell py-12">
+        <div className="rounded-3xl border border-red-100 bg-red-50 px-6 py-16 text-center">
+          <span className="text-5xl" aria-hidden>📡</span>
+          <h1 className="mt-4 font-bold text-slate-700">دریافت دسته‌بندی ممکن نشد</h1>
+          <p className="mt-2 text-sm text-slate-500">لطفاً چند لحظه دیگر دوباره تلاش کنید.</p>
+        </div>
+      </div>
+    );
+  }
+  const categories = categoriesResult[0].value;
   const category = categories.find((c) => c.slug === slug);
   if (!category) notFound();
 
-  const sort = (SORTS.some((s) => s.key === sp.sort) ? sp.sort : "newest") as
+  const sort = (SORTS.some((s) => s.key === current.sort) ? current.sort : "newest") as
     | "newest"
     | "popular"
     | "cheapest"
     | "expensive";
-  const page = Math.max(1, Number(sp.page) || 1);
-  const onlyDiscounted = sp.discounted === "1";
-  const search = sp.search?.trim() || undefined;
+  const rawPage = Number(current.page);
+  const page =
+    Number.isSafeInteger(rawPage) && rawPage >= 1 && rawPage <= 1_000_000
+      ? rawPage
+      : 1;
+  current.page = String(page);
+  const onlyDiscounted = current.discounted === "1";
+  const search = current.search || undefined;
 
-  const result = await getProducts({
-    categorySlug: slug,
-    sort,
-    page,
-    perPage: 12,
-    search,
-    onlyDiscounted,
-  });
+  const [productsResult, seoResult] = await Promise.allSettled([
+    getProducts({
+      categorySlug: slug,
+      sort,
+      page,
+      perPage: 12,
+      search,
+      onlyDiscounted,
+    }),
+    fetchSeo("category", slug),
+  ]);
+  const productsFailed = productsResult.status === "rejected";
+  const result =
+    productsResult.status === "fulfilled"
+      ? productsResult.value
+      : { items: [], total: 0, page, perPage: 12, pages: 0 };
 
   const hasFilter = Boolean(search) || onlyDiscounted;
-  const seo = await fetchSeo("category", slug);
+  const seo = seoResult.status === "fulfilled" ? seoResult.value : null;
 
   return (
     <div className="site-shell py-6">
@@ -149,7 +186,7 @@ export default async function CategoryPage({
         {SORTS.map((s) => (
           <Link
             key={s.key}
-            href={buildUrl(slug, sp, { sort: s.key, page: "1" })}
+            href={buildUrl(slug, current, { sort: s.key, page: "1" })}
             className={`rounded-lg px-3 py-1.5 text-xs transition ${
               sort === s.key
                 ? "bg-brand-50 font-bold text-brand-700"
@@ -163,7 +200,7 @@ export default async function CategoryPage({
         <span className="mx-2 hidden h-5 w-px bg-slate-200 sm:block" />
 
         <Link
-          href={buildUrl(slug, sp, {
+          href={buildUrl(slug, current, {
             discounted: onlyDiscounted ? undefined : "1",
             page: "1",
           })}
@@ -194,7 +231,7 @@ export default async function CategoryPage({
           <span className="text-slate-400">فیلترهای فعال:</span>
           {search && (
             <Link
-              href={buildUrl(slug, sp, { search: undefined, page: "1" })}
+              href={buildUrl(slug, current, { search: undefined, page: "1" })}
               className="flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-brand-700 transition hover:bg-brand-100"
             >
               {search} <span className="text-sm leading-none">×</span>
@@ -202,7 +239,7 @@ export default async function CategoryPage({
           )}
           {onlyDiscounted && (
             <Link
-              href={buildUrl(slug, sp, { discounted: undefined, page: "1" })}
+              href={buildUrl(slug, current, { discounted: undefined, page: "1" })}
               className="flex items-center gap-1.5 rounded-full bg-accent-50 px-3 py-1.5 text-accent-700 transition hover:bg-accent-100"
             >
               تخفیف‌دار <span className="text-sm leading-none">×</span>
@@ -218,7 +255,13 @@ export default async function CategoryPage({
       )}
 
       {/* گرید محصولات */}
-      {result.items.length > 0 ? (
+      {productsFailed ? (
+        <div className="rounded-3xl border border-red-100 bg-red-50 px-6 py-16 text-center">
+          <span className="mb-4 block text-5xl" aria-hidden>📡</span>
+          <h2 className="font-bold text-slate-700">دریافت نتایج جستجو ممکن نشد</h2>
+          <p className="mt-2 text-sm text-slate-500">لطفاً چند لحظه دیگر دوباره تلاش کنید.</p>
+        </div>
+      ) : result.items.length > 0 ? (
         <ProductGrid>
           {result.items.map((p) => (
             <ProductCard key={p.id} product={p} />
@@ -247,7 +290,7 @@ export default async function CategoryPage({
         <nav className="mt-8 flex flex-wrap items-center justify-center gap-1.5" aria-label="صفحه‌بندی محصولات">
           {page > 1 && (
             <Link
-              href={buildUrl(slug, sp, { page: String(page - 1) })}
+              href={buildUrl(slug, current, { page: String(page - 1) })}
               className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-brand-400 hover:text-brand-700"
             >
               →
@@ -256,7 +299,7 @@ export default async function CategoryPage({
           {Array.from({ length: result.pages }, (_, i) => i + 1).map((n) => (
             <Link
               key={n}
-              href={buildUrl(slug, sp, { page: String(n) })}
+              href={buildUrl(slug, current, { page: String(n) })}
               className={`grid h-9 w-9 place-items-center rounded-lg border text-sm font-num transition ${
                 n === page
                   ? "border-brand-600 bg-brand-600 font-bold text-white"
@@ -268,7 +311,7 @@ export default async function CategoryPage({
           ))}
           {page < result.pages && (
             <Link
-              href={buildUrl(slug, sp, { page: String(page + 1) })}
+              href={buildUrl(slug, current, { page: String(page + 1) })}
               className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-brand-400 hover:text-brand-700"
             >
               ←

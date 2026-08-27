@@ -52,8 +52,13 @@ export default async function BlogPage({
   const current = {
     category: single(raw.category)?.trim() || undefined,
     tag: single(raw.tag)?.trim() || undefined,
-    search: single(raw.search)?.trim() || undefined,
-    page: Math.max(1, Number(single(raw.page)) || 1),
+    search: single(raw.search)?.trim().slice(0, 200) || undefined,
+    page: (() => {
+      const value = Number(single(raw.page));
+      return Number.isSafeInteger(value) && value >= 1 && value <= 1_000_000
+        ? value
+        : 1;
+    })(),
   };
 
   const [postsResult, taxonomyResult] = await Promise.allSettled([
@@ -94,6 +99,8 @@ export default async function BlogPage({
           <input
             id="blog-search"
             name="search"
+            type="search"
+            maxLength={200}
             defaultValue={current.search}
             placeholder="جستجو در عنوان و متن نوشته‌ها..."
             className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-white"

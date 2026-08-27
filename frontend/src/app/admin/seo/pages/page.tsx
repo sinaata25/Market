@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/client-api";
-import { faNum, EmptyRow } from "@/components/admin/ui";
+import { faNum, EmptyRow, Pager } from "@/components/admin/ui";
+import { useDebouncedValue } from "@/components/admin/useDebouncedValue";
 
 type PageRow = {
   pageType: string;
@@ -40,20 +41,45 @@ export default function SeoPages() {
   const [pages, setPages] = useState<PageRow[]>([]);
   const [filter, setFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const requestId = useRef(0);
+  const debouncedSearch = useDebouncedValue(search);
+
+  const load = useCallback(async () => {
+    if (search !== debouncedSearch) return;
+    const currentRequest = ++requestId.current;
+    await Promise.resolve();
+    if (currentRequest !== requestId.current) return;
+    setLoading(true);
+    setLoadError("");
+    const query = new URLSearchParams({ page: String(page) });
+    if (filter) query.set("type", filter);
+    if (debouncedSearch.trim()) query.set("search", debouncedSearch.trim());
+    const res = await api.get<{
+      pages: PageRow[];
+      pagesCount: number;
+      total: number;
+    }>(`/api/admin/seo/pages?${query}`);
+    if (currentRequest !== requestId.current) return;
+    if (res.ok && res.data) {
+      setPages(res.data.pages);
+      setPageCount(res.data.pagesCount);
+      setTotal(res.data.total);
+    } else {
+      setPages([]);
+      setLoadError(res.error ?? "دریافت صفحات انجام نشد");
+    }
+    setLoading(false);
+  }, [debouncedSearch, filter, page, search]);
 
   useEffect(() => {
-    api.get<{ pages: PageRow[] }>("/api/admin/seo/pages").then((res) => {
-      if (res.ok && res.data) setPages(res.data.pages);
-      setLoading(false);
-    });
-  }, []);
-
-  const visible = pages.filter(
-    (p) =>
-      (!filter || p.pageType === filter) &&
-      (!search.trim() || p.title.includes(search.trim()) || p.path.includes(search.trim()))
-  );
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   return (
     <div className="space-y-4">
@@ -61,12 +87,19 @@ export default function SeoPages() {
         <h1 className="text-lg font-bold text-slate-800">
           📝 متای صفحات{" "}
           <span className="text-sm font-normal text-slate-400 font-num">
-            ({faNum(pages.length)})
+            ({faNum(total)})
           </span>
         </h1>
         <input
+          type="search"
+          maxLength={200}
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            requestId.current += 1;
+            setLoading(true);
+            setSearch(e.target.value);
+            setPage(1);
+          }}
           placeholder="جستجوی صفحه..."
           className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs outline-none focus:border-brand-400 sm:w-56"
         />
@@ -81,7 +114,12 @@ export default function SeoPages() {
         ].map((t) => (
           <button
             key={t.key}
-            onClick={() => setFilter(t.key)}
+            onClick={() => {
+              requestId.current += 1;
+              setLoading(true);
+              setFilter(t.key);
+              setPage(1);
+            }}
             className={`rounded-lg px-3.5 py-1.5 text-xs transition ${
               filter === t.key
                 ? "bg-slate-800 font-medium text-white"
@@ -108,10 +146,12 @@ export default function SeoPages() {
           <tbody className="divide-y divide-slate-50">
             {loading ? (
               <EmptyRow colSpan={6} text="در حال بارگذاری..." />
-            ) : visible.length === 0 ? (
+            ) : loadError ? (
+              <EmptyRow colSpan={6} text={loadError} />
+            ) : pages.length === 0 ? (
               <EmptyRow colSpan={6} text="صفحه‌ای یافت نشد" />
             ) : (
-              visible.map((p) => {
+              pages.map((p) => {
                 const status = statusOf(p);
                 return (
                   <tr
@@ -160,6 +200,15 @@ export default function SeoPages() {
           </tbody>
         </table>
       </div>
+      <Pager
+        page={page}
+        pages={pageCount}
+        onPage={(nextPage) => {
+          requestId.current += 1;
+          setLoading(true);
+          setPage(nextPage);
+        }}
+      />
     </div>
   );
 }

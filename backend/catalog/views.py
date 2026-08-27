@@ -9,6 +9,7 @@ from rest_framework import serializers
 from rest_framework.views import APIView
 
 from common.responses import fail, ok
+from common.search import SearchQueryTooLong
 
 from .category_tree import visible_category_ids
 from .compare import MAX_COMPARE_PRODUCTS, MIN_COMPARE_PRODUCTS, compare_dto
@@ -135,20 +136,25 @@ class ProductListView(APIView):
         responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
-        qs = filtered_products_queryset(
-            category_slug=request.query_params.get("category"),
-            brand_slug=request.query_params.get("brand"),
-            search=request.query_params.get("search"),
-            discounted=request.query_params.get("discounted") in ("true", "1"),
-            best_seller=request.query_params.get("bestSeller") in ("true", "1"),
-            incredible=request.query_params.get("incredible") in ("true", "1"),
-            sort=request.query_params.get("sort", "newest"),
-        )
+        try:
+            qs = filtered_products_queryset(
+                category_slug=request.query_params.get("category"),
+                brand_slug=request.query_params.get("brand"),
+                search=request.query_params.get("search"),
+                discounted=request.query_params.get("discounted") in ("true", "1"),
+                best_seller=request.query_params.get("bestSeller") in ("true", "1"),
+                incredible=request.query_params.get("incredible") in ("true", "1"),
+                sort=request.query_params.get("sort", "newest"),
+            )
+        except SearchQueryTooLong as exc:
+            return fail(str(exc), 422)
 
         try:
             page = max(1, int(request.query_params.get("page", 1)))
             per_page = min(50, max(1, int(request.query_params.get("perPage", 20))))
-        except ValueError:
+            if page > 1_000_000:
+                raise ValueError
+        except (TypeError, ValueError):
             return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
 
         total = qs.count()

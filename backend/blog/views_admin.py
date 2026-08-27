@@ -1,13 +1,13 @@
 import math
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
 from accounts.permissions import ShopAdminRequiredMixin
 from common.responses import fail, ok
+from common.search import SearchQueryTooLong, filter_by_search
 
 from .dto import category_dto, post_dto, tag_dto
 from .models import BlogCategory, BlogPost, BlogTag
@@ -58,13 +58,23 @@ class AdminBlogPostListView(ShopAdminRequiredMixin, APIView):
         status = request.query_params.get("status", "")
         if status in BlogPost.Status.values:
             queryset = queryset.filter(status=status)
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
-            queryset = queryset.filter(
-                Q(title__icontains=search)
-                | Q(excerpt__icontains=search)
-                | Q(content__icontains=search)
-            )
+            try:
+                queryset = filter_by_search(
+                    queryset,
+                    search,
+                    fields=(
+                        "title",
+                        "slug",
+                        "excerpt",
+                        "content",
+                        "category__name",
+                        "tags__name",
+                    ),
+                ).distinct()
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
         total = queryset.count()
         start = (page - 1) * per_page
         posts = [

@@ -5,6 +5,7 @@ import type {
   ManagedStaticPage,
   SupportPageContent,
 } from "@/lib/static-page-types";
+import { normalizeSearchText, searchTextIncludes } from "@/lib/search";
 
 const supportGroupRoutes = [
   { slug: "order", emoji: "🛒", sectionId: "faq-order" },
@@ -40,24 +41,24 @@ export default function SupportContent({
       })).filter((group) => sections[group.sectionId]),
     [content.groups, sections]
   );
-  const isSearching = query.trim().length > 0;
+  const normalizedQuery = normalizeSearchText(query);
+  const isSearching = normalizedQuery.length > 0;
 
   const visibleGroups = useMemo(() => {
     if (!isSearching) {
       return groups.filter((group) => group.slug === activeGroup);
     }
-    const normalizedQuery = query.trim();
     return groups
       .map((group) => ({
         ...group,
         items: group.items.filter(
           (item) =>
-            item.question.includes(normalizedQuery) ||
-            item.answer.includes(normalizedQuery)
+            searchTextIncludes(item.question, normalizedQuery) ||
+            searchTextIncludes(item.answer, normalizedQuery)
         ),
       }))
       .filter((group) => group.items.length > 0);
-  }, [query, activeGroup, isSearching, groups]);
+  }, [activeGroup, groups, isSearching, normalizedQuery]);
 
   return (
     <div className="site-shell py-8">
@@ -66,18 +67,33 @@ export default function SupportContent({
         <p className="mb-6 text-sm text-brand-50">{content.hero.description}</p>
         <div className="relative mx-auto max-w-xl">
           <input
-            type="text"
+            type="search"
+            maxLength={200}
+            aria-label="جستجو در پرسش‌های متداول"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
               setOpenKey(null);
             }}
             placeholder={content.hero.searchPlaceholder}
-            className="w-full rounded-2xl border border-transparent bg-white px-5 py-3.5 pr-12 text-sm text-slate-700 outline-none focus:border-brand-300"
+            className="w-full rounded-2xl border border-transparent bg-white px-12 py-3.5 text-sm text-slate-700 outline-none focus:border-brand-300"
           />
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
             🔍
           </span>
+          {query && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setOpenKey(null);
+              }}
+              aria-label="پاک کردن جستجو"
+              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-100"
+            >
+              ×
+            </button>
+          )}
         </div>
       </section>}
 

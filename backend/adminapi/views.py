@@ -48,6 +48,7 @@ from catalog.specifications import (
 )
 from catalog.validators import validate_category_icon
 from common.responses import fail, ok
+from common.search import SearchQueryTooLong, filter_by_search
 from orders.models import Order, OrderItem
 
 User = get_user_model()
@@ -57,7 +58,8 @@ VALID_STATUSES = [s for s, _ in Order.Status.choices]
 
 def positive_page(value) -> int | None:
     try:
-        return max(1, int(value or 1))
+        page = max(1, int(value or 1))
+        return page if page <= 1_000_000 else None
     except (TypeError, ValueError):
         return None
 
@@ -239,13 +241,16 @@ class AdminOrderListView(ShopAdminRequiredMixin, APIView):
         if status in VALID_STATUSES:
             qs = qs.filter(status=status)
 
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
-            qs = qs.filter(
-                Q(code__icontains=search)
-                | Q(full_name__icontains=search)
-                | Q(phone__icontains=search)
-            )
+            try:
+                qs = filter_by_search(
+                    qs,
+                    search,
+                    fields=("code", "full_name", "phone"),
+                )
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
 
         page = positive_page(request.query_params.get("page"))
         if page is None:
@@ -727,17 +732,25 @@ class AdminSpecificationKeyListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         queryset = specification_keys_queryset()
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
             try:
-                _, normalized_search = normalize_specification_name(search)
-            except ValueError:
-                queryset = queryset.none()
-            else:
-                queryset = queryset.filter(
-                    Q(normalized_name__icontains=normalized_search)
-                    | Q(slug__icontains=search)
+                queryset = filter_by_search(
+                    queryset,
+                    search,
+                    fields=("normalized_name", "slug"),
                 )
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
+        raw_limit = request.query_params.get("limit")
+        if raw_limit is not None:
+            try:
+                limit = int(raw_limit)
+                if not 1 <= limit <= 100:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return fail("محدوده نتایج نامعتبر است", 422)
+            queryset = queryset[:limit]
         return ok(
             {"specifications": [specification_key_dto(key) for key in queryset]}
         )
@@ -895,9 +908,23 @@ class AdminProductListView(ShopAdminRequiredMixin, APIView):
             .prefetch_related("categories", "images")
             .order_by("-created_at")
         )
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
-            qs = qs.filter(title__icontains=search)
+            try:
+                qs = filter_by_search(
+                    qs,
+                    search,
+                    fields=(
+                        "title",
+                        "title_en",
+                        "brand__name",
+                        "category__title",
+                        "categories__title",
+                    ),
+                    include_pk=True,
+                ).distinct()
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
 
         page = positive_page(request.query_params.get("page"))
         if page is None:
@@ -1162,11 +1189,12 @@ class AdminUserListView(ShopAdminRequiredMixin, APIView):
                 is_manager_admin=False,
                 is_seo_manager=False,
             )
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
-            qs = qs.filter(
-                Q(phone__icontains=search) | Q(name__icontains=search)
-            )
+            try:
+                qs = filter_by_search(qs, search, fields=("phone", "name"))
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
 
         page = positive_page(request.query_params.get("page"))
         if page is None:

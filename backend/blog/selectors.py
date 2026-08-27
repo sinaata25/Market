@@ -1,4 +1,6 @@
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
+
+from common.search import filter_by_search
 
 from .models import BlogPost
 
@@ -25,9 +27,16 @@ def filter_posts(
     if tag_slug:
         queryset = queryset.filter(tags__slug=tag_slug)
     if search:
-        queryset = queryset.filter(
-            Q(title__icontains=search)
-            | Q(excerpt__icontains=search)
-            | Q(content__icontains=search)
+        queryset = filter_by_search(
+            queryset,
+            search,
+            fields=(
+                "title",
+                "slug",
+                "excerpt",
+                "content",
+                "category__name",
+                "tags__name",
+            ),
         )
     return queryset.distinct()

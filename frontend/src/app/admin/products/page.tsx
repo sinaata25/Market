@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/client-api";
 import { formatPrice, type Product } from "@/lib/products";
 import { faNum, Pager, EmptyRow } from "@/components/admin/ui";
+import { useDebouncedValue } from "@/components/admin/useDebouncedValue";
 
 // دکمه‌های ستون «عملیات» — هم‌سبک با دکمه‌های ردیف در پنل «صفحه اصلی»:
 // فقط کادر و رنگ متن، بدون پس‌زمینه.
@@ -38,26 +39,39 @@ export default function AdminProducts() {
     null
   );
   const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const requestId = useRef(0);
+  const debouncedSearch = useDebouncedValue(search);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
+    if (search !== debouncedSearch) return;
+    const currentRequest = ++requestId.current;
+    await Promise.resolve();
+    if (currentRequest !== requestId.current) return;
+    setLoading(true);
+    setLoadError("");
     const qs = new URLSearchParams({ page: String(page) });
-    if (search.trim()) qs.set("search", search.trim());
-    api
-      .get<{ products: Product[]; pages: number; total: number }>(
-        `/api/admin/products?${qs}`
-      )
-      .then((res) => {
-        if (res.ok && res.data) {
-          setProducts(res.data.products);
-          setPages(res.data.pages);
-          setTotal(res.data.total);
-        }
-        setLoading(false);
-      });
-  }, [page, search]);
+    if (debouncedSearch.trim()) qs.set("search", debouncedSearch.trim());
+    const res = await api.get<{
+      products: Product[];
+      pages: number;
+      total: number;
+    }>(`/api/admin/products?${qs}`);
+    if (currentRequest !== requestId.current) return;
+    if (res.ok && res.data) {
+      setProducts(res.data.products);
+      setPages(res.data.pages);
+      setTotal(res.data.total);
+    } else {
+      setProducts([]);
+      setLoadError(res.error ?? "دریافت محصولات انجام نشد");
+    }
+    setLoading(false);
+  }, [page, search, debouncedSearch]);
 
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   async function remove(p: Product) {
@@ -158,8 +172,12 @@ export default function AdminProducts() {
         </h1>
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <input
+            type="search"
+            maxLength={200}
             value={search}
             onChange={(e) => {
+              requestId.current += 1;
+              setLoading(true);
               setSearch(e.target.value);
               setPage(1);
             }}
@@ -200,6 +218,8 @@ export default function AdminProducts() {
           <tbody className="divide-y divide-slate-50">
             {loading ? (
               <EmptyRow colSpan={10} text="در حال بارگذاری..." />
+            ) : loadError ? (
+              <EmptyRow colSpan={10} text={loadError} />
             ) : products.length === 0 ? (
               <EmptyRow colSpan={10} text="محصولی یافت نشد" />
             ) : (
@@ -347,7 +367,15 @@ export default function AdminProducts() {
         </table>
       </div>
 
-      <Pager page={page} pages={pages} onPage={setPage} />
+      <Pager
+        page={page}
+        pages={pages}
+        onPage={(nextPage) => {
+          requestId.current += 1;
+          setLoading(true);
+          setPage(nextPage);
+        }}
+      />
     </div>
   );
 }

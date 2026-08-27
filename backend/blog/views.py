@@ -7,6 +7,7 @@ from rest_framework import serializers
 from rest_framework.views import APIView
 
 from common.responses import fail, ok
+from common.search import SearchQueryTooLong
 
 from .dto import category_dto, post_dto, tag_dto
 from .models import BlogCategory, BlogPost, BlogTag
@@ -30,6 +31,8 @@ def pagination_values(request, *, default_per_page: int = 12):
             50,
             max(1, int(request.query_params.get("perPage", default_per_page))),
         )
+        if page > 1_000_000:
+            return None
     except (TypeError, ValueError):
         return None
     return page, per_page
@@ -56,12 +59,15 @@ class BlogPostListView(APIView):
         if pagination is None:
             return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
         page, per_page = pagination
-        queryset = filter_posts(
-            public_posts(),
-            category_slug=request.query_params.get("category", "").strip(),
-            tag_slug=request.query_params.get("tag", "").strip(),
-            search=request.query_params.get("search", "").strip(),
-        ).order_by("-published_at", "-created_at")
+        try:
+            queryset = filter_posts(
+                public_posts(),
+                category_slug=request.query_params.get("category", "").strip(),
+                tag_slug=request.query_params.get("tag", "").strip(),
+                search=request.query_params.get("search", ""),
+            ).order_by("-published_at", "-created_at")
+        except SearchQueryTooLong as exc:
+            return fail(str(exc), 422)
         total = queryset.count()
         start = (page - 1) * per_page
         items = [post_dto(post) for post in queryset[start : start + per_page]]

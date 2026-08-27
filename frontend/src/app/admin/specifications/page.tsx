@@ -49,7 +49,10 @@ export default function AdminSpecificationsPage() {
       );
       if (currentRequest !== requestId.current) return;
       if (result.ok) setSpecifications(result.data?.specifications ?? []);
-      else notify(result.error ?? "دریافت مشخصه‌ها انجام نشد");
+      else {
+        setSpecifications([]);
+        notify(result.error ?? "دریافت مشخصه‌ها انجام نشد");
+      }
       setLoading(false);
     },
     [notify]
@@ -219,9 +222,12 @@ export default function AdminSpecificationsPage() {
         <label className="block sm:max-w-sm">
           <span className="sr-only">جستجوی مشخصه</span>
           <input
+            type="search"
+            maxLength={200}
             value={search}
             onChange={(event) => {
               const nextSearch = event.target.value;
+              requestId.current += 1;
               searchRef.current = nextSearch;
               setSearch(nextSearch);
               setLoading(true);

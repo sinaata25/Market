@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.html import format_html
 
+from common.admin import NormalizedSearchAdminMixin
+
 from .feedback import recompute_product_rating
 from .brand_files import schedule_brand_logo_delete
 from .icon_files import schedule_category_icon_delete
@@ -73,13 +75,13 @@ class CategoryAdminForm(forms.ModelForm):
 
 
 @admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
+class CategoryAdmin(NormalizedSearchAdminMixin, admin.ModelAdmin):
     form = CategoryAdminForm
     list_display = ["icon_preview", "title", "slug", "is_active"]
     list_editable = ["is_active"]
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ["icon_preview"]
-    search_fields = ["title"]
+    search_fields = ["title", "slug"]
     filter_horizontal = ["parents"]
     formfield_overrides = {
         models.FileField: {
@@ -152,7 +154,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(Brand)
-class BrandAdmin(admin.ModelAdmin):
+class BrandAdmin(NormalizedSearchAdminMixin, admin.ModelAdmin):
     list_display = ["logo_preview", "name", "slug", "is_active", "product_count"]
     list_editable = ["is_active"]
     prepopulated_fields = {"slug": ("name",)}
@@ -219,7 +221,7 @@ class BrandAdmin(admin.ModelAdmin):
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(NormalizedSearchAdminMixin, admin.ModelAdmin):
     list_display = [
         "title",
         "brand",
@@ -231,7 +233,13 @@ class ProductAdmin(admin.ModelAdmin):
         "is_active",
     ]
     list_filter = ["brand", "categories"]
-    search_fields = ["title", "title_en"]
+    search_fields = [
+        "title",
+        "title_en",
+        "brand__name",
+        "category__title",
+        "categories__title",
+    ]
     list_editable = ["price", "old_price", "stock", "is_active"]
     filter_horizontal = ["categories"]
     inlines = [
@@ -246,7 +254,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 
 @admin.register(SpecificationKey)
-class SpecificationKeyAdmin(admin.ModelAdmin):
+class SpecificationKeyAdmin(NormalizedSearchAdminMixin, admin.ModelAdmin):
     list_display = ["name", "slug", "product_count", "updated_at"]
     search_fields = ["name", "normalized_name", "slug"]
     readonly_fields = ["normalized_name", "created_at", "updated_at"]
@@ -268,7 +276,7 @@ class SpecificationKeyAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProductRating)
-class ProductRatingAdmin(admin.ModelAdmin):
+class ProductRatingAdmin(NormalizedSearchAdminMixin, admin.ModelAdmin):
     list_display = ["product", "user", "rating", "updated_at"]
     list_filter = ["rating"]
     search_fields = ["product__title", "user__phone", "user__name"]
@@ -294,7 +302,7 @@ class ProductRatingAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProductComment)
-class ProductCommentAdmin(admin.ModelAdmin):
+class ProductCommentAdmin(NormalizedSearchAdminMixin, admin.ModelAdmin):
     list_display = [
         "product",
         "user",
