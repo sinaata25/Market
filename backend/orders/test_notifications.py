@@ -186,7 +186,7 @@ class OrderSmsServiceTests(TestCase):
             [item.args[0] for item in backend.send_pattern.call_args_list],
         )
 
-    def test_status_sms_is_not_sent_when_owner_is_an_admin(self):
+    def test_status_sms_goes_to_owner_even_when_owner_has_an_admin_role(self):
         backend = Mock()
 
         with patch(
@@ -199,7 +199,13 @@ class OrderSmsServiceTests(TestCase):
                 order_status="تحویل شده",
             )
 
-        backend.send_pattern.assert_not_called()
+        backend.send_pattern.assert_called_once_with(
+            "+989120000103",
+            "fivdiyj4psxj94k",
+            {"order_number": "GS-52", "order_status": "تحویل شده"},
+            sms_type="order_status_changed",
+            order_id=52,
+        )
 
     def test_missing_or_invalid_owner_phone_is_skipped_safely(self):
         invalid_owner = SimpleNamespace(

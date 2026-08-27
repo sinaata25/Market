@@ -7,7 +7,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
-from accounts.roles import Role, role_of_record
+from accounts.roles import Role
 from accounts.selectors import role_filter
 from common.utils import iran_mobile_to_e164
 
@@ -308,9 +308,9 @@ def send_order_status_changed_sms(
 
     User = get_user_model()
     owner = User.objects.filter(pk=owner_id).first()
-    if owner is None or Role.CUSTOMER != role_of_record(owner):
+    if owner is None:
         logger.info(
-            "Order status SMS skipped (order_id=%s, reason=owner_not_customer)",
+            "Order status SMS skipped (order_id=%s, reason=owner_missing)",
             order_id,
         )
         return
