@@ -1,4 +1,8 @@
-"""مدیریت حساب‌های «مدیر سئو» — فقط سوپریوزر
+"""مدیریت حساب‌های «مدیر سئو»
+
+دسترسی: مدیر سیستم، یا مدیر اجرایی‌ای که سوپریوزر به او دسترسی سئو داده است
+(``accounts.roles.can_create_role(user, Role.SEO_ADMIN)``). مدیر اجرایی بدون
+دسترسی سئو، مدیر عادی، مدیر سئو و مشتری همگی رد می‌شوند.
 
 ورود در این پروژه فقط با کد یکبارمصرف انجام می‌شود؛ بنابراین «اطلاعات حساب» یک
 مدیر سئو همان شماره موبایل (شناسه ورود)، نام و وضعیت فعال/غیرفعال است و رمزی
@@ -13,7 +17,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
-from accounts.permissions import DeveloperOnlyMixin
+from accounts.permissions import SeoAdminManagementRequiredMixin
 from common.responses import fail, ok
 from common.utils import is_valid_iran_mobile, normalize_phone
 
@@ -57,7 +61,7 @@ class SeoAdminUpdateSerializer(serializers.Serializer):
     isActive = serializers.BooleanField(required=False)
 
 
-class SeoAdminListView(DeveloperOnlyMixin, APIView):
+class SeoAdminListView(SeoAdminManagementRequiredMixin, APIView):
     """فهرست مدیران سئو + ساخت مدیر سئوی جدید"""
 
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
@@ -97,7 +101,7 @@ class SeoAdminListView(DeveloperOnlyMixin, APIView):
         return ok({"seoAdmin": seo_admin_dto(user)}, status=201)
 
 
-class SeoAdminDetailView(DeveloperOnlyMixin, APIView):
+class SeoAdminDetailView(SeoAdminManagementRequiredMixin, APIView):
     """ویرایش، فعال/غیرفعال‌سازی و لغو نقش یک مدیر سئو"""
 
     @staticmethod

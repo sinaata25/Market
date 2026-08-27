@@ -8,22 +8,53 @@ models from accounts, catalog, and orders.
 
 ## Module map
 
-- `views.py`: permission policy, DTOs, statistics, and all management endpoints.
+- `views.py`: DTOs, statistics, and the operational management endpoints.
+- `views_users.py`: user management — list, create, edit, role change, delete.
+- `views_managers.py`: manager admin accounts and the SEO-access grant (superuser).
+- `views_seo_admins.py`: SEO admin accounts.
 - `urls.py`: routes under `/api/admin/`.
-- `tests.py`: current product/low-stock/pagination contract coverage.
+- `tests.py`: product/low-stock/pagination contract coverage.
+- `tests_user_management.py`: the capability matrix, per role, plus crafted-payload
+  privilege-escalation attempts.
+- `tests_managers.py` / `tests_seo_admins.py`: privileged-account lifecycles.
 - `apps.py`: normal Django app registration. The empty migrations package exists
   even though this app currently owns no models.
 
 ## Authorization boundary
 
-`IsStaff.has_permission()` requires an authenticated user with `is_staff=True`.
-`StaffRequiredMixin` applies it consistently to every view. Do not use
-`is_seo_manager` here: that role is intentionally isolated to SEO data and must
-not gain access to users, orders, revenue, or stock.
+Every authorization decision comes from `accounts/roles.py`; this app only wires
+DRF mixins from `accounts/permissions.py` onto views. Never re-derive a role from
+raw flags (`user.is_staff and not user.is_superuser`) inside a view.
 
-When adding an endpoint, inherit `StaffRequiredMixin` before `APIView`. Global DRF
+- `ShopAdminRequiredMixin` — the operational dashboard: superuser, manager admin,
+  regular admin. SEO admins and customers are rejected.
+- `UserManagementRequiredMixin` — user management. Passing this mixin only gets a
+  caller *into* the section; how much they see is decided by
+  `accounts.selectors.visible_users_for()`.
+- `SeoAdminManagementRequiredMixin` — managing SEO admin accounts: superuser, or a
+  manager admin the superuser granted SEO access.
+- `DeveloperOnlyMixin` — system-level areas (manager accounts, granting SEO
+  access). Superuser only.
+
+When adding an endpoint, inherit the right mixin before `APIView`. Global DRF
 permissions allow anonymous access by default, so omitting the mixin is a security
 bug.
+
+### Roles
+
+Roles are *derived* from existing flags, never stored in a parallel column
+(`accounts.roles.Role` / `role_of()`):
+
+| Role          | Condition                                            |
+| ------------- | ---------------------------------------------------- |
+| Superuser     | `is_superuser` — Django's own mechanism, untouched   |
+| Manager admin | `is_manager_admin and is_staff`, not superuser        |
+| Regular admin | `is_staff` with no other role                         |
+| SEO admin     | `is_seo_manager` (separate branch, never `is_staff`)  |
+| Customer      | none of the above                                     |
+
+`can_access_seo` is an added capability on a manager admin, granted and revoked
+only by a superuser through `views_managers.py`.
 
 ## Shared helpers
 
@@ -111,9 +142,27 @@ destroying historical integrity.
 
 ## User and comment management
 
-`AdminUserListView` returns/searches users and aggregate activity without exposing
-password hashes, OTP hashes, or private authentication state. Be deliberate when
-adding personal information.
+User management lives in `views_users.py`, not `views.py`. It returns/searches
+users and aggregate activity without exposing password hashes, OTP hashes, or
+private authentication state. Be deliberate when adding personal information.
+
+Three rules keep it safe, and all three must hold for any new user endpoint:
+
+1. **Restrict before serializing.** Read through `visible_users_for(request.user)`
+   so an invisible record never leaves the database. Filtering a full queryset in
+   the response — or in React — is a security bug.
+2. **Invisible record → 404, not 403.** A manager admin requesting a superuser's
+   id must not learn that the account exists. 403 is for a record the caller *can*
+   see but an operation they may not perform.
+3. **Never let a role field reach the model directly.** `UserCreateSerializer` and
+   `UserUpdateSerializer` contain no `is_superuser`, `is_staff`, `groups`, or
+   `user_permissions` at all, so sending them is inert. `role`, `isActive` and
+   `canAccessSeo` each pass a separate capability check before being applied, and
+   role writes go through `apply_role()` so flag combinations stay consistent.
+
+`GET` responses carry a `permissions` object so the dashboard can render controls
+without duplicating the rules. It is a UI hint — the same checks run again on
+write.
 
 `AdminCommentListView` joins comment/user/product and can filter by moderation
 status. `AdminCommentDetailView` approves, rejects/unpublishes, or deletes a
@@ -131,10 +180,13 @@ bound page sizes. Use `select_related` for single-valued relationships and
 
 ## Safe change checklist
 
-1. Put `StaffRequiredMixin` on every new view.
-2. Never broaden staff access to SEO-only users.
+1. Put the correct `*RequiredMixin` from `accounts/permissions.py` on every new view.
+2. Never broaden dashboard access to SEO-only users, and never widen a role check
+   by hand — change `accounts/roles.py` so every caller moves together.
 3. Keep cancellation and stock restoration atomic and exactly-once.
 4. Reuse canonical DTO/mapping helpers rather than creating response drift.
 5. Scope nested image/review/object lookups to their parent where applicable.
 6. Avoid exposing credentials, OTP state, or password hashes in user responses.
-7. Run `./.venv/bin/python manage.py test adminapi orders catalog --verbosity 2`.
+7. Add permission coverage to `tests_user_management.py` for anything touching
+   roles, visibility, or account state — including the crafted-payload case.
+8. Run `./.venv/bin/python manage.py test adminapi orders catalog accounts seo --verbosity 2`.

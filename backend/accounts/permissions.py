@@ -1,83 +1,34 @@
-"""نقش‌های مدیریتی — تنها منبع حقیقت برای دسترسی به پنل‌ها
+"""لایه‌ی DRF روی جدول نقش‌ها — کلاس‌های مجوز و میکسین‌های ویو
 
-سلسله‌مراتب نقش‌ها:
-
-* «سوپریوزر» (``is_superuser``) — نقش **توسعه‌دهنده/سیستمی**: هرچه مدیر اجرایی
-  می‌تواند، به‌علاوه‌ی ناحیه‌های سطح‌سیستم (ادمین جنگو، ساخت و مدیریت نقش‌های
-  ممتاز). تنها نقشی که می‌تواند «مدیر اجرایی» و «مدیر سئو» بسازد.
-* «مدیر اجرایی» (``is_manager_admin``) — نقش **کسب‌وکار**: کل داشبورد فروشگاه
-  (سفارش‌ها، محصولات، کاربران، محتوا و ...) بدون هیچ دسترسی سطح‌سیستمی.
-* «کارمند» (``is_staff`` بدون نقش دیگر) — همان دسترسی تاریخیِ داشبورد فروشگاه.
-* «مدیر سئو» (``is_seo_manager``) — فقط پنل سئو، بدون داشبورد فروشگاه.
+منطق واقعیِ «چه کسی چه کاری می‌تواند بکند» در ``accounts.roles`` است و اینجا
+فقط به DRF وصل می‌شود. کدی که خودش ویو نیست (ادمین جنگو، سرویس‌ها، دستورهای
+مدیریتی) باید مستقیم از ``accounts.roles`` بخواند، نه از این ماژول.
 
 دو قاعده‌ی عمدی:
 
-1. پنل سئو ناحیه‌ای جداست؛ سوپریوزر و مدیر اجرایی هم از آن کنار گذاشته می‌شوند.
-   به همین دلیل هیچ‌جا از ``user.has_perm`` استفاده نمی‌شود (که برای سوپریوزر
-   همیشه True است) و همین توابع صریح مبنا قرار می‌گیرند.
-2. مدیر اجرایی هرگز نمی‌تواند نقش ممتاز بسازد یا خودش را ارتقا دهد؛ ساخت نقش‌ها
-   فقط از مسیرهای ``IsDeveloperAdmin`` می‌گذرد.
-
-ناسازگاری نقش‌ها علاوه بر این توابع، در ``User.clean``/``User.save`` و با
-CheckConstraintهای دیتابیس هم تضمین می‌شود.
+1. هیچ‌جا از ``user.has_perm`` استفاده نمی‌شود؛ برای سوپریوزر همیشه True است و
+   مرز نقش‌های دیگر را بی‌معنا می‌کند. مبنا همان توابع صریح ``accounts.roles``
+   است.
+2. ساخت و ارتقای نقش هرگز به داده‌ی ارسالی کاربر اعتماد نمی‌کند؛ هر تغییر نقش
+   از ``roles.can_change_role`` رد می‌شود.
 """
 
 from rest_framework.permissions import BasePermission
 
-
-def _is_active_user(user) -> bool:
-    """کاربر واقعی، لاگین‌شده و فعال باشد (نه ناشناس، نه غیرفعال‌شده)"""
-    return bool(
-        user is not None
-        and getattr(user, "is_authenticated", False)
-        and getattr(user, "is_active", False)
-    )
-
-
-def is_seo_admin(user) -> bool:
-    """مدیر سئو: فقط پنل سئو — سوپریوزر و staff عمداً مستثنا هستند"""
-    return bool(
-        _is_active_user(user)
-        and user.is_seo_manager
-        and not user.is_staff
-        and not user.is_superuser
-    )
-
-
-def is_shop_admin(user) -> bool:
-    """دسترسی به داشبورد فروشگاه — سوپریوزر، مدیر اجرایی و کارمند
-
-    مدیر سئو اینجا راه ندارد.
-    """
-    return bool(
-        _is_active_user(user) and user.is_staff and not user.is_seo_manager
-    )
-
-
-def is_manager_admin(user) -> bool:
-    """مدیر اجرایی: کل کسب‌وکار، هیچ دسترسی سطح‌سیستمی"""
-    return bool(
-        _is_active_user(user)
-        and user.is_manager_admin
-        and user.is_staff
-        and not user.is_superuser
-        and not user.is_seo_manager
-    )
-
-
-def is_developer_admin(user) -> bool:
-    """نقش توسعه‌دهنده/سیستمی — تنها نقشی که نقش‌های ممتاز را می‌سازد
-
-    عمداً بر پایه‌ی ``is_superuser`` است: ناحیه‌های سطح‌سیستم فقط برای اوست و
-    مدیر اجرایی هرگز نباید از این در رد شود.
-    """
-    return bool(
-        _is_active_user(user) and user.is_superuser and not user.is_seo_manager
-    )
+from .roles import (
+    Role,
+    can_access_seo,
+    can_create_role,
+    can_manage_users,
+    is_developer_admin,
+    is_manager_admin,
+    is_seo_admin,
+    is_shop_admin,
+)
 
 
 class IsShopAdmin(BasePermission):
-    """فقط مدیران فروشگاه — خطا با قالب یکسان {ok:false, error} برمی‌گردد"""
+    """در ورودی داشبورد فروشگاه — سوپریوزر، مدیر اجرایی و مدیر عادی"""
 
     message = "دسترسی مدیریتی ندارید"
 
@@ -85,8 +36,17 @@ class IsShopAdmin(BasePermission):
         return is_shop_admin(request.user)
 
 
+class CanAccessSeoPanel(BasePermission):
+    """پنل سئو — مدیر سئو، سوپریوزر، و مدیر اجرایی دارای دسترسی سئو"""
+
+    message = "دسترسی پنل سئو ندارید"
+
+    def has_permission(self, request, view):
+        return can_access_seo(request.user)
+
+
 class IsSeoAdmin(BasePermission):
-    """فقط «مدیر سئو» — سوپریوزر، staff و مشتری همگی رد می‌شوند"""
+    """فقط حسابِ «مدیر سئو» — برای بخش‌های مخصوص همین نقش"""
 
     message = "دسترسی پنل سئو ندارید"
 
@@ -104,7 +64,7 @@ class IsManagerAdmin(BasePermission):
 
 
 class IsDeveloperAdmin(BasePermission):
-    """فقط نقش توسعه‌دهنده (سوپریوزر) — ناحیه‌های سطح‌سیستم و ساخت نقش ممتاز"""
+    """فقط مدیر سیستم (سوپریوزر) — ناحیه‌های سطح‌سیستم"""
 
     message = "این بخش فقط برای مدیر سیستم (سوپریوزر) است"
 
@@ -112,16 +72,34 @@ class IsDeveloperAdmin(BasePermission):
         return is_developer_admin(request.user)
 
 
+class CanManageUsers(BasePermission):
+    """در ورودی بخش مدیریت کاربران — دامنه‌ی دید هر نقش را سلکتور تعیین می‌کند"""
+
+    message = "دسترسی مدیریت کاربران ندارید"
+
+    def has_permission(self, request, view):
+        return can_manage_users(request.user)
+
+
+class CanManageSeoAdmins(BasePermission):
+    """مدیریت حساب‌های مدیر سئو — سوپریوزر یا مدیر اجرایی دارای دسترسی سئو"""
+
+    message = "دسترسی مدیریت مدیران سئو ندارید"
+
+    def has_permission(self, request, view):
+        return can_create_role(request.user, Role.SEO_ADMIN)
+
+
 class ShopAdminRequiredMixin:
-    """پیش‌شرط همه‌ی ویوهای داشبورد فروشگاه: ورود + دسترسی staff"""
+    """پیش‌شرط همه‌ی ویوهای داشبورد فروشگاه: ورود + دسترسی داشبورد"""
 
     permission_classes = [IsShopAdmin]
 
 
-class SeoAdminRequiredMixin:
-    """پیش‌شرط همه‌ی ویوهای پنل سئو: ورود + نقش مدیر سئو"""
+class SeoPanelRequiredMixin:
+    """پیش‌شرط همه‌ی ویوهای پنل سئو"""
 
-    permission_classes = [IsSeoAdmin]
+    permission_classes = [CanAccessSeoPanel]
 
 
 class ManagerAdminRequiredMixin:
@@ -133,8 +111,19 @@ class ManagerAdminRequiredMixin:
 class DeveloperOnlyMixin:
     """پیش‌شرط ناحیه‌های سطح‌سیستم: ورود + سوپریوزر
 
-    مدیریت حساب‌های «مدیر اجرایی» و «مدیر سئو» از همین‌جا رد می‌شود؛ هیچ نقش
-    دیگری — از جمله خودِ مدیر اجرایی — نمی‌تواند نقش ممتاز بسازد.
+    ساخت و مدیریت «مدیر اجرایی» و دادن/گرفتن دسترسی سئو فقط از این در می‌گذرد.
     """
 
     permission_classes = [IsDeveloperAdmin]
+
+
+class UserManagementRequiredMixin:
+    """پیش‌شرط ویوهای مدیریت کاربران"""
+
+    permission_classes = [CanManageUsers]
+
+
+class SeoAdminManagementRequiredMixin:
+    """پیش‌شرط ویوهای مدیریت حساب‌های مدیر سئو"""
+
+    permission_classes = [CanManageSeoAdmins]

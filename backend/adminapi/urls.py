@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_managers, views_seo_admins
+from . import views, views_managers, views_seo_admins, views_users
 
 urlpatterns = [
     path("stats", views.StatsView.as_view()),
@@ -39,10 +39,13 @@ urlpatterns = [
         "products/<int:pk>/images/<int:image_id>",
         views.AdminProductImageDetailView.as_view(),
     ),
-    path("users", views.AdminUserListView.as_view()),
-    # مدیریت نقش‌های ممتاز — فقط سوپریوزر (ناحیه‌ی توسعه‌دهنده)
+    # مدیریت کاربران — دامنه‌ی دید هر نقش را accounts.selectors تعیین می‌کند
+    path("users", views_users.AdminUserListView.as_view()),
+    path("users/<int:pk>", views_users.AdminUserDetailView.as_view()),
+    # مدیریت «مدیر اجرایی» و دسترسی سئوی او — فقط سوپریوزر
     path("managers", views_managers.ManagerListView.as_view()),
     path("managers/<int:pk>", views_managers.ManagerDetailView.as_view()),
+    # مدیریت «مدیر سئو» — سوپریوزر یا مدیر اجرایی دارای دسترسی سئو
     path("seo-admins", views_seo_admins.SeoAdminListView.as_view()),
     path(
         "seo-admins/<int:pk>", views_seo_admins.SeoAdminDetailView.as_view()

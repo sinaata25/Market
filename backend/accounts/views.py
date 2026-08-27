@@ -13,6 +13,7 @@ from rest_framework.exceptions import Throttled
 from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
 
+from accounts.roles import can_access_seo, role_of_record
 from carts.services import merge_guest_cart_into_user
 from common.responses import fail, ok
 from common.utils import (
@@ -41,14 +42,22 @@ logger = logging.getLogger(__name__)
 
 
 def user_dto(user) -> dict:
+    """هویت و نقشِ کاربر جاری — فرانت منو و مسیرها را از همین می‌سازد
+
+    ``role`` نقشِ استنتاج‌شده است و ``canAccessSeo`` یعنی «این کاربر به پنل سئو
+    راه دارد» (نه صرفاً فلگ خامِ مدیر اجرایی). فلگ‌های قدیمی برای سازگاری
+    می‌مانند، اما مرجع نمایش همین دو فیلد است.
+    """
     return {
         "id": user.id,
         "phone": user.phone,
         "name": user.name or None,
+        "role": role_of_record(user).value,
         "isStaff": user.is_staff,
         "isSuperuser": user.is_superuser,
         "isManagerAdmin": user.is_manager_admin,
         "isSeoManager": user.is_seo_manager,
+        "canAccessSeo": can_access_seo(user),
         "createdAt": user.date_joined.isoformat(),
     }
 
@@ -114,6 +123,8 @@ class UserDtoSerializer(serializers.Serializer):
     isSuperuser = serializers.BooleanField()
     isManagerAdmin = serializers.BooleanField()
     isSeoManager = serializers.BooleanField()
+    role = serializers.CharField()
+    canAccessSeo = serializers.BooleanField()
     createdAt = serializers.DateTimeField()
 
 

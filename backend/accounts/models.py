@@ -68,8 +68,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     # همیشه is_staff دارد و هرگز سوپریوزر نیست (accounts.permissions).
     is_manager_admin = models.BooleanField("مدیر اجرایی", default=False)
     # نقش «مدیر سئو»: دسترسی فقط به پنل سئو، بدون سفارش‌ها/کاربران/مالی.
-    # این نقش با is_staff/is_superuser ناسازگار است (accounts.permissions).
+    # این نقش با is_staff/is_superuser ناسازگار است (accounts.roles).
     is_seo_manager = models.BooleanField("مدیر سئو", default=False)
+    # توانایی افزوده‌ی «مدیر اجرایی»: ورود به شاخه‌ی سئو. نقش جدیدی نمی‌سازد و
+    # فقط سوپریوزر آن را می‌دهد/می‌گیرد (accounts.roles.can_grant_seo_access).
+    # سوپریوزر و مدیر سئو ذاتاً سئو دارند و این فلگ برایشان بی‌معناست.
+    can_access_seo = models.BooleanField("دسترسی سئوی مدیر اجرایی", default=False)
     date_joined = models.DateTimeField("تاریخ عضویت", default=timezone.now)
 
     objects = UserManager()
@@ -98,6 +102,13 @@ class User(AbstractBaseUser, PermissionsMixin):
                 | models.Q(is_staff=True, is_superuser=False),
                 name="accounts_user_manager_role_consistent",
             ),
+            # فلگ دسترسی سئو فقط روی «مدیر اجرایی» معنا دارد؛ روی بقیه‌ی نقش‌ها
+            # نشستنش یعنی جایی نقش را بدون پاک‌کردن توانایی عوض کرده‌ایم
+            models.CheckConstraint(
+                condition=models.Q(can_access_seo=False)
+                | models.Q(is_manager_admin=True),
+                name="accounts_user_seo_access_manager_only",
+            ),
         ]
 
     def clean(self):
@@ -120,6 +131,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.is_manager_admin and not self.is_staff:
             errors["is_manager_admin"] = (
                 "مدیر اجرایی باید دسترسی داشبورد (is_staff) داشته باشد"
+            )
+        if self.can_access_seo and not self.is_manager_admin:
+            errors["can_access_seo"] = (
+                "دسترسی سئو فقط برای «مدیر اجرایی» تعریف می‌شود"
             )
         return errors
 

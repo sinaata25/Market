@@ -17,7 +17,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
-from accounts.permissions import ShopAdminRequiredMixin, is_manager_admin
+from accounts.permissions import ShopAdminRequiredMixin
 from catalog.category_tree import visible_category_ids
 from catalog.brand_files import schedule_brand_logo_delete
 from catalog.brand_pricing import adjust_brand_prices
@@ -1173,58 +1173,6 @@ class AdminProductImageDetailView(ShopAdminRequiredMixin, APIView):
 
 
 # ─── کاربران ─────────────────────────────────────────────────
-
-
-class AdminUserListView(ShopAdminRequiredMixin, APIView):
-    def get(self, request):
-        qs = User.objects.annotate(orders_count=Count("orders")).order_by(
-            "-date_joined"
-        )
-        # مدیر اجرایی فقط مشتری‌ها را می‌بیند؛ حساب‌های مدیریتی (سوپریوزر،
-        # مدیر اجرایی، کارمند و مدیر سئو) از دید او پنهان می‌مانند.
-        if is_manager_admin(request.user):
-            qs = qs.filter(
-                is_staff=False,
-                is_superuser=False,
-                is_manager_admin=False,
-                is_seo_manager=False,
-            )
-        search = request.query_params.get("search", "")
-        if search:
-            try:
-                qs = filter_by_search(qs, search, fields=("phone", "name"))
-            except SearchQueryTooLong as exc:
-                return fail(str(exc), 422)
-
-        page = positive_page(request.query_params.get("page"))
-        if page is None:
-            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
-        per_page = 15
-        total = qs.count()
-        rows = qs[(page - 1) * per_page : page * per_page]
-
-        return ok(
-            {
-                "users": [
-                    {
-                        "id": u.id,
-                        "phone": u.phone,
-                        "name": u.name or None,
-                        "isStaff": u.is_staff,
-                        "isManagerAdmin": u.is_manager_admin,
-                        "isSeoManager": u.is_seo_manager,
-                        "isSuperuser": u.is_superuser,
-                        "isActive": u.is_active,
-                        "dateJoined": u.date_joined.isoformat(),
-                        "ordersCount": u.orders_count,
-                    }
-                    for u in rows
-                ],
-                "total": total,
-                "page": page,
-                "pages": math.ceil(total / per_page) or 1,
-            }
-        )
 
 
 # ─── دیدگاه‌ها ───────────────────────────────────────────────
