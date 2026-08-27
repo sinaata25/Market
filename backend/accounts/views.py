@@ -21,6 +21,7 @@ from common.utils import (
     normalize_digits,
     normalize_phone,
 )
+from notifications.services.sms import SmsDeliveryError
 
 from .otp import (
     InactiveOtpUser,
@@ -30,7 +31,6 @@ from .otp import (
     issue_otp,
     verify_otp,
 )
-from .sms import SmsDeliveryError
 from .throttles import (
     OtpSendIpThrottle,
     OtpSendPhoneThrottle,

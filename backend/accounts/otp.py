@@ -14,8 +14,13 @@ from django.db import DatabaseError, OperationalError, connection, transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
+from notifications.services.sms import (
+    SmsDeliveryError,
+    SmsDeliveryUncertain,
+    send_otp_sms,
+)
+
 from .models import Otp
-from .sms import SmsDeliveryError, SmsDeliveryUncertain, send_otp_sms
 
 logger = logging.getLogger(__name__)
 User = get_user_model()

@@ -50,6 +50,7 @@ from catalog.validators import validate_category_icon
 from common.responses import fail, ok
 from common.search import SearchQueryTooLong, filter_by_search
 from orders.models import Order, OrderItem
+from orders.services import schedule_order_status_changed_sms
 
 User = get_user_model()
 
@@ -291,8 +292,11 @@ class AdminOrderDetailView(ShopAdminRequiredMixin, APIView):
                     Product.objects.filter(pk=item.product_id).update(
                         stock=F("stock") + item.qty
                     )
-            order.status = status
-            order.save(update_fields=["status"])
+            previous_status = order.status
+            if previous_status != status:
+                order.status = status
+                order.save(update_fields=["status"])
+                schedule_order_status_changed_sms(order, previous_status)
         return ok({"order": order_row(order)})
 
 
