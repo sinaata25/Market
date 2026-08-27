@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from catalog.dto import product_dto
 from catalog.feedback import verified_purchase_pairs
 from catalog.models import Product, ProductComment, ProductRating
+from accounts.roles import role_of_record
 from common.responses import fail, ok
 from common.utils import is_valid_iran_mobile, normalize_phone
 from locations.validation import validate_location_fields
@@ -61,6 +62,7 @@ class ProfileView(AuthRequired, APIView):
                     "name": user.name or None,
                     "isStaff": user.is_staff,
                     "isSeoManager": user.is_seo_manager,
+                    "role": role_of_record(user).value,
                     "dateJoined": user.date_joined.isoformat(),
                 },
                 "stats": {

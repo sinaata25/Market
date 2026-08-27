@@ -10,18 +10,23 @@ import {
 } from "@/lib/client-api";
 import {
   adminRedirectFor,
-  isDeveloperAdmin,
+  canAccessSeo,
+  canManageManagers,
+  canManageSeoAdmins,
   isDeveloperRoute,
-  isManagerAdmin,
+  isRegularAdmin,
   isSeoAdmin,
+  isSeoAdminRoute,
   isSeoRoute,
   isShopAdmin,
+  ROLE_LABELS,
+  roleOf,
   type Me,
 } from "@/lib/admin-roles";
 
 type NavItem = { href: string; icon: string; label: string };
 
-// منوی مدیران فروشگاه (staff) — مدیر سئو هیچ‌کدام را نمی‌بیند
+// منوی عملیاتی داشبورد — مدیر سیستم، مدیر اجرایی و مدیر عادی
 const SHOP_NAV: NavItem[] = [
   { href: "/admin", icon: "📊", label: "داشبورد" },
   { href: "/admin/orders", icon: "📦", label: "سفارش‌ها" },
@@ -40,11 +45,19 @@ const SHOP_NAV: NavItem[] = [
   { href: "/admin/content", icon: "📄", label: "محتوای صفحات" },
 ];
 
-// ناحیه‌ی توسعه‌دهنده/سیستمی — فقط سوپریوزر؛ مدیر اجرایی این‌ها را نمی‌بیند
-const DEVELOPER_NAV: NavItem[] = [
-  { href: "/admin/managers", icon: "🛡️", label: "مدیران اجرایی" },
-  { href: "/admin/seo-admins", icon: "🔑", label: "مدیران سئو" },
-];
+// ناحیه‌ی سطح‌سیستم — فقط مدیر سیستم
+const MANAGERS_NAV: NavItem = {
+  href: "/admin/managers",
+  icon: "🛡️",
+  label: "مدیران اجرایی",
+};
+
+// مدیریت حساب‌های مدیر سئو — مدیر سیستم یا مدیر اجرایی دارای دسترسی سئو
+const SEO_ADMINS_NAV: NavItem = {
+  href: "/admin/seo-admins",
+  icon: "🔑",
+  label: "مدیران سئو",
+};
 
 // منوی ناحیه‌ی سئو — فقط برای «مدیر سئو»
 const SEO_NAV: NavItem[] = [
@@ -165,19 +178,29 @@ export default function AdminLayout({
     );
   }
 
-  // منوی هر نقش کاملاً جداست؛ لینکی به ناحیه‌ی دیگر نمایش داده نمی‌شود
-  const developer = isDeveloperAdmin(me);
+  // منو دقیقاً از روی توانایی‌های همین کاربر ساخته می‌شود؛ آیتمی که به آن
+  // دسترسی ندارد اصلاً رندر نمی‌شود (و مسیرش هم در بک‌اند بسته است).
+  const seo = canAccessSeo(me);
   const nav: NavItem[] = seoAdmin
     ? SEO_NAV
-    : [...SHOP_NAV, ...(developer ? DEVELOPER_NAV : [])];
+    : [
+        // مدیر عادی فقط مشتری‌ها را می‌بیند؛ برچسب منو همان را می‌گوید
+        ...SHOP_NAV.map((item) =>
+          item.href === "/admin/users" && isRegularAdmin(me)
+            ? { ...item, label: "مشتریان" }
+            : item
+        ),
+        ...(canManageManagers(me) ? [MANAGERS_NAV] : []),
+        ...(canManageSeoAdmins(me) ? [SEO_ADMINS_NAV] : []),
+        ...(seo ? SEO_NAV : []),
+      ];
+  const role = roleOf(me);
   const panelTitle = seoAdmin ? "پنل سئو" : "پنل مدیریت";
   const panelRole = seoAdmin
     ? "SEO Administration"
-    : developer
-      ? "مدیر سیستم"
-      : isManagerAdmin(me)
-        ? "مدیر اجرایی"
-        : "مدیر فروشگاه";
+    : role
+      ? ROLE_LABELS[role]
+      : "";
 
   return (
     <div className="site-shell flex flex-col gap-5 py-4 sm:py-6 lg:flex-row">
@@ -243,10 +266,12 @@ export default function AdminLayout({
               {seoAdmin
                 ? "نقش شما «مدیر سئو» است و فقط به پنل سئو دسترسی دارید."
                 : isSeoRoute(pathname)
-                  ? "پنل سئو ناحیه‌ای جداست و فقط «مدیر سئو» به آن دسترسی دارد."
+                  ? "دسترسی پنل سئو ندارید؛ این دسترسی را فقط مدیر سیستم می‌دهد."
                   : isDeveloperRoute(pathname)
                     ? "این بخش سطح‌سیستمی است و فقط مدیر سیستم به آن دسترسی دارد."
-                    : "به این بخش دسترسی ندارید."}
+                    : isSeoAdminRoute(pathname)
+                      ? "مدیریت حساب‌های سئو دسترسی سئو می‌خواهد."
+                      : "به این بخش دسترسی ندارید."}
             </p>
             <Link
               href={misroutedTo}

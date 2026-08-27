@@ -100,7 +100,8 @@ class ManagerAdminRoleTests(TestCase):
 
     # ─── مرز ناحیه‌ی سئو ─────────────────────────────────────
 
-    def test_manager_admin_cannot_reach_the_seo_panel(self):
+    def test_manager_admin_without_seo_access_cannot_reach_the_seo_panel(self):
+        self.assertFalse(self.manager.can_access_seo)
         client = self.client_for(self.manager)
         for url in (
             "/api/admin/seo/overview",
@@ -112,16 +113,45 @@ class ManagerAdminRoleTests(TestCase):
                 self.assertEqual(response.status_code, 403)
                 self.assertFalse(response.data["ok"])
 
-    def test_existing_seo_rule_is_unchanged(self):
-        """قاعده‌ی قبلی دست‌نخورده: سوپریوزر نه، مدیر سئو بله"""
+    def test_seo_panel_is_open_to_seo_admin_and_superuser(self):
+        """مدیر سیستم به همه‌جا از جمله سئو دسترسی دارد؛ مدیر سئو هم که ذاتاً"""
         self.assertEqual(
-            self.root.get("/api/admin/seo/overview").status_code, 403
+            self.root.get("/api/admin/seo/overview").status_code, 200
         )
         self.assertEqual(
             self.client_for(self.seo_admin)
             .get("/api/admin/seo/overview")
             .status_code,
             200,
+        )
+
+    def test_granting_seo_access_opens_the_panel_for_a_manager_admin(self):
+        """همان لحظه‌ای که سوپریوزر دسترسی می‌دهد، پنل باز می‌شود"""
+        client = self.client_for(self.manager)
+        self.assertEqual(
+            client.get("/api/admin/seo/overview").status_code, 403
+        )
+
+        self.manager.can_access_seo = True
+        self.manager.save(update_fields=["can_access_seo"])
+
+        self.assertEqual(
+            client.get("/api/admin/seo/overview").status_code, 200
+        )
+
+    def test_revoking_seo_access_closes_the_panel_again(self):
+        self.manager.can_access_seo = True
+        self.manager.save(update_fields=["can_access_seo"])
+        client = self.client_for(self.manager)
+        self.assertEqual(
+            client.get("/api/admin/seo/overview").status_code, 200
+        )
+
+        self.manager.can_access_seo = False
+        self.manager.save(update_fields=["can_access_seo"])
+
+        self.assertEqual(
+            client.get("/api/admin/seo/overview").status_code, 403
         )
 
     # ─── ناحیه‌ی توسعه‌دهنده ─────────────────────────────────
@@ -365,9 +395,34 @@ class PrivilegeEscalationTests(TestCase):
         self.assertFalse(self.victim.is_seo_manager)
         self.assertFalse(self.victim.is_staff)
 
-    def test_user_listing_is_read_only(self):
-        """فهرست کاربران هیچ مسیر نوشتنی ندارد که بتوان نقش را از آن عوض کرد"""
-        for method in ("post", "patch", "put", "delete"):
+    def test_user_listing_ignores_raw_django_flags(self):
+        """ساخت کاربر از فهرست، فلگ‌های خام جنگو را نمی‌پذیرد
+
+        ``isStaff``/``isSuperuser`` اصلاً در سریالایزر نیستند، پس ارسالشان
+        بی‌اثر است و کاربر تازه با نقش پیش‌فرض «مشتری» ساخته می‌شود.
+        """
+        response = self.client_api.post(
+            "/api/admin/users",
+            {
+                "phone": "09129998877",
+                "isStaff": True,
+                "isSuperuser": True,
+                "is_staff": True,
+                "is_superuser": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+
+        created = User.objects.get(phone="09129998877")
+        self.assertFalse(created.is_staff)
+        self.assertFalse(created.is_superuser)
+        self.assertFalse(created.is_manager_admin)
+        self.assertFalse(created.can_access_seo)
+
+    def test_user_listing_has_no_bulk_write_methods(self):
+        """فهرست فقط GET/POST دارد؛ ویرایش جمعی از این مسیر ممکن نیست"""
+        for method in ("patch", "put", "delete"):
             with self.subTest(method=method):
                 handler = getattr(self.client_api, method)
                 response = handler(
@@ -451,20 +506,39 @@ class ManagerUserListingScopeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()["data"]
 
-    def test_manager_sees_only_customers(self):
+    def test_manager_sees_regular_admins_and_customers(self):
         data = self.listing(self.manager)
         self.assertEqual(
-            [u["phone"] for u in data["users"]], [self.customer.phone]
+            sorted(u["phone"] for u in data["users"]),
+            sorted([self.staff.phone, self.customer.phone]),
         )
-        self.assertEqual(data["total"], 1)
+        self.assertEqual(data["total"], 2)
 
-    def test_manager_cannot_reach_admins_through_search(self):
-        """جستجو هم نباید حساب مدیریتی را لو بدهد"""
-        for admin in (self.superuser, self.staff, self.seo_admin):
-            with self.subTest(phone=admin.phone):
-                data = self.listing(self.manager, search=admin.phone)
+    def test_manager_never_sees_superusers_or_other_managers(self):
+        """جستجو هم نباید حساب ممتاز را لو بدهد"""
+        other_manager = User.objects.create_user(
+            phone="09120000906",
+            name="مدیر اجرایی دیگر",
+            is_staff=True,
+            is_manager_admin=True,
+        )
+        for hidden in (self.superuser, other_manager):
+            with self.subTest(phone=hidden.phone):
+                data = self.listing(self.manager, search=hidden.phone)
                 self.assertEqual(data["users"], [])
                 self.assertEqual(data["total"], 0)
+
+    def test_manager_sees_seo_admins_only_with_seo_access(self):
+        without = self.listing(self.manager, search=self.seo_admin.phone)
+        self.assertEqual(without["users"], [])
+
+        self.manager.can_access_seo = True
+        self.manager.save(update_fields=["can_access_seo"])
+
+        granted = self.listing(self.manager, search=self.seo_admin.phone)
+        self.assertEqual(
+            [u["phone"] for u in granted["users"]], [self.seo_admin.phone]
+        )
 
     def test_superuser_still_sees_everyone(self):
         data = self.listing(self.superuser)
@@ -473,7 +547,17 @@ class ManagerUserListingScopeTests(TestCase):
             self.manager.phone, [u["phone"] for u in data["users"]]
         )
 
-    def test_staff_listing_is_unchanged(self):
-        """کارمند ساده همان دید تاریخی خودش را دارد"""
+    def test_regular_admin_sees_only_customers(self):
+        """مدیر عادی هیچ حساب مدیریتی — حتی هم‌ردیف خودش — نمی‌بیند"""
         data = self.listing(self.staff)
-        self.assertEqual(data["total"], User.objects.count())
+        self.assertEqual(
+            [u["phone"] for u in data["users"]], [self.customer.phone]
+        )
+        self.assertEqual(data["total"], 1)
+
+    def test_regular_admin_cannot_reach_any_admin_through_search(self):
+        for hidden in (self.superuser, self.manager, self.staff, self.seo_admin):
+            with self.subTest(phone=hidden.phone):
+                data = self.listing(self.staff, search=hidden.phone)
+                self.assertEqual(data["users"], [])
+                self.assertEqual(data["total"], 0)

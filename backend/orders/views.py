@@ -19,6 +19,10 @@ from locations.validation import validate_location_fields
 
 from .invoice import render_invoice_pdf
 from .models import Order, OrderItem
+from .services import (
+    schedule_new_order_admin_sms,
+    schedule_order_status_changed_sms,
+)
 
 SHOP = settings.SHOP
 logger = logging.getLogger(__name__)
@@ -234,6 +238,7 @@ class OrderListCreateView(APIView):
 
                 # سبد خالی می‌شود
                 cart.items.all().delete()
+                schedule_new_order_admin_sms(order)
         except OutOfStock as e:
             return fail(str(e), 409)
 
@@ -277,8 +282,10 @@ class OrderDetailView(APIView):
                 Product.objects.filter(pk=item.product_id).update(
                     stock=F("stock") + item.qty
                 )
+            previous_status = order.status
             order.status = Order.Status.CANCELED
             order.save(update_fields=["status"])
+            schedule_order_status_changed_sms(order, previous_status)
 
         return ok({"order": order_dto(order)})
 

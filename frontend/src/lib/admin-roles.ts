@@ -1,74 +1,171 @@
 // نقش‌های پنل مدیریت — تنها مرجعِ تصمیم‌گیریِ نمایشی در فرانت
 //
 // این ماژول فقط ناوبری و نمایش را کنترل می‌کند؛ مرجع نهایی مجوزها بک‌اند است
-// (`accounts/permissions.py`). هر مسیری که اینجا اجازه داده شود، باز هم در
-// سمت سرور بررسی می‌شود.
+// (`accounts/roles.py`). هر مسیری که اینجا اجازه داده شود، باز هم در سمت
+// سرور بررسی می‌شود و هر مسیری که اینجا پنهان شود، تایپ‌کردن دستی‌اش هم به
+// جایی نمی‌رسد. پنهان‌کردن در فرانت فقط برای تجربه‌ی کاربری است.
 //
-// سلسله‌مراتب: سوپریوزر (توسعه‌دهنده) ⊃ مدیر اجرایی (کسب‌وکار)؛
-// مدیر سئو ناحیه‌ی جداگانه‌ای دارد که هیچ‌کدام از آن دو به آن دسترسی ندارند.
+// سلسله‌مراتب:
+//
+//     مدیر سیستم
+//         ├── مدیر اجرایی ── مدیر عادی ── مشتری
+//         └── مدیر سئو            (شاخه‌ی تخصصی و جدا)
+//
+// مدیر اجرایی فقط وقتی وارد شاخه‌ی سئو می‌شود که سوپریوزر صراحتاً اجازه داده
+// باشد؛ این را بک‌اند در `canAccessSeo` پاسخ `/api/auth/me` حساب می‌کند.
+
+export type Role =
+  | "superuser"
+  | "manager_admin"
+  | "regular_admin"
+  | "seo_admin"
+  | "customer";
 
 export type Me = {
   id: number;
   phone: string;
   name: string | null;
+  /** نقشِ استنتاج‌شده از بک‌اند — مرجع اصلی */
+  role?: Role;
+  /** «به پنل سئو راه دارد» (نه فلگ خام) — بک‌اند حسابش می‌کند */
+  canAccessSeo?: boolean;
+  // فلگ‌های خام؛ فقط برای سازگاری با پاسخ‌های قدیمی نگه داشته شده‌اند
   isStaff?: boolean;
   isSuperuser?: boolean;
   isManagerAdmin?: boolean;
   isSeoManager?: boolean;
 };
 
+export const ROLE_LABELS: Record<Role, string> = {
+  superuser: "مدیر سیستم",
+  manager_admin: "مدیر اجرایی",
+  regular_admin: "مدیر عادی",
+  seo_admin: "مدیر سئو",
+  customer: "مشتری",
+};
+
+export const ROLE_BADGES: Record<Role, string> = {
+  superuser: "bg-rose-50 text-rose-600",
+  manager_admin: "bg-violet-50 text-violet-600",
+  regular_admin: "bg-blue-50 text-blue-600",
+  seo_admin: "bg-amber-50 text-amber-600",
+  customer: "bg-slate-100 text-slate-500",
+};
+
 export const SEO_ROOT = "/admin/seo";
 export const SHOP_ROOT = "/admin";
 
-// ناحیه‌ی توسعه‌دهنده/سیستمی — فقط سوپریوزر
-export const DEVELOPER_ROUTES = ["/admin/managers", "/admin/seo-admins"];
+/** ناحیه‌ی سطح‌سیستم — فقط مدیر سیستم */
+export const DEVELOPER_ROUTES = ["/admin/managers"];
 
-/** «مدیر سئو»: فقط پنل سئو — staff و سوپریوزر عمداً مستثنا هستند */
-export function isSeoAdmin(me: Me | null): boolean {
-  return Boolean(me?.isSeoManager && !me.isStaff && !me.isSuperuser);
+/** مدیریت حساب‌های مدیر سئو — مدیر سیستم یا مدیر اجرایی دارای دسترسی سئو */
+export const SEO_ADMIN_ROUTES = ["/admin/seo-admins"];
+
+/** نقش کاربر؛ اگر بک‌اند `role` نداد، از فلگ‌های قدیمی استنتاج می‌شود */
+export function roleOf(me: Me | null): Role | null {
+  if (!me) return null;
+  if (me.role) return me.role;
+  if (me.isSuperuser) return "superuser";
+  if (me.isSeoManager) return "seo_admin";
+  if (me.isManagerAdmin && me.isStaff) return "manager_admin";
+  if (me.isStaff) return "regular_admin";
+  return "customer";
 }
 
-/** «مدیر اجرایی»: کل داشبورد کسب‌وکار، بدون ناحیه‌ی سیستمی */
+/** حسابِ «مدیر سئو» — کل کارش شاخه‌ی سئوست */
+export function isSeoAdmin(me: Me | null): boolean {
+  return roleOf(me) === "seo_admin";
+}
+
+/** «مدیر اجرایی» — کل داشبورد کسب‌وکار، بدون ناحیه‌ی سطح‌سیستم */
 export function isManagerAdmin(me: Me | null): boolean {
-  return Boolean(
-    me?.isManagerAdmin && me.isStaff && !me.isSuperuser && !me.isSeoManager
+  return roleOf(me) === "manager_admin";
+}
+
+/** «مدیر عادی» — کارهای عملیاتی، با مدیریت کاربرِ محدود به مشتری‌ها */
+export function isRegularAdmin(me: Me | null): boolean {
+  return roleOf(me) === "regular_admin";
+}
+
+/** در ورودی داشبورد فروشگاه */
+export function isShopAdmin(me: Me | null): boolean {
+  const role = roleOf(me);
+  return (
+    role === "superuser" || role === "manager_admin" || role === "regular_admin"
   );
 }
 
-/** دسترسی داشبورد فروشگاه — سوپریوزر، مدیر اجرایی و کارمند */
-export function isShopAdmin(me: Me | null): boolean {
-  return Boolean(me?.isStaff && !me.isSeoManager);
-}
-
-/** نقش توسعه‌دهنده/سیستمی — تنها نقشی که نقش ممتاز می‌سازد */
+/** مدیر سیستم — بالاترین سطح */
 export function isDeveloperAdmin(me: Me | null): boolean {
-  return Boolean(me?.isSuperuser && !me.isSeoManager);
+  return roleOf(me) === "superuser";
 }
 
-/** آیا مسیر، داخل ناحیه‌ی سئوست؟ («/admin/seo-admins» عمداً بیرون است) */
-export function isSeoRoute(pathname: string): boolean {
-  return pathname === SEO_ROOT || pathname.startsWith(`${SEO_ROOT}/`);
+/** دسترسی به پنل سئو — بک‌اند تصمیم گرفته، اینجا فقط خوانده می‌شود */
+export function canAccessSeo(me: Me | null): boolean {
+  if (!me) return false;
+  if (me.canAccessSeo !== undefined) return me.canAccessSeo;
+  // سازگاری با پاسخ قدیمی که این فیلد را نداشت
+  const role = roleOf(me);
+  return role === "superuser" || role === "seo_admin";
 }
 
-/** آیا مسیر، ناحیه‌ی توسعه‌دهنده است؟ */
-export function isDeveloperRoute(pathname: string): boolean {
-  return DEVELOPER_ROUTES.some(
+/** مدیریت حساب‌های مدیر سئو */
+export function canManageSeoAdmins(me: Me | null): boolean {
+  return (
+    isDeveloperAdmin(me) || (isManagerAdmin(me) && canAccessSeo(me))
+  );
+}
+
+/** مدیریت حساب‌های مدیر اجرایی و دادن دسترسی سئو — فقط مدیر سیستم */
+export function canManageManagers(me: Me | null): boolean {
+  return isDeveloperAdmin(me);
+}
+
+function matches(pathname: string, routes: string[]): boolean {
+  return routes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
 }
 
+/** آیا مسیر داخل شاخه‌ی سئوست؟ («/admin/seo-admins» عمداً بیرون است) */
+export function isSeoRoute(pathname: string): boolean {
+  return pathname === SEO_ROOT || pathname.startsWith(`${SEO_ROOT}/`);
+}
+
+/** آیا مسیر، ناحیه‌ی سطح‌سیستم است؟ */
+export function isDeveloperRoute(pathname: string): boolean {
+  return matches(pathname, DEVELOPER_ROUTES);
+}
+
+/** آیا مسیر، مدیریت حساب‌های مدیر سئوست؟ */
+export function isSeoAdminRoute(pathname: string): boolean {
+  return matches(pathname, SEO_ADMIN_ROUTES);
+}
+
+/** خانه‌ی هر نقش */
+export function homeFor(me: Me | null): string {
+  return isSeoAdmin(me) ? SEO_ROOT : SHOP_ROOT;
+}
+
 /**
  * مقصد مجاز کاربر برای یک مسیر؛ `null` یعنی همین‌جا بماند.
- * مدیر سئو بیرون از /admin/seo کاری ندارد، و ناحیه‌ی سیستمی فقط مال سوپریوزر است.
+ *
+ * مدیر سئو بیرون از /admin/seo کاری ندارد، شاخه‌ی سئو دسترسی صریح می‌خواهد،
+ * و ناحیه‌ی سطح‌سیستم فقط مال مدیر سیستم است.
  */
 export function adminRedirectFor(
   me: Me | null,
   pathname: string
 ): string | null {
   if (!me) return null;
-  const seoRoute = isSeoRoute(pathname);
-  if (isSeoAdmin(me)) return seoRoute ? null : SEO_ROOT;
-  if (seoRoute) return SHOP_ROOT;
-  if (isDeveloperRoute(pathname) && !isDeveloperAdmin(me)) return SHOP_ROOT;
+
+  if (isSeoRoute(pathname)) {
+    return canAccessSeo(me) ? null : homeFor(me);
+  }
+  // بیرون از شاخه‌ی سئو، مدیر سئو هیچ‌جا نمی‌رود
+  if (isSeoAdmin(me)) return SEO_ROOT;
+
+  if (isDeveloperRoute(pathname) && !canManageManagers(me)) return SHOP_ROOT;
+  if (isSeoAdminRoute(pathname) && !canManageSeoAdmins(me)) return SHOP_ROOT;
   return null;
 }

@@ -7,7 +7,7 @@ from django.db.models import Max
 from catalog.models import Product
 from catalog.selectors import filtered_products_queryset
 
-from .models import Banner, HomepageSection
+from .models import Banner, HomepageSection, allowed_fields
 from .selectors import sections_queryset
 
 
@@ -57,6 +57,9 @@ DEFAULT_LIMITS: dict[str, int] = {
     # این بخش صفحه‌بندی می‌شود؛ عدد یعنی تعداد کالای هر صفحه
     HomepageSection.SectionType.ALL_PRODUCTS: 6,
     HomepageSection.SectionType.PRODUCT_COLLECTION: 8,
+    # ردیف برند/دسته‌بندی: پیش‌فرض ۶ کالا
+    HomepageSection.SectionType.BRAND_PRODUCTS: 6,
+    HomepageSection.SectionType.CATEGORY_PRODUCTS: 6,
     HomepageSection.SectionType.RECENTLY_VIEWED: 10,
 }
 
@@ -75,8 +78,34 @@ PRODUCT_SECTION_FILTERS = {
 }
 
 
+# هر نوع بخشی که داده‌اش فهرست محصول است — مرجع واحد برای DTO عمومی، تا نوع
+# تازه بی‌سروصدا از پاسخ فروشگاه حذف نشود
+PRODUCT_SECTION_TYPES = set(PRODUCT_SECTION_FILTERS) | {
+    HomepageSection.SectionType.PRODUCT_COLLECTION,
+    HomepageSection.SectionType.BRAND_PRODUCTS,
+    HomepageSection.SectionType.CATEGORY_PRODUCTS,
+}
+
+
 def resolved_title(section: HomepageSection) -> str:
-    return section.title or DEFAULT_TITLES.get(section.section_type, "")
+    """عنوان نمایشی بخش — عنوان سفارشی مدیر، وگرنه پیش‌فرض این نوع بخش
+
+    برای ردیف برند/دسته‌بندی، پیش‌فرض نام همان برند یا دسته‌بندی است تا مدیر
+    مجبور به تایپ دوباره‌ی آن نباشد.
+    """
+    if section.title:
+        return section.title
+    if (
+        section.section_type == HomepageSection.SectionType.BRAND_PRODUCTS
+        and section.brand_id
+    ):
+        return section.brand.name
+    if (
+        section.section_type == HomepageSection.SectionType.CATEGORY_PRODUCTS
+        and section.category_id
+    ):
+        return section.category.title
+    return DEFAULT_TITLES.get(section.section_type, "")
 
 
 def resolved_limit(section: HomepageSection) -> int:
@@ -90,6 +119,20 @@ def _section_queryset(section: HomepageSection):
     می‌آید تا با API عمومی محصولات یکی بماند.
     """
     section_type = section.section_type
+
+    # ردیف برند/دسته‌بندی: مرجع الزامی است، اما اگر بخش هنوز ذخیره نشده باشد
+    # (یا مرجعش رفته باشد) به‌جای خطا فهرست خالی برمی‌گردد
+    if section_type == HomepageSection.SectionType.BRAND_PRODUCTS:
+        if section.brand_id is None:
+            return None
+        return filtered_products_queryset(brand_slug=section.brand.slug, sort="newest")
+
+    if section_type == HomepageSection.SectionType.CATEGORY_PRODUCTS:
+        if section.category_id is None:
+            return None
+        return filtered_products_queryset(
+            category_slug=section.category.slug, sort="newest"
+        )
 
     if section_type == HomepageSection.SectionType.PRODUCT_COLLECTION:
         return filtered_products_queryset(
@@ -155,10 +198,29 @@ def create_section(
     return section
 
 
+def _clear_disallowed_references(section: HomepageSection) -> None:
+    """پس از تعویض نوع بخش، مرجع‌هایی که به نوع تازه ربطی ندارند پاک می‌شوند
+
+    بدون این کار، تعویض «محصولات برند» به «محصولات دسته‌بندی» با خطای
+    «این فیلد برای این نوع بخش قابل استفاده نیست» رد می‌شد.
+    """
+    allowed = allowed_fields(section.section_type)
+    if "brand" not in allowed:
+        section.brand = None
+    if "category" not in allowed:
+        section.category = None
+    if "banner" not in allowed:
+        section.banner = None
+    if "sort" not in allowed:
+        section.sort = ""
+
+
 @transaction.atomic
 def update_section(section: HomepageSection, **fields) -> HomepageSection:
     for field_name, value in fields.items():
         setattr(section, field_name, value)
+    if "section_type" in fields:
+        _clear_disallowed_references(section)
     _save(section)
     return section
 

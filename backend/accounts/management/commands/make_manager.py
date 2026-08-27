@@ -17,6 +17,16 @@ class Command(BaseCommand):
         parser.add_argument(
             "--revoke", action="store_true", help="گرفتن نقش مدیر اجرایی"
         )
+        parser.add_argument(
+            "--seo",
+            action="store_true",
+            help="دادن دسترسی پنل سئو به این مدیر اجرایی",
+        )
+        parser.add_argument(
+            "--no-seo",
+            action="store_true",
+            help="گرفتن دسترسی پنل سئو از این مدیر اجرایی",
+        )
 
     def handle(self, *args, **options):
         phone = normalize_phone(options["phone"])
@@ -39,14 +49,33 @@ class Command(BaseCommand):
                 )
                 return
 
+        if options["seo"] and options["no_seo"]:
+            self.stderr.write("همزمان --seo و --no-seo معنا ندارد")
+            return
+
         user.is_manager_admin = not options["revoke"]
         user.is_staff = user.is_manager_admin
-        user.save(update_fields=["is_manager_admin", "is_staff"])
+        if not user.is_manager_admin:
+            # توانایی افزوده روی نقشی که لغو شده باقی نمی‌ماند
+            user.can_access_seo = False
+        elif options["seo"]:
+            user.can_access_seo = True
+        elif options["no_seo"]:
+            user.can_access_seo = False
+        user.save(
+            update_fields=["is_manager_admin", "is_staff", "can_access_seo"]
+        )
 
         state = (
             "مدیر اجرایی شد ✅"
             if user.is_manager_admin
             else "نقش اجرایی‌اش لغو شد"
         )
+        if user.is_manager_admin:
+            state += (
+                " (با دسترسی سئو)"
+                if user.can_access_seo
+                else " (بدون دسترسی سئو)"
+            )
         prefix = "کاربر جدید ساخته و " if created else ""
         self.stdout.write(self.style.SUCCESS(f"{prefix}{phone} {state}"))

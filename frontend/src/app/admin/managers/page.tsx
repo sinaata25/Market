@@ -12,12 +12,14 @@ type Manager = {
   phone: string;
   name: string | null;
   isActive: boolean;
+  /** دسترسی پنل سئو — فقط از همین صفحه (یعنی فقط مدیر سیستم) داده می‌شود */
+  canAccessSeo: boolean;
   createdAt: string;
 };
 
-type Draft = { phone: string; name: string };
+type Draft = { phone: string; name: string; canAccessSeo: boolean };
 
-const EMPTY_DRAFT: Draft = { phone: "", name: "" };
+const EMPTY_DRAFT: Draft = { phone: "", name: "", canAccessSeo: false };
 
 export default function AdminManagers() {
   const [rows, setRows] = useState<Manager[]>([]);
@@ -50,7 +52,11 @@ export default function AdminManagers() {
     setSaving(true);
     const res = await api.post<{ manager: Manager }>(
       "/api/admin/managers",
-      { phone: draft.phone.trim(), name: draft.name.trim() }
+      {
+        phone: draft.phone.trim(),
+        name: draft.name.trim(),
+        canAccessSeo: draft.canAccessSeo,
+      }
     );
     setSaving(false);
     if (!res.ok) {
@@ -92,6 +98,22 @@ export default function AdminManagers() {
     load();
   }
 
+  async function toggleSeoAccess(row: Manager) {
+    const res = await api.patch(`/api/admin/managers/${row.id}`, {
+      canAccessSeo: !row.canAccessSeo,
+    });
+    if (!res.ok) {
+      setError(res.error ?? "تغییر دسترسی سئو ناموفق بود");
+      return;
+    }
+    flash(
+      row.canAccessSeo
+        ? "دسترسی سئو گرفته شد"
+        : "دسترسی سئو داده شد؛ حالا پنل سئو و ساخت مدیر سئو برایش باز است"
+    );
+    load();
+  }
+
   async function revoke(row: Manager) {
     const res = await api.delete(`/api/admin/managers/${row.id}`);
     if (!res.ok) {
@@ -118,10 +140,15 @@ export default function AdminManagers() {
 
       <p className="rounded-2xl border border-slate-100 bg-white p-4 text-xs leading-6 text-slate-500">
         مدیر اجرایی به همه‌ی بخش‌های کسب‌وکار (سفارش‌ها، محصولات، کاربران،
-        محتوا و ...) دسترسی دارد، اما به ناحیه‌ی سیستمی — همین صفحه، مدیران سئو
-        و ادمین جنگو — و به پنل سئو دسترسی ندارد و نمی‌تواند نقش ممتاز بسازد.
-        ورود این حساب‌ها هم مثل بقیه با کد یکبارمصرفِ همان شماره موبایل انجام
-        می‌شود.
+        محتوا و ...) دسترسی دارد و می‌تواند «مدیر عادی» و «مشتری» بسازد؛ اما
+        سوپریوزرها را نمی‌بیند، مدیر اجرایی دیگری نمی‌سازد و به ناحیه‌ی سیستمی
+        — همین صفحه و ادمین جنگو — راه ندارد.
+        <br />
+        <b className="font-medium text-slate-600">دسترسی سئو</b> را فقط از
+        همین‌جا می‌توان داد یا گرفت. با روشن‌کردنش، آن مدیر اجرایی پنل سئو را
+        می‌بیند و می‌تواند «مدیر سئو» بسازد؛ ولی همچنان نمی‌تواند این دسترسی را
+        به خودش یا مدیر اجرایی دیگری بدهد. ورود این حساب‌ها هم مثل بقیه با کد
+        یکبارمصرفِ همان شماره موبایل انجام می‌شود.
       </p>
 
       {error && (
@@ -137,7 +164,7 @@ export default function AdminManagers() {
 
       <form
         onSubmit={create}
-        className="grid gap-3 rounded-2xl border border-slate-100 bg-white p-4 sm:grid-cols-[1fr_1fr_auto]"
+        className="grid gap-3 rounded-2xl border border-slate-100 bg-white p-4 sm:grid-cols-[1fr_1fr_auto_auto]"
       >
         <label className="block">
           <span className="mb-1 block text-[11px] text-slate-400">
@@ -163,6 +190,16 @@ export default function AdminManagers() {
             className={field}
           />
         </label>
+        <label className="flex items-center gap-2 self-end pb-2.5 text-xs text-slate-600">
+          <input
+            type="checkbox"
+            checked={draft.canAccessSeo}
+            onChange={(e) =>
+              setDraft({ ...draft, canAccessSeo: e.target.checked })
+            }
+          />
+          دسترسی سئو
+        </label>
         <button
           type="submit"
           disabled={saving}
@@ -180,14 +217,15 @@ export default function AdminManagers() {
               <th className="px-3 py-3 font-medium">شماره موبایل</th>
               <th className="px-3 py-3 font-medium">تاریخ ایجاد</th>
               <th className="px-3 py-3 font-medium">وضعیت</th>
+              <th className="px-3 py-3 font-medium">دسترسی سئو</th>
               <th className="px-5 py-3 font-medium">عملیات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <EmptyRow colSpan={5} text="در حال بارگذاری..." />
+              <EmptyRow colSpan={6} text="در حال بارگذاری..." />
             ) : rows.length === 0 ? (
-              <EmptyRow colSpan={5} text="هنوز مدیر اجرایی‌ای ساخته نشده است" />
+              <EmptyRow colSpan={6} text="هنوز مدیر اجرایی‌ای ساخته نشده است" />
             ) : (
               rows.map((row) => (
                 <tr key={row.id} className="hover:bg-slate-50/60">
@@ -214,6 +252,17 @@ export default function AdminManagers() {
                       </span>
                     )}
                   </td>
+                  <td className="px-3 py-3">
+                    {row.canAccessSeo ? (
+                      <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-600">
+                        دارد
+                      </span>
+                    ) : (
+                      <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] text-slate-500">
+                        ندارد
+                      </span>
+                    )}
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -227,6 +276,12 @@ export default function AdminManagers() {
                         className="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 transition hover:border-brand-400"
                       >
                         {row.isActive ? "غیرفعال‌سازی" : "فعال‌سازی"}
+                      </button>
+                      <button
+                        onClick={() => toggleSeoAccess(row)}
+                        className="rounded-lg border border-amber-200 px-3 py-1.5 text-[11px] text-amber-600 transition hover:border-amber-400"
+                      >
+                        {row.canAccessSeo ? "گرفتن دسترسی سئو" : "دادن دسترسی سئو"}
                       </button>
                       <button
                         onClick={() => revoke(row)}

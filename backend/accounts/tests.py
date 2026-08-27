@@ -37,11 +37,13 @@ from .otp import (
     issue_otp,
     verify_otp,
 )
-from .sms import (
+from notifications.services.sms import (
+    ConsoleSmsBackend,
     IPPanelSmsBackend,
     SmsDeliveryError,
     SmsDeliveryResult,
     SmsDeliveryUncertain,
+    send_otp_sms,
 )
 from .throttles import OtpSendIpThrottle
 
@@ -63,8 +65,9 @@ IPPANEL_CONFIG = {
     "BASE_URL": "https://edge.ippanel.com/v1",
     "API_KEY": "test-api-key",
     "FROM_NUMBER": "+983000505",
-    "PATTERN_CODE": "approved-pattern",
-    "OTP_PARAMETER": "code",
+    "OTP_PATTERN_CODE": "b9f8d6co8e5z6de",
+    "NEW_ORDER_PATTERN_CODE": "3v0og6lgz3ixp8i",
+    "ORDER_STATUS_PATTERN_CODE": "fivdiyj4psxj94k",
     "CONNECT_TIMEOUT": 3.0,
     "READ_TIMEOUT": 10.0,
 }
@@ -80,12 +83,42 @@ def accepted_response(message_id=1123594208):
 
 
 class IPPanelSmsBackendTests(SimpleTestCase):
-    @patch("accounts.sms.requests.post")
+    def test_console_backend_never_logs_the_otp_value(self):
+        with self.assertLogs("notifications.services.sms", level="WARNING") as logs:
+            ConsoleSmsBackend().send_pattern(
+                "09121234567",
+                "b9f8d6co8e5z6de",
+                {"otp_code": "7294"},
+                sms_type="otp",
+            )
+
+        self.assertNotIn("7294", " ".join(logs.output))
+
+    @override_settings(IPPANEL=IPPANEL_CONFIG)
+    @patch("notifications.services.sms.get_sms_backend")
+    def test_otp_uses_the_configured_pattern_and_exact_variable(self, get_backend):
+        backend = get_backend.return_value
+        backend.send_pattern.return_value = SmsDeliveryResult("42")
+
+        result = send_otp_sms("09121234567", "7294")
+
+        self.assertEqual(result.provider_message_id, "42")
+        backend.send_pattern.assert_called_once_with(
+            "09121234567",
+            "b9f8d6co8e5z6de",
+            {"otp_code": "7294"},
+            sms_type="otp",
+        )
+
+    @patch("notifications.services.sms.requests.post")
     def test_sends_the_documented_pattern_payload(self, post):
         post.return_value = accepted_response()
 
-        result = IPPanelSmsBackend(IPPANEL_CONFIG).send_otp(
-            "09121234567", "1234"
+        result = IPPanelSmsBackend(IPPANEL_CONFIG).send_pattern(
+            "09121234567",
+            "approved-pattern",
+            {"code": "1234"},
+            sms_type="otp",
         )
 
         self.assertEqual(result.provider_message_id, "1123594208")
@@ -106,7 +139,7 @@ class IPPanelSmsBackendTests(SimpleTestCase):
             timeout=(3.0, 10.0),
         )
 
-    @patch("accounts.sms.requests.post")
+    @patch("notifications.services.sms.requests.post")
     def test_rejects_an_unsuccessful_provider_envelope(self, post):
         response = Mock(status_code=422)
         response.json.return_value = {
@@ -116,9 +149,14 @@ class IPPanelSmsBackendTests(SimpleTestCase):
         post.return_value = response
 
         with self.assertRaises(SmsDeliveryError):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_pattern(
+                "09121234567",
+                "approved-pattern",
+                {"code": "1234"},
+                sms_type="otp",
+            )
 
-    @patch("accounts.sms.requests.post")
+    @patch("notifications.services.sms.requests.post")
     def test_server_error_is_delivery_ambiguous(self, post):
         response = Mock(status_code=503)
         response.json.return_value = {
@@ -128,29 +166,70 @@ class IPPanelSmsBackendTests(SimpleTestCase):
         post.return_value = response
 
         with self.assertRaises(SmsDeliveryUncertain):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_pattern(
+                "09121234567",
+                "approved-pattern",
+                {"code": "1234"},
+                sms_type="otp",
+            )
 
-    @patch("accounts.sms.requests.post")
+    @patch("notifications.services.sms.requests.post")
     def test_rejects_a_malformed_success_response(self, post):
         response = Mock(status_code=200)
         response.json.return_value = {"data": {}, "meta": {"status": True}}
         post.return_value = response
 
         with self.assertRaises(SmsDeliveryUncertain):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_pattern(
+                "09121234567",
+                "approved-pattern",
+                {"code": "1234"},
+                sms_type="otp",
+            )
 
-    @patch("accounts.sms.requests.post", side_effect=requests.Timeout)
+    @patch("notifications.services.sms.requests.post", side_effect=requests.Timeout)
     def test_timeout_is_not_retried(self, post):
         with self.assertRaises(SmsDeliveryUncertain):
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_pattern(
+                "09121234567",
+                "approved-pattern",
+                {"code": "1234"},
+                sms_type="otp",
+            )
         self.assertEqual(post.call_count, 1)
 
-    @patch("accounts.sms.requests.post", side_effect=requests.ConnectTimeout)
+    @patch(
+        "notifications.services.sms.requests.post",
+        side_effect=requests.ConnectTimeout,
+    )
     def test_connect_timeout_is_a_definite_failure(self, post):
         with self.assertRaises(SmsDeliveryError) as caught:
-            IPPanelSmsBackend(IPPANEL_CONFIG).send_otp("09121234567", "1234")
+            IPPanelSmsBackend(IPPANEL_CONFIG).send_pattern(
+                "09121234567",
+                "approved-pattern",
+                {"code": "1234"},
+                sms_type="otp",
+            )
         self.assertNotIsInstance(caught.exception, SmsDeliveryUncertain)
         self.assertEqual(post.call_count, 1)
+
+    @override_settings(IPPANEL=IPPANEL_CONFIG)
+    @patch(
+        "notifications.services.sms.requests.post",
+        side_effect=requests.Timeout,
+    )
+    def test_network_failure_logs_neither_otp_nor_api_key(self, _post):
+        otp = "7294"
+        with (
+            self.assertLogs("notifications.services.sms", level="WARNING") as logs,
+            self.assertRaises(SmsDeliveryUncertain),
+        ):
+            send_otp_sms("09121234567", otp)
+
+        output = " ".join(logs.output)
+        self.assertNotIn(otp, output)
+        self.assertNotIn(IPPANEL_CONFIG["API_KEY"], output)
+        self.assertIn(IPPANEL_CONFIG["OTP_PATTERN_CODE"], output)
 
 
 class PhoneNormalizationTests(SimpleTestCase):

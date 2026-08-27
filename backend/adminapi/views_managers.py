@@ -1,8 +1,12 @@
 """مدیریت حساب‌های «مدیر اجرایی» — فقط سوپریوزر (نقش توسعه‌دهنده)
 
-ساخت نقش ممتاز عمداً فقط از این مسیر می‌گذرد: خودِ مدیر اجرایی هیچ‌جا نمی‌تواند
-نقش بسازد یا ارتقا بدهد. مثل مدیر سئو، ورود این حساب‌ها هم با کد یکبارمصرفِ
-همان شماره موبایل انجام می‌شود و رمزی برای بازنشانی وجود ندارد.
+ساخت این نقش عمداً فقط از این مسیر می‌گذرد: خودِ مدیر اجرایی هیچ‌جا نمی‌تواند
+مدیر اجرایی دیگری بسازد یا خودش را ارتقا بدهد. مثل مدیر سئو، ورود این حساب‌ها
+هم با کد یکبارمصرفِ همان شماره موبایل انجام می‌شود و رمزی برای بازنشانی نیست.
+
+«دسترسی سئو» (``canAccessSeo``) هم فقط از همین‌جا داده/گرفته می‌شود؛ چون کل
+ماژول پشت ``DeveloperOnlyMixin`` است، حتی مدیر اجرایی‌ای که خودش دسترسی سئو
+دارد نمی‌تواند آن را به خودش یا مدیر اجرایی دیگری بدهد.
 """
 
 from django.contrib.auth import get_user_model
@@ -27,6 +31,7 @@ def manager_dto(user) -> dict:
         "phone": user.phone,
         "name": user.name or None,
         "isActive": user.is_active,
+        "canAccessSeo": user.can_access_seo,
         "createdAt": user.date_joined.isoformat(),
     }
 
@@ -40,12 +45,14 @@ class ManagerCreateSerializer(serializers.Serializer):
         max_length=32, error_messages={"required": "شماره موبایل الزامی است"}
     )
     name = serializers.CharField(max_length=100, allow_blank=True, default="")
+    canAccessSeo = serializers.BooleanField(default=False)
 
 
 class ManagerUpdateSerializer(serializers.Serializer):
     phone = PhoneField(max_length=32, required=False)
     name = serializers.CharField(max_length=100, allow_blank=True, required=False)
     isActive = serializers.BooleanField(required=False)
+    canAccessSeo = serializers.BooleanField(required=False)
 
 
 class ManagerListView(DeveloperOnlyMixin, APIView):
@@ -63,6 +70,7 @@ class ManagerListView(DeveloperOnlyMixin, APIView):
         ser.is_valid(raise_exception=True)
         phone = ser.validated_data["phone"]
         name = ser.validated_data["name"].strip()
+        seo_access = ser.validated_data["canAccessSeo"]
 
         existing = User.objects.filter(phone=phone).first()
         if existing is not None:
@@ -78,13 +86,19 @@ class ManagerListView(DeveloperOnlyMixin, APIView):
                     "این شماره متعلق به مدیر سئو است؛ ابتدا نقش سئو را لغو کنید",
                     409,
                 )
-            # کارمند یا مشتری موجود ارتقا می‌یابد تا حسابش حفظ شود
+            # مدیر عادی یا مشتری موجود ارتقا می‌یابد تا حسابش حفظ شود
             existing.is_manager_admin = True
             existing.is_staff = True
+            existing.can_access_seo = seo_access
             if name:
                 existing.name = name
             existing.save(
-                update_fields=["is_manager_admin", "is_staff", "name"]
+                update_fields=[
+                    "is_manager_admin",
+                    "is_staff",
+                    "can_access_seo",
+                    "name",
+                ]
             )
             return ok({"manager": manager_dto(existing)}, status=201)
 
@@ -95,6 +109,7 @@ class ManagerListView(DeveloperOnlyMixin, APIView):
                     name=name,
                     is_staff=True,
                     is_manager_admin=True,
+                    can_access_seo=seo_access,
                 )
         except IntegrityError:
             return fail("این شماره از قبل ثبت شده است", 409)
@@ -134,6 +149,10 @@ class ManagerDetailView(DeveloperOnlyMixin, APIView):
         if "isActive" in d:
             user.is_active = d["isActive"]
             updated.append("is_active")
+        if "canAccessSeo" in d:
+            # تنها نقطه‌ی دادن/گرفتن دسترسی سئو در کل پروژه
+            user.can_access_seo = d["canAccessSeo"]
+            updated.append("can_access_seo")
 
         if updated:
             try:
@@ -150,5 +169,9 @@ class ManagerDetailView(DeveloperOnlyMixin, APIView):
             return fail("مدیر اجرایی یافت نشد", 404)
         user.is_manager_admin = False
         user.is_staff = False
-        user.save(update_fields=["is_manager_admin", "is_staff"])
+        # توانایی افزوده روی نقشی که دیگر وجود ندارد نمی‌ماند
+        user.can_access_seo = False
+        user.save(
+            update_fields=["is_manager_admin", "is_staff", "can_access_seo"]
+        )
         return ok({"revoked": True})

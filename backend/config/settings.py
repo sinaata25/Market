@@ -120,6 +120,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     # اپ‌های پروژه
     "locations",
+    "notifications",
     "accounts",
     "catalog",
     "carts",
@@ -342,8 +343,8 @@ if SHOP["OTP_TTL_SECONDS"] < SHOP["OTP_RESEND_COOLDOWN_SECONDS"]:
         "OTP_TTL_SECONDS must be greater than or equal to "
         "OTP_RESEND_COOLDOWN_SECONDS"
     )
-# ارسال OTP: در توسعه console و در استقرار ippanel.
-# هیچ مسیر bypass یا بازگرداندن کد در API وجود ندارد.
+# ارسال پیامک: در توسعه console و در استقرار ippanel. نام تنظیم قدیمی برای
+# سازگاری استقرار حفظ شده است. هیچ مسیر bypass یا بازگرداندن OTP در API نیست.
 _default_otp_backend = "console" if DEBUG else "ippanel"
 OTP_SMS_BACKEND = os.getenv("OTP_SMS_BACKEND", _default_otp_backend).strip().lower()
 if OTP_SMS_BACKEND not in {"console", "ippanel"}:
@@ -359,8 +360,15 @@ IPPANEL = {
     ),
     "API_KEY": os.getenv("IPPANEL_API_KEY", "").strip(),
     "FROM_NUMBER": os.getenv("IPPANEL_FROM_NUMBER", "").strip(),
-    "PATTERN_CODE": os.getenv("IPPANEL_PATTERN_CODE", "").strip(),
-    "OTP_PARAMETER": os.getenv("IPPANEL_OTP_PARAMETER", "otp_code").strip(),
+    "OTP_PATTERN_CODE": os.getenv(
+        "IPPANEL_OTP_PATTERN_CODE", "b9f8d6co8e5z6de"
+    ).strip(),
+    "NEW_ORDER_PATTERN_CODE": os.getenv(
+        "IPPANEL_NEW_ORDER_PATTERN_CODE", "3v0og6lgz3ixp8i"
+    ).strip(),
+    "ORDER_STATUS_PATTERN_CODE": os.getenv(
+        "IPPANEL_ORDER_STATUS_PATTERN_CODE", "fivdiyj4psxj94k"
+    ).strip(),
     "CONNECT_TIMEOUT": env_float(
         "IPPANEL_CONNECT_TIMEOUT", 3.0, maximum=10.0
     ),
@@ -370,7 +378,13 @@ IPPANEL = {
 if OTP_SMS_BACKEND == "ippanel":
     missing = [
         key
-        for key in ("API_KEY", "FROM_NUMBER", "PATTERN_CODE", "OTP_PARAMETER")
+        for key in (
+            "API_KEY",
+            "FROM_NUMBER",
+            "OTP_PATTERN_CODE",
+            "NEW_ORDER_PATTERN_CODE",
+            "ORDER_STATUS_PATTERN_CODE",
+        )
         if not IPPANEL[key]
     ]
     if missing:

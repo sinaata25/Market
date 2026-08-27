@@ -26,16 +26,22 @@ type SortKey = (typeof SORTS)[number]["key"];
 const PER_PAGE = 24;
 
 type Search = {
-  sort?: string;
-  page?: string;
-  search?: string;
-  category?: string;
-  discounted?: string;
+  sort?: string | string[];
+  page?: string | string[];
+  search?: string | string[];
+  category?: string | string[];
+  discounted?: string | string[];
 };
 
+type CleanSearch = { [Key in keyof Search]?: string };
+
+function single(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 // ساخت آدرس با حفظ بقیه‌ی پارامترها
-function buildUrl(params: Search, patch: Partial<Search>) {
-  const merged: Search = { ...params, ...patch };
+function buildUrl(params: CleanSearch, patch: Partial<CleanSearch>) {
+  const merged = { ...params, ...patch };
   const qs = new URLSearchParams();
   if (merged.sort && merged.sort !== "newest") qs.set("sort", merged.sort);
   if (merged.search) qs.set("search", merged.search);
@@ -62,32 +68,52 @@ export default async function AllProductsPage({
   searchParams: Promise<Search>;
 }) {
   const sp = await searchParams;
+  const current: CleanSearch = {
+    sort: single(sp.sort),
+    page: single(sp.page),
+    search: single(sp.search)?.trim().slice(0, 200),
+    category: single(sp.category),
+    discounted: single(sp.discounted),
+  };
 
   const sort = (
-    SORTS.some((s) => s.key === sp.sort) ? sp.sort : "newest"
+    SORTS.some((s) => s.key === current.sort) ? current.sort : "newest"
   ) as SortKey;
-  const page = Math.max(1, Number(sp.page) || 1);
-  const onlyDiscounted = sp.discounted === "1";
-  const search = sp.search?.trim() || undefined;
+  const rawPage = Number(current.page);
+  const page =
+    Number.isSafeInteger(rawPage) && rawPage >= 1 && rawPage <= 1_000_000
+      ? rawPage
+      : 1;
+  current.page = String(page);
+  const onlyDiscounted = current.discounted === "1";
+  const search = current.search || undefined;
 
-  const [categories, result, seo] = await Promise.all([
+  const [categoriesResult, productsResult, seoResult] = await Promise.allSettled([
     getCategories(),
     getProducts({
       sort,
       page,
       perPage: PER_PAGE,
       search,
-      categorySlug: sp.category,
+      categorySlug: current.category,
       onlyDiscounted,
     }),
     fetchSeo("static", "/products"),
   ]);
+  const categories =
+    categoriesResult.status === "fulfilled" ? categoriesResult.value : [];
+  const productsFailed = productsResult.status === "rejected";
+  const result =
+    productsResult.status === "fulfilled"
+      ? productsResult.value
+      : { items: [], total: 0, page, perPage: PER_PAGE, pages: 0 };
+  const seo = seoResult.status === "fulfilled" ? seoResult.value : null;
 
   const rootCategories = categories.filter(
     (category) => category.isTopLevel !== false
   );
-  const activeCategory = categories.find((c) => c.slug === sp.category);
-  const hasFilter = Boolean(search) || onlyDiscounted || Boolean(sp.category);
+  const activeCategory = categories.find((c) => c.slug === current.category);
+  const hasFilter = Boolean(search) || onlyDiscounted || Boolean(current.category);
   const numbers = pageWindow(page, result.pages);
 
   return (
@@ -138,9 +164,9 @@ export default async function AllProductsPage({
       {/* فیلتر دسته‌بندی */}
       <div className="mb-4 flex flex-wrap gap-2">
         <Link
-          href={buildUrl(sp, { category: undefined, page: "1" })}
+          href={buildUrl(current, { category: undefined, page: "1" })}
           className={`inline-flex min-h-11 items-center rounded-full border px-4 py-1.5 text-xs transition sm:min-h-0 ${
-            !sp.category
+            !current.category
               ? "border-brand-500 bg-brand-600 font-medium text-white"
               : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
           }`}
@@ -150,9 +176,9 @@ export default async function AllProductsPage({
         {rootCategories.map((category) => (
           <Link
             key={category.slug}
-            href={buildUrl(sp, { category: category.slug, page: "1" })}
+            href={buildUrl(current, { category: category.slug, page: "1" })}
             className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs transition sm:min-h-0 ${
-              sp.category === category.slug
+              current.category === category.slug
                 ? "border-brand-500 bg-brand-600 font-medium text-white"
                 : "border-slate-200 bg-white text-slate-600 hover:border-brand-400 hover:text-brand-700"
             }`}
@@ -178,7 +204,7 @@ export default async function AllProductsPage({
         {SORTS.map((s) => (
           <Link
             key={s.key}
-            href={buildUrl(sp, { sort: s.key, page: "1" })}
+            href={buildUrl(current, { sort: s.key, page: "1" })}
             className={`rounded-lg px-3 py-1.5 text-xs transition ${
               sort === s.key
                 ? "bg-brand-50 font-bold text-brand-700"
@@ -192,7 +218,7 @@ export default async function AllProductsPage({
         <span className="mx-2 hidden h-5 w-px bg-slate-200 sm:block" />
 
         <Link
-          href={buildUrl(sp, {
+          href={buildUrl(current, {
             discounted: onlyDiscounted ? undefined : "1",
             page: "1",
           })}
@@ -223,7 +249,7 @@ export default async function AllProductsPage({
           <span className="text-slate-400">فیلترهای فعال:</span>
           {search && (
             <Link
-              href={buildUrl(sp, { search: undefined, page: "1" })}
+              href={buildUrl(current, { search: undefined, page: "1" })}
               className="flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-brand-700 transition hover:bg-brand-100"
             >
               {search} <span className="text-sm leading-none">×</span>
@@ -231,7 +257,7 @@ export default async function AllProductsPage({
           )}
           {activeCategory && (
             <Link
-              href={buildUrl(sp, { category: undefined, page: "1" })}
+              href={buildUrl(current, { category: undefined, page: "1" })}
               className="flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-brand-700 transition hover:bg-brand-100"
             >
               {activeCategory.title} <span className="text-sm leading-none">×</span>
@@ -239,7 +265,7 @@ export default async function AllProductsPage({
           )}
           {onlyDiscounted && (
             <Link
-              href={buildUrl(sp, { discounted: undefined, page: "1" })}
+              href={buildUrl(current, { discounted: undefined, page: "1" })}
               className="flex items-center gap-1.5 rounded-full bg-accent-50 px-3 py-1.5 text-accent-700 transition hover:bg-accent-100"
             >
               تخفیف‌دار <span className="text-sm leading-none">×</span>
@@ -255,7 +281,13 @@ export default async function AllProductsPage({
       )}
 
       {/* گرید محصولات */}
-      {result.items.length > 0 ? (
+      {productsFailed ? (
+        <div className="rounded-3xl border border-red-100 bg-red-50 px-6 py-16 text-center">
+          <span className="mb-4 block text-5xl" aria-hidden>📡</span>
+          <h2 className="font-bold text-slate-700">دریافت نتایج جستجو ممکن نشد</h2>
+          <p className="mt-2 text-sm text-slate-500">لطفاً چند لحظه دیگر دوباره تلاش کنید.</p>
+        </div>
+      ) : result.items.length > 0 ? (
         <ProductGrid>
           {result.items.map((product) => (
             <ProductCard key={product.id} product={product} />
@@ -293,7 +325,7 @@ export default async function AllProductsPage({
         >
           {page > 1 && (
             <Link
-              href={buildUrl(sp, { page: String(page - 1) })}
+              href={buildUrl(current, { page: String(page - 1) })}
               aria-label="صفحه قبل"
               className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-brand-400 hover:text-brand-700"
             >
@@ -304,7 +336,7 @@ export default async function AllProductsPage({
           {numbers.map((n) => (
             <Link
               key={n}
-              href={buildUrl(sp, { page: String(n) })}
+              href={buildUrl(current, { page: String(n) })}
               aria-current={n === page ? "page" : undefined}
               className={`grid h-9 w-9 place-items-center rounded-lg border text-sm font-num transition ${
                 n === page
@@ -320,7 +352,7 @@ export default async function AllProductsPage({
           )}
           {page < result.pages && (
             <Link
-              href={buildUrl(sp, { page: String(page + 1) })}
+              href={buildUrl(current, { page: String(page + 1) })}
               aria-label="صفحه بعد"
               className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-brand-400 hover:text-brand-700"
             >

@@ -11,6 +11,9 @@ from django.db.utils import IntegrityError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from accounts.roles import can_access_seo
+from catalog.models import Category, Product
+
 from .models import PageMeta, Redirect, SeoSettings
 
 User = get_user_model()
@@ -93,13 +96,18 @@ class SeoRoleTestMixin:
 
     @property
     def denied_roles(self) -> dict:
+        """نقش‌هایی که هرگز به پنل سئو راه ندارند
+
+        سوپریوزر عمداً اینجا نیست: مدیر سیستم به همه‌ی نواحی پروژه — از جمله
+        سئو — دسترسی دارد. مدیر اجرایی هم فقط تا وقتی که سوپریوزر به او
+        دسترسی سئو نداده باشد رد می‌شود.
+        """
         return {
             "anonymous": APIClient(),
             "customer": self.client_for(self.customer),
-            "staff": self.client_for(self.staff),
-            "other-staff": self.client_for(self.other_staff),
-            "manager-admin": self.client_for(self.manager),
-            "superuser": self.client_for(self.superuser),
+            "regular-admin": self.client_for(self.staff),
+            "other-regular-admin": self.client_for(self.other_staff),
+            "manager-admin-without-seo": self.client_for(self.manager),
         }
 
 
@@ -113,6 +121,52 @@ class SeoPanelAccessTests(SeoRoleTestMixin, TestCase):
                 response = call(client, method, url, payload)
                 self.assertLess(response.status_code, 400, response.data)
 
+    def test_page_inventory_search_is_server_paginated_and_normalized(self):
+        category = Category.objects.create(slug="farming", title="کشاورزی")
+        Product.objects.bulk_create(
+            [
+                Product(title=f"پمپ کشاورزی {index}", category=category, price=100)
+                for index in range(25)
+            ]
+        )
+        client = self.client_for(self.seo_admin)
+
+        first = client.get(
+            "/api/admin/seo/pages",
+            {"type": "product", "search": "كشاورزي", "page": 1},
+        )
+        second = client.get(
+            "/api/admin/seo/pages",
+            {"type": "product", "search": "كشاورزي", "page": 2},
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.data["data"]["total"], 25)
+        self.assertEqual(first.data["data"]["pagesCount"], 2)
+        self.assertEqual(len(first.data["data"]["pages"]), 20)
+        self.assertEqual(len(second.data["data"]["pages"]), 5)
+        self.assertTrue(
+            all(
+                row["pageType"] == "product"
+                for row in first.data["data"]["pages"]
+            )
+        )
+
+    def test_page_inventory_rejects_malformed_search_parameters(self):
+        client = self.client_for(self.seo_admin)
+
+        too_long = client.get(
+            "/api/admin/seo/pages", {"search": "x" * 201}
+        )
+        bad_type = client.get("/api/admin/seo/pages", {"type": "private"})
+        huge_page = client.get(
+            "/api/admin/seo/pages", {"page": "9" * 100}
+        )
+
+        self.assertEqual(too_long.status_code, 422)
+        self.assertEqual(bad_type.status_code, 422)
+        self.assertEqual(huge_page.status_code, 422)
+
     def test_every_other_role_is_rejected_from_every_seo_endpoint(self):
         for role, client in self.denied_roles.items():
             for method, url, payload in SEO_ENDPOINTS:
@@ -121,11 +175,57 @@ class SeoPanelAccessTests(SeoRoleTestMixin, TestCase):
                     self.assertEqual(response.status_code, 403)
                     self.assertFalse(response.data["ok"])
 
-    def test_superuser_is_rejected_even_though_django_grants_all_perms(self):
-        """سوپریوزر has_perm همیشه True است؛ پنل سئو نباید به آن تکیه کند"""
+    def test_superuser_can_use_every_seo_endpoint(self):
+        """مدیر سیستم بالاترین سطح است و هیچ ناحیه‌ای برایش بسته نیست"""
+        client = self.client_for(self.superuser)
+        for method, url, payload in SEO_ENDPOINTS:
+            if url.endswith("/scan") and method == "post":
+                continue  # اسکن به شبکه‌ی بیرونی می‌زند
+            with self.subTest(method=method, url=url):
+                response = call(client, method, url, payload)
+                self.assertLess(response.status_code, 400, response.data)
+
+    def test_seo_access_is_not_derived_from_django_permissions(self):
+        """مبنا ``can_access_seo`` است نه ``has_perm``
+
+        اگر پنل به ``has_perm`` تکیه می‌کرد، سوپریوزر همیشه True می‌گرفت و
+        مرزِ بقیه‌ی نقش‌ها بی‌معنا می‌شد — مثلاً مدیر اجرایی هم که گروه
+        مناسب بگیرد بی‌اجازه وارد می‌شد.
+        """
         self.assertTrue(self.superuser.has_perm("seo.change_seosettings"))
-        response = self.client_for(self.superuser).get("/api/admin/seo/overview")
-        self.assertEqual(response.status_code, 403)
+        self.assertFalse(can_access_seo(self.manager))
+        self.assertEqual(
+            self.client_for(self.manager)
+            .get("/api/admin/seo/overview")
+            .status_code,
+            403,
+        )
+
+    def test_manager_admin_with_seo_access_can_use_every_seo_endpoint(self):
+        self.manager.can_access_seo = True
+        self.manager.save(update_fields=["can_access_seo"])
+        client = self.client_for(self.manager)
+        for method, url, payload in SEO_ENDPOINTS:
+            if url.endswith("/scan") and method == "post":
+                continue  # اسکن به شبکه‌ی بیرونی می‌زند
+            with self.subTest(method=method, url=url):
+                response = call(client, method, url, payload)
+                self.assertLess(response.status_code, 400, response.data)
+
+    def test_manager_admin_seo_access_does_not_leak_to_other_managers(self):
+        """دسترسی سئو فردی است و به نقش «مدیر اجرایی» تعلق نمی‌گیرد"""
+        self.manager.can_access_seo = True
+        self.manager.save(update_fields=["can_access_seo"])
+        other = User.objects.create_user(
+            phone="09120000107",
+            name="مدیر اجرایی دیگر",
+            is_staff=True,
+            is_manager_admin=True,
+        )
+        self.assertEqual(
+            self.client_for(other).get("/api/admin/seo/overview").status_code,
+            403,
+        )
 
     def test_rejected_write_leaves_data_untouched(self):
         """رد شدن فقط خواندن نیست — نوشتن هم واقعاً انجام نمی‌شود"""

@@ -2,6 +2,8 @@
 
 from django.db.models import F, Q, QuerySet
 
+from common.search import filter_by_search
+
 from .category_tree import descendant_category_ids, visible_category_ids
 from .models import Category, Product
 
@@ -55,7 +57,18 @@ def filtered_products_queryset(
         qs = qs.filter(brand__slug=brand_slug, brand__is_active=True)
 
     if search:
-        qs = qs.filter(title__contains=search)
+        qs = filter_by_search(
+            qs,
+            search,
+            fields=(
+                "title",
+                "title_en",
+                "brand__name",
+                "category__title",
+                "categories__title",
+            ),
+            include_pk=True,
+        ).distinct()
 
     # «تخفیف‌دار» یعنی قیمت قبلی واقعاً بیشتر از قیمت فعلی باشد؛ صرفِ پرشدن
     # old_price کافی نیست، وگرنه کالایی بدون تخفیفِ واقعی در فهرست تخفیف‌ها

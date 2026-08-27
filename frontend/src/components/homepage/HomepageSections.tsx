@@ -7,7 +7,9 @@ import type {
   HomepageSection,
   HomepageSectionType,
 } from "@/lib/homepage";
-import RecentlyViewedSection from "@/components/homepage/RecentlyViewedSection";
+import { bannerImageSources } from "@/lib/banner-image";
+import { sectionAllLink } from "@/lib/homepage-links";
+import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 import AllProductsSection from "@/components/homepage/AllProductsSection";
 
 const BANNER_THEMES: Record<HomepageBanner["theme"], string> = {
@@ -24,17 +26,23 @@ function BannerSection({
   title?: string | null;
 }) {
   const visibleTitle = title ?? banner.title;
+  const images = bannerImageSources(banner);
   return (
     <section
       className={`relative overflow-hidden rounded-3xl bg-gradient-to-l ${BANNER_THEMES[banner.theme]} px-6 py-12 text-white sm:px-12 sm:py-16`}
     >
-      {banner.image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={banner.image}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-30"
-        />
+      {images && (
+        // مرورگر فقط نسخه‌ی متناسب با عرض نمایشگر را دانلود می‌کند
+        <picture className="pointer-events-none absolute inset-0">
+          {images.desktop && (
+            <source media={images.media} srcSet={images.desktop} />
+          )}
+          <img
+            src={images.fallback}
+            alt=""
+            className="h-full w-full object-cover opacity-30"
+          />
+        </picture>
       )}
       <div className="relative z-10 max-w-lg">
         {visibleTitle && (
@@ -56,7 +64,7 @@ function BannerSection({
           </Link>
         )}
       </div>
-      {!banner.image && (
+      {!images && (
         <span className="pointer-events-none absolute -left-6 bottom-0 text-[10rem] opacity-20 sm:opacity-30">
           🚜
         </span>
@@ -129,11 +137,13 @@ function BrandsSection({ section }: { section: HomepageSection }) {
   );
 }
 
-const PRODUCT_LINKS: Partial<Record<HomepageSectionType, string>> = {
-  best_sellers: "/best-sellers",
-  incredible_products: "/incredible",
-  discounted_products: "/discounts",
-};
+/** ردیف‌هایی که مثل «شگفت‌انگیزها» روی موبایل افقی اسکرول می‌شوند */
+const RAIL_SECTIONS = new Set<string>([
+  "discounted_products",
+  "incredible_products",
+  "brand_products",
+  "category_products",
+]);
 
 function ProductSection({ section }: { section: HomepageSection }) {
   const products = section.data.products ?? [];
@@ -141,7 +151,8 @@ function ProductSection({ section }: { section: HomepageSection }) {
   const isDeals =
     section.type === "discounted_products" ||
     section.type === "incredible_products";
-  const allLink = PRODUCT_LINKS[section.type as HomepageSectionType];
+  const isRail = RAIL_SECTIONS.has(section.type);
+  const allLink = sectionAllLink(section);
 
   return (
     <section
@@ -173,7 +184,7 @@ function ProductSection({ section }: { section: HomepageSection }) {
           </Link>
         )}
       </div>
-      {isDeals ? (
+      {isRail ? (
         <ProductRail>
           {products.map((product) => (
             <ProductCard key={product.id} product={product} />
@@ -231,6 +242,8 @@ const SECTION_RENDERERS: Partial<
   new_products: (section) => <ProductSection section={section} />,
   all_products: (section) => <AllProductsHomeSection section={section} />,
   product_collection: (section) => <ProductSection section={section} />,
+  brand_products: (section) => <ProductSection section={section} />,
+  category_products: (section) => <ProductSection section={section} />,
   recently_viewed: (section) => (
     <RecentlyViewedSection
       title={section.title ?? "محصولات اخیراً مشاهده‌شده"}

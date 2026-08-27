@@ -1,8 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Suspense } from "react";
 import CategoryMenu from "./CategoryMenu";
 import BrandMenu from "./BrandMenu";
 import HeaderActions from "./HeaderActions";
+import HeaderSearch, { HeaderSearchFallback } from "./HeaderSearch";
 
 export default function Header() {
   return (
@@ -32,15 +34,9 @@ export default function Header() {
 
           {/* جستجو */}
           <div className="relative col-span-2 row-start-2 min-w-0 lg:order-none lg:col-auto lg:row-auto lg:flex-1">
-            <input
-              aria-label="جستجو در فروشگاه"
-              type="text"
-              placeholder="جستجو در گروه صنعتی توانا..."
-              className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-11 pl-4 text-base outline-none transition focus:border-brand-400 focus:bg-white sm:text-sm"
-            />
-            <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-              🔍
-            </span>
+            <Suspense fallback={<HeaderSearchFallback />}>
+              <HeaderSearch />
+            </Suspense>
           </div>
 
           {/* اکشن‌ها: وضعیت ورود و سبد خرید (کلاینتی، متصل به API) */}

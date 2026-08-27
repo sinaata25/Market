@@ -41,8 +41,29 @@ ORM writes cannot bypass the manager. The database check constraint is a final
 canonical-format defense. Keep all three layers: caller validation gives good
 errors, `save()` protects Python writes, and the constraint protects the data.
 
-`is_staff` grants the full custom admin API. `is_seo_manager` grants only the SEO
-API. Do not conflate these roles.
+Roles are derived from flags, never stored in a parallel `user_type` column —
+`accounts/roles.py` is the single source of truth and `role_of()` names exactly
+one role per user:
+
+| Role          | Condition                                           |
+| ------------- | --------------------------------------------------- |
+| Superuser     | `is_superuser` — Django's mechanism, left intact     |
+| Manager admin | `is_manager_admin and is_staff`, not superuser       |
+| Regular admin | `is_staff` with no other role                        |
+| SEO admin     | `is_seo_manager` — separate branch, never `is_staff` |
+| Customer      | none of the above                                    |
+
+`can_access_seo` is a capability added to a manager admin, not a role: it opens
+the SEO branch and the ability to create SEO admins. Only a superuser grants or
+revokes it. Superusers and SEO admins reach SEO through their role, so the flag is
+meaningless for them and a check constraint keeps it off any non-manager.
+
+Role consistency is defended at three layers, and all three must be kept: the
+capability functions in `roles.py`, `User.clean()`/`User.save()`, and the database
+check constraints (which stop even a raw `queryset.update()` bypass).
+
+Do not add role checks like `if user.is_staff and not user.is_superuser` in views.
+Add a capability to `roles.py` instead, so every caller moves together.
 
 ### `Address` and `Favorite`
 

@@ -10,7 +10,7 @@
 from django.contrib.admin import AdminSite
 from django.contrib.admin.apps import AdminConfig
 
-from accounts.permissions import is_developer_admin
+from accounts.roles import is_developer_admin
 
 
 class DeveloperAdminSite(AdminSite):

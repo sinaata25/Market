@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client-api";
 import { formatPrice } from "@/lib/products";
 import {
@@ -10,6 +10,7 @@ import {
   Pager,
   EmptyRow,
 } from "@/components/admin/ui";
+import { useDebouncedValue } from "@/components/admin/useDebouncedValue";
 
 type Order = {
   id: number;
@@ -42,28 +43,41 @@ export default function AdminOrders() {
   const [total, setTotal] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const requestId = useRef(0);
+  const debouncedSearch = useDebouncedValue(search);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
+    if (search !== debouncedSearch) return;
+    const currentRequest = ++requestId.current;
+    await Promise.resolve();
+    if (currentRequest !== requestId.current) return;
+    setLoading(true);
+    setLoadError("");
     const qs = new URLSearchParams();
     if (status) qs.set("status", status);
-    if (search.trim()) qs.set("search", search.trim());
+    if (debouncedSearch.trim()) qs.set("search", debouncedSearch.trim());
     qs.set("page", String(page));
-    api
-      .get<{ orders: Order[]; pages: number; total: number }>(
-        `/api/admin/orders?${qs}`
-      )
-      .then((res) => {
-        if (res.ok && res.data) {
-          setOrders(res.data.orders);
-          setPages(res.data.pages);
-          setTotal(res.data.total);
-        }
-        setLoading(false);
-      });
-  }, [status, search, page]);
+    const res = await api.get<{
+      orders: Order[];
+      pages: number;
+      total: number;
+    }>(`/api/admin/orders?${qs}`);
+    if (currentRequest !== requestId.current) return;
+    if (res.ok && res.data) {
+      setOrders(res.data.orders);
+      setPages(res.data.pages);
+      setTotal(res.data.total);
+    } else {
+      setOrders([]);
+      setLoadError(res.error ?? "دریافت سفارش‌ها انجام نشد");
+    }
+    setLoading(false);
+  }, [status, search, debouncedSearch, page]);
 
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   async function changeStatus(order: Order, newStatus: string) {
@@ -88,8 +102,12 @@ export default function AdminOrders() {
           </span>
         </h1>
         <input
+          type="search"
+          maxLength={200}
           value={search}
           onChange={(e) => {
+            requestId.current += 1;
+            setLoading(true);
             setSearch(e.target.value);
             setPage(1);
           }}
@@ -104,6 +122,8 @@ export default function AdminOrders() {
           <button
             key={t.key}
             onClick={() => {
+              requestId.current += 1;
+              setLoading(true);
               setStatus(t.key);
               setPage(1);
             }}
@@ -134,6 +154,8 @@ export default function AdminOrders() {
           <tbody className="divide-y divide-slate-50">
             {loading ? (
               <EmptyRow colSpan={6} text="در حال بارگذاری..." />
+            ) : loadError ? (
+              <EmptyRow colSpan={6} text={loadError} />
             ) : orders.length === 0 ? (
               <EmptyRow colSpan={6} text="سفارشی یافت نشد" />
             ) : (
@@ -153,7 +175,15 @@ export default function AdminOrders() {
         </table>
       </div>
 
-      <Pager page={page} pages={pages} onPage={setPage} />
+      <Pager
+        page={page}
+        pages={pages}
+        onPage={(nextPage) => {
+          requestId.current += 1;
+          setLoading(true);
+          setPage(nextPage);
+        }}
+      />
     </div>
   );
 }

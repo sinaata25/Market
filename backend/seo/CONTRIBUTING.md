@@ -82,9 +82,22 @@ avoid duplicate/missed redirects.
 
 ## Admin authorization and endpoints
 
-`IsSeoOrAdmin` permits authenticated `is_staff` or `is_seo_manager` users.
-`SeoMixin` applies that policy. SEO managers must remain unable to reach the main
-admin API.
+`SeoPanelRequiredMixin` (backed by `accounts.roles.can_access_seo`) guards every
+admin SEO view. Exactly three groups pass:
+
+- the SEO admin, whose whole job is this area;
+- the superuser, who reaches every area of the project;
+- a manager admin the superuser explicitly granted `can_access_seo`.
+
+Regular admins and customers never pass. The check deliberately does not use
+`user.has_perm`, which is always `True` for a superuser and would make every other
+role boundary meaningless.
+
+Access is read from the database on each request, so granting or revoking SEO
+access takes effect immediately on an open session — no re-login.
+
+The reverse boundary still holds: an SEO admin must remain unable to reach the
+main admin API (orders, users, revenue, stock).
 
 Under `/api/admin/seo/`:
 

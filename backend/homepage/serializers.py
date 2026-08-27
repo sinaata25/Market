@@ -2,7 +2,13 @@ from rest_framework import serializers
 
 from catalog.models import Brand, Category
 
-from .models import Banner, HomepageSection, SORT_CHOICES, THEME_CHOICES
+from .models import (
+    INTERCHANGEABLE_SECTION_TYPES,
+    Banner,
+    HomepageSection,
+    SORT_CHOICES,
+    THEME_CHOICES,
+)
 
 
 class HomepageSectionCreateSerializer(serializers.Serializer):
@@ -62,7 +68,13 @@ class HomepageSectionCreateSerializer(serializers.Serializer):
 
 
 class HomepageSectionUpdateSerializer(HomepageSectionCreateSerializer):
-    """همان فیلدهای ایجاد، بدون sectionType — نوع بخش پس از ایجاد قابل تغییر نیست"""
+    """همان فیلدهای ایجاد؛ نوع بخش پس از ایجاد قابل تغییر نیست
+
+    تنها استثنا تعویض بین «محصولات برند» و «محصولات دسته‌بندی» است — این دو
+    فقط در مرجعشان فرق دارند، پس مدیر می‌تواند بدون ساختن بخش تازه (و از دست
+    دادن جایش در ترتیب صفحه) یکی را به دیگری تبدیل کند. نوع فعلی بخش از
+    context با کلید `section_type` گرفته می‌شود.
+    """
 
     def get_fields(self):
         fields = super().get_fields()
@@ -72,11 +84,20 @@ class HomepageSectionUpdateSerializer(HomepageSectionCreateSerializer):
         return fields
 
     def to_internal_value(self, data):
-        if isinstance(data, dict) and "sectionType" in data:
+        requested_type = data.get("sectionType") if isinstance(data, dict) else None
+        current_type = self.context.get("section_type")
+        switching = requested_type is not None and requested_type != current_type
+        if switching and not {
+            requested_type,
+            current_type,
+        } <= INTERCHANGEABLE_SECTION_TYPES:
             raise serializers.ValidationError(
                 {"sectionType": "نوع بخش پس از ایجاد قابل تغییر نیست"}
             )
-        return super().to_internal_value(data)
+        value = super().to_internal_value(data)
+        if switching:
+            value["section_type"] = requested_type
+        return value
 
 
 class HomepageSectionMoveSerializer(serializers.Serializer):

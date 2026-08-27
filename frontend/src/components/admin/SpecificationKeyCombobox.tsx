@@ -68,6 +68,7 @@ export default function SpecificationKeyCombobox({
     );
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams();
+      params.set("limit", "50");
       if (query.trim()) params.set("search", query.trim());
       const suffix = params.toString();
       api
@@ -190,6 +191,7 @@ export default function SpecificationKeyCombobox({
         aria-activedescendant={activeOptionId}
         aria-invalid={hasError || undefined}
         autoComplete="off"
+        maxLength={100}
         disabled={disabled}
         value={query}
         onFocus={() => {

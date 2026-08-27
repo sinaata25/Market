@@ -1,10 +1,14 @@
 from django.contrib.auth import get_user_model
+from django.contrib.admin.sites import AdminSite
 from django.test import TestCase
+from django.test.client import RequestFactory
 from rest_framework.test import APIClient
 
 from orders.models import Order, OrderItem
 
+from .admin import ProductAdmin
 from .models import (
+    Brand,
     Category,
     Product,
     ProductComment,
@@ -122,6 +126,122 @@ class ProductApiContractTests(TestCase):
         self.assertEqual(
             response.data["data"]["product"]["warranty"], "۱۸ ماه گارانتی شرکتی"
         )
+
+
+class ProductSearchTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.tools = Category.objects.create(slug="tools", title="ابزار")
+        self.farming = Category.objects.create(
+            slug="farming", title="کشاورزی حرفه‌ای"
+        )
+        self.ronix = Brand.objects.create(name="Ronix", slug="ronix")
+        self.pump = Product.objects.create(
+            title="پمپ آب مدل 12",
+            title_en="Professional Water Pump",
+            category=self.tools,
+            brand=self.ronix,
+            price=2_000,
+            old_price=2_500,
+        )
+        self.pump.categories.add(self.tools, self.farming)
+        self.other = Product.objects.create(
+            title="دریل شارژی",
+            category=self.tools,
+            price=1_000,
+        )
+        Product.objects.create(
+            title="پمپ مخفی",
+            category=self.tools,
+            brand=self.ronix,
+            price=500,
+            is_active=False,
+        )
+
+    def result_ids(self, search: str, **params) -> list[int]:
+        response = self.client.get(
+            "/api/products", {"search": search, **params}
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        return [item["id"] for item in response.data["data"]["items"]]
+
+    def test_searches_logical_product_fields_case_insensitively(self):
+        for query in (
+            "پمپ آب",
+            "  پمپ   آب  ",
+            "professional",
+            "WATER",
+            "ronix",
+            "كشاورزي",
+            "۱۲",
+            str(self.pump.id),
+        ):
+            with self.subTest(query=query):
+                self.assertEqual(self.result_ids(query), [self.pump.id])
+
+    def test_search_excludes_inactive_products_and_does_not_duplicate_joins(self):
+        response = self.client.get("/api/products", {"search": "پمپ ronix"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["total"], 1)
+        self.assertEqual(
+            [item["id"] for item in response.data["data"]["items"]],
+            [self.pump.id],
+        )
+
+    def test_search_combines_with_filters_sorting_and_pagination(self):
+        second = Product.objects.create(
+            title="پمپ دوم",
+            category=self.farming,
+            brand=self.ronix,
+            price=1_500,
+            old_price=1_800,
+        )
+        second.categories.add(self.farming)
+
+        response = self.client.get(
+            "/api/products",
+            {
+                "search": "پمپ",
+                "category": self.farming.slug,
+                "brand": self.ronix.slug,
+                "discounted": "1",
+                "sort": "cheapest",
+                "page": 2,
+                "perPage": 1,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["total"], 2)
+        self.assertEqual(response.data["data"]["pages"], 2)
+        self.assertEqual(response.data["data"]["items"][0]["id"], self.pump.id)
+
+    def test_unusual_and_oversized_search_inputs_are_safe(self):
+        unusual = self.client.get("/api/products", {"search": "%_'[]\\"})
+        too_long = self.client.get("/api/products", {"search": "x" * 201})
+        huge_page = self.client.get(
+            "/api/products", {"search": "پمپ", "page": "9" * 100}
+        )
+
+        self.assertEqual(unusual.status_code, 200)
+        self.assertEqual(unusual.data["data"]["total"], 0)
+        self.assertEqual(too_long.status_code, 422)
+        self.assertEqual(huge_page.status_code, 422)
+
+    def test_django_admin_search_uses_the_same_persian_query_variants(self):
+        model_admin = ProductAdmin(Product, AdminSite())
+        request = RequestFactory().get("/admin/catalog/product/", {"q": "كشاورزي"})
+
+        results, _duplicates = model_admin.get_search_results(
+            request, Product.objects.all(), "كشاورزي"
+        )
+        oversized, _duplicates = model_admin.get_search_results(
+            request, Product.objects.all(), "x" * 201
+        )
+
+        self.assertEqual(list(results), [self.pump])
+        self.assertFalse(oversized.exists())
 
 
 class ProductFeedbackContractTests(TestCase):

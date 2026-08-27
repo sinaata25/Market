@@ -17,7 +17,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
-from accounts.permissions import ShopAdminRequiredMixin, is_manager_admin
+from accounts.permissions import ShopAdminRequiredMixin
 from catalog.category_tree import visible_category_ids
 from catalog.brand_files import schedule_brand_logo_delete
 from catalog.brand_pricing import adjust_brand_prices
@@ -48,7 +48,9 @@ from catalog.specifications import (
 )
 from catalog.validators import validate_category_icon
 from common.responses import fail, ok
+from common.search import SearchQueryTooLong, filter_by_search
 from orders.models import Order, OrderItem
+from orders.services import schedule_order_status_changed_sms
 
 User = get_user_model()
 
@@ -57,7 +59,8 @@ VALID_STATUSES = [s for s, _ in Order.Status.choices]
 
 def positive_page(value) -> int | None:
     try:
-        return max(1, int(value or 1))
+        page = max(1, int(value or 1))
+        return page if page <= 1_000_000 else None
     except (TypeError, ValueError):
         return None
 
@@ -239,13 +242,16 @@ class AdminOrderListView(ShopAdminRequiredMixin, APIView):
         if status in VALID_STATUSES:
             qs = qs.filter(status=status)
 
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
-            qs = qs.filter(
-                Q(code__icontains=search)
-                | Q(full_name__icontains=search)
-                | Q(phone__icontains=search)
-            )
+            try:
+                qs = filter_by_search(
+                    qs,
+                    search,
+                    fields=("code", "full_name", "phone"),
+                )
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
 
         page = positive_page(request.query_params.get("page"))
         if page is None:
@@ -286,8 +292,11 @@ class AdminOrderDetailView(ShopAdminRequiredMixin, APIView):
                     Product.objects.filter(pk=item.product_id).update(
                         stock=F("stock") + item.qty
                     )
-            order.status = status
-            order.save(update_fields=["status"])
+            previous_status = order.status
+            if previous_status != status:
+                order.status = status
+                order.save(update_fields=["status"])
+                schedule_order_status_changed_sms(order, previous_status)
         return ok({"order": order_row(order)})
 
 
@@ -727,17 +736,25 @@ class AdminSpecificationKeyListView(ShopAdminRequiredMixin, APIView):
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         queryset = specification_keys_queryset()
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
             try:
-                _, normalized_search = normalize_specification_name(search)
-            except ValueError:
-                queryset = queryset.none()
-            else:
-                queryset = queryset.filter(
-                    Q(normalized_name__icontains=normalized_search)
-                    | Q(slug__icontains=search)
+                queryset = filter_by_search(
+                    queryset,
+                    search,
+                    fields=("normalized_name", "slug"),
                 )
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
+        raw_limit = request.query_params.get("limit")
+        if raw_limit is not None:
+            try:
+                limit = int(raw_limit)
+                if not 1 <= limit <= 100:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return fail("محدوده نتایج نامعتبر است", 422)
+            queryset = queryset[:limit]
         return ok(
             {"specifications": [specification_key_dto(key) for key in queryset]}
         )
@@ -895,9 +912,23 @@ class AdminProductListView(ShopAdminRequiredMixin, APIView):
             .prefetch_related("categories", "images")
             .order_by("-created_at")
         )
-        search = request.query_params.get("search", "").strip()
+        search = request.query_params.get("search", "")
         if search:
-            qs = qs.filter(title__icontains=search)
+            try:
+                qs = filter_by_search(
+                    qs,
+                    search,
+                    fields=(
+                        "title",
+                        "title_en",
+                        "brand__name",
+                        "category__title",
+                        "categories__title",
+                    ),
+                    include_pk=True,
+                ).distinct()
+            except SearchQueryTooLong as exc:
+                return fail(str(exc), 422)
 
         page = positive_page(request.query_params.get("page"))
         if page is None:
@@ -1146,57 +1177,6 @@ class AdminProductImageDetailView(ShopAdminRequiredMixin, APIView):
 
 
 # ─── کاربران ─────────────────────────────────────────────────
-
-
-class AdminUserListView(ShopAdminRequiredMixin, APIView):
-    def get(self, request):
-        qs = User.objects.annotate(orders_count=Count("orders")).order_by(
-            "-date_joined"
-        )
-        # مدیر اجرایی فقط مشتری‌ها را می‌بیند؛ حساب‌های مدیریتی (سوپریوزر،
-        # مدیر اجرایی، کارمند و مدیر سئو) از دید او پنهان می‌مانند.
-        if is_manager_admin(request.user):
-            qs = qs.filter(
-                is_staff=False,
-                is_superuser=False,
-                is_manager_admin=False,
-                is_seo_manager=False,
-            )
-        search = request.query_params.get("search", "").strip()
-        if search:
-            qs = qs.filter(
-                Q(phone__icontains=search) | Q(name__icontains=search)
-            )
-
-        page = positive_page(request.query_params.get("page"))
-        if page is None:
-            return fail("پارامتر صفحه‌بندی نامعتبر است", 422)
-        per_page = 15
-        total = qs.count()
-        rows = qs[(page - 1) * per_page : page * per_page]
-
-        return ok(
-            {
-                "users": [
-                    {
-                        "id": u.id,
-                        "phone": u.phone,
-                        "name": u.name or None,
-                        "isStaff": u.is_staff,
-                        "isManagerAdmin": u.is_manager_admin,
-                        "isSeoManager": u.is_seo_manager,
-                        "isSuperuser": u.is_superuser,
-                        "isActive": u.is_active,
-                        "dateJoined": u.date_joined.isoformat(),
-                        "ordersCount": u.orders_count,
-                    }
-                    for u in rows
-                ],
-                "total": total,
-                "page": page,
-                "pages": math.ceil(total / per_page) or 1,
-            }
-        )
 
 
 # ─── دیدگاه‌ها ───────────────────────────────────────────────

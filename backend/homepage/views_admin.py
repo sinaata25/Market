@@ -9,7 +9,7 @@ from common.responses import fail, first_error_message, ok
 
 from .banner_files import schedule_banner_image_delete
 from .dto import admin_banner_dto, admin_section_dto
-from .models import Banner, HomepageSection
+from .models import BANNER_IMAGE_FIELDS, Banner, HomepageSection
 from .selectors import banners_queryset, sections_queryset
 from .serializers import (
     BannerWriteSerializer,
@@ -76,7 +76,11 @@ class AdminHomepageSectionDetailView(ShopAdminRequiredMixin, APIView):
         section = self._get(pk)
         if section is None:
             return fail("بخش یافت نشد", 404)
-        serializer = HomepageSectionUpdateSerializer(data=request.data, partial=True)
+        serializer = HomepageSectionUpdateSerializer(
+            data=request.data,
+            partial=True,
+            context={"section_type": section.section_type},
+        )
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         if "isActive" in data:
@@ -161,20 +165,38 @@ class AdminBannerDetailView(ShopAdminRequiredMixin, APIView):
         banner = self._get(pk)
         if banner is None:
             return fail("بنر یافت نشد", 404)
-        old_name = banner.image.name if banner.image else ""
-        old_storage = banner.image.storage if banner.image else None
+        stored_images = [
+            (field.name, field.storage)
+            for field in (
+                getattr(banner, field_name)
+                for field_name in BANNER_IMAGE_FIELDS.values()
+            )
+            if field
+        ]
         using = banner._state.db or "default"
         banner.delete()
-        if old_name:
-            schedule_banner_image_delete(old_name, old_storage, using=using)
+        for name, storage in stored_images:
+            schedule_banner_image_delete(name, storage, using=using)
         return ok({"deleted": True})
 
 
 class AdminBannerImageView(ShopAdminRequiredMixin, APIView):
-    """آپلود تصویر بنر (multipart/form-data با فیلد file)"""
+    """آپلود/حذف یک نسخه‌ی تصویر بنر (multipart/form-data با فیلد file)
 
-    def post(self, request, pk: int):
-        banner = Banner.objects.filter(pk=pk).first()
+    variant یکی از کلیدهای BANNER_IMAGE_FIELDS است: desktop یا mobile.
+    هر نسخه مستقل ذخیره و حذف می‌شود.
+    """
+
+    def _resolve(self, pk: int, variant: str) -> tuple[Banner | None, str]:
+        field_name = BANNER_IMAGE_FIELDS.get(variant, "")
+        if not field_name:
+            return None, ""
+        return Banner.objects.filter(pk=pk).first(), field_name
+
+    def post(self, request, pk: int, variant: str):
+        banner, field_name = self._resolve(pk, variant)
+        if not field_name:
+            return fail("نسخه‌ی تصویر پشتیبانی نمی‌شود", 404)
         if banner is None:
             return fail("بنر یافت نشد", 404)
         file = request.FILES.get("file")
@@ -189,30 +211,34 @@ class AdminBannerImageView(ShopAdminRequiredMixin, APIView):
         except (UnidentifiedImageError, OSError):
             return fail("فایل ارسال‌شده تصویر معتبر نیست", 422)
 
-        old_name = banner.image.name if banner.image else ""
-        old_storage = banner.image.storage if banner.image else None
-        banner.image = file
+        current = getattr(banner, field_name)
+        old_name = current.name if current else ""
+        old_storage = current.storage if current else None
+        setattr(banner, field_name, file)
         try:
-            banner.save(update_fields=["image"])
+            banner.save(update_fields=[field_name])
         except DjangoValidationError as exc:
             messages = getattr(exc, "messages", None)
             return fail(messages[0] if messages else "تصویر معتبر نیست", 422)
-        if old_name and old_name != banner.image.name:
+        if old_name and old_name != getattr(banner, field_name).name:
             schedule_banner_image_delete(
                 old_name, old_storage, using=banner._state.db or "default"
             )
         return ok({"banner": admin_banner_dto(banner)}, status=201)
 
-    def delete(self, request, pk: int):
-        banner = Banner.objects.filter(pk=pk).first()
+    def delete(self, request, pk: int, variant: str):
+        banner, field_name = self._resolve(pk, variant)
+        if not field_name:
+            return fail("نسخه‌ی تصویر پشتیبانی نمی‌شود", 404)
         if banner is None:
             return fail("بنر یافت نشد", 404)
-        if not banner.image:
+        current = getattr(banner, field_name)
+        if not current:
             return ok({"banner": admin_banner_dto(banner)})
-        old_name = banner.image.name
-        old_storage = banner.image.storage
-        banner.image = ""
-        banner.save(update_fields=["image"])
+        old_name = current.name
+        old_storage = current.storage
+        setattr(banner, field_name, "")
+        banner.save(update_fields=[field_name])
         schedule_banner_image_delete(
             old_name, old_storage, using=banner._state.db or "default"
         )
