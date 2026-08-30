@@ -264,6 +264,8 @@ REST_FRAMEWORK = {
         "otp_send_phone": os.getenv("OTP_SEND_PHONE_RATE", "5/hour"),
         "otp_verify_ip": os.getenv("OTP_VERIFY_IP_RATE", "100/hour"),
         "otp_verify_phone": os.getenv("OTP_VERIFY_PHONE_RATE", "20/hour"),
+        # انتخابگر نقشه‌ی داشبورد؛ سرویس نشانی مهمان ماست و نرخ پایین می‌خواهد
+        "footer_geocode": os.getenv("FOOTER_GEOCODE_RATE", "120/hour"),
     },
 }
 
@@ -324,6 +326,17 @@ INVOICE_STORE_NAME = os.getenv("INVOICE_STORE_NAME", "گروه صنعتی توا
 # خالی گذاشتنشان (پیش‌فرض توسعه) یعنی کش فقط با انقضای زمانی خودش تازه شود.
 FRONTEND_REVALIDATE_URL = os.getenv("FRONTEND_REVALIDATE_URL", "").strip()
 FRONTEND_REVALIDATE_SECRET = os.getenv("FRONTEND_REVALIDATE_SECRET", "").strip()
+
+# جست‌وجوی نشانی برای انتخابگر نقشه‌ی داشبورد. نمونه‌ی عمومی Nominatim برای
+# استفاده‌ی سبک رایگان است و کلید نمی‌خواهد؛ در استقرار پرترافیک آدرس یک
+# نمونه‌ی اختصاصی را اینجا بگذارید. User-Agent را سیاست استفاده‌ی آن‌ها
+# می‌خواهد؛ با ایمیل/دامنه‌ی واقعی سایت جایگزینش کنید.
+NOMINATIM_BASE_URL = os.getenv(
+    "NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"
+).strip()
+NOMINATIM_USER_AGENT = os.getenv(
+    "NOMINATIM_USER_AGENT", "MarketStoreAdmin/1.0 (footer shop location picker)"
+).strip()
 
 # ─── تنظیمات فروشگاه ─────────────────────────────────────────
 

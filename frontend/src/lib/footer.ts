@@ -45,6 +45,17 @@ export type FooterSection = {
   items: FooterItem[];
 };
 
+export type FooterLocation = {
+  address: string | null;
+  latitude: string;
+  longitude: string;
+  zoom: number;
+  /** «مشاهده روی نقشه» — پیوند دلخواه مدیر یا ساخته‌شده از مختصات */
+  mapsUrl: string;
+  /** «مسیریابی» — همیشه از مختصات ذخیره‌شده ساخته می‌شود */
+  directionsUrl: string;
+};
+
 export type FooterSettings = {
   brandTitle: string | null;
   logo: string | null;
@@ -55,6 +66,8 @@ export type FooterSettings = {
   phoneUrl: string | null;
   email: string | null;
   emailUrl: string | null;
+  /** null یعنی مدیر نقشه را خاموش کرده یا مختصاتی ذخیره نشده است */
+  location: FooterLocation | null;
 };
 
 export type FooterData = {

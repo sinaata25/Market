@@ -7,6 +7,7 @@ from django.db.models import Max
 from seo.models import SeoSettings
 
 from .files import schedule_footer_image_delete
+from .maps import maps_directions_url, maps_search_url
 from .models import FooterItem, FooterSection, FooterSettings, allowed_fields
 from .revalidation import schedule_footer_revalidation
 
@@ -220,3 +221,29 @@ def resolved_copyright(settings_row: FooterSettings, *, year: int) -> str:
     return template.replace("{year}", str(year)).replace(
         "{brand}", resolved_brand_title(settings_row)
     )
+
+
+def shop_coordinates(settings_row: FooterSettings):
+    """جفت مختصات فروشگاه، یا None اگر کامل تنظیم نشده باشد"""
+    if settings_row.latitude is None or settings_row.longitude is None:
+        return None
+    return settings_row.latitude, settings_row.longitude
+
+
+def shop_map_is_visible(settings_row: FooterSettings) -> bool:
+    """نقشه فقط وقتی در فوتر می‌آید که مدیر روشنش کرده و مختصات کامل باشد"""
+    return settings_row.show_map and shop_coordinates(settings_row) is not None
+
+
+def shop_maps_url(settings_row: FooterSettings) -> str:
+    """«مشاهده روی نقشه» — پیوند دلخواه مدیر، وگرنه ساخته‌شده از مختصات"""
+    coordinates = shop_coordinates(settings_row)
+    if coordinates is None:
+        return ""
+    return settings_row.maps_place_url or maps_search_url(*coordinates)
+
+
+def shop_directions_url(settings_row: FooterSettings) -> str:
+    """«مسیریابی» — همیشه از مختصات، تا سوزن دقیقاً روی فروشگاه بیفتد"""
+    coordinates = shop_coordinates(settings_row)
+    return maps_directions_url(*coordinates) if coordinates else ""

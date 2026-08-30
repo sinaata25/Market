@@ -9,6 +9,8 @@ public_urlpatterns = [
 admin_urlpatterns = [
     path("settings", views_admin.AdminFooterSettingsView.as_view()),
     path("settings/logo", views_admin.AdminFooterLogoView.as_view()),
+    path("geocode/search", views_admin.AdminFooterGeocodeSearchView.as_view()),
+    path("geocode/reverse", views_admin.AdminFooterGeocodeReverseView.as_view()),
     path("sections", views_admin.AdminFooterSectionListView.as_view()),
     path("sections/<int:pk>", views_admin.AdminFooterSectionDetailView.as_view()),
     path("sections/<int:pk>/move", views_admin.AdminFooterSectionMoveView.as_view()),

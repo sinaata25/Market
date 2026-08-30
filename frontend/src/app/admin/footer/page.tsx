@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ShopLocationPicker from "@/components/admin/ShopLocationPicker";
+import type { ShopLocationValues } from "@/components/admin/ShopLocationPicker";
 import { api } from "@/lib/client-api";
 
 type SectionVariant = "column" | "strip";
@@ -51,6 +53,13 @@ type FooterSettings = {
   email: string | null;
   storedBrandTitle: string | null;
   storedCopyright: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  showMap: boolean;
+  mapZoom: number;
+  mapsPlaceUrl: string | null;
+  mapsUrl: string | null;
+  directionsUrl: string | null;
 };
 
 type PageSummary = { key: string; label: string };
@@ -77,7 +86,6 @@ type SettingsForm = {
   brandTitle: string;
   description: string;
   copyrightText: string;
-  address: string;
   phone: string;
   email: string;
 };
@@ -174,9 +182,17 @@ const EMPTY_SETTINGS: SettingsForm = {
   brandTitle: "",
   description: "",
   copyrightText: "",
-  address: "",
   phone: "",
   email: "",
+};
+
+const EMPTY_LOCATION: ShopLocationValues = {
+  address: "",
+  latitude: "",
+  longitude: "",
+  showMap: true,
+  mapZoom: "15",
+  mapsPlaceUrl: "",
 };
 
 const INPUT_CLASS =
@@ -210,9 +226,19 @@ function settingsForm(settings: FooterSettings): SettingsForm {
     brandTitle: settings.storedBrandTitle ?? "",
     description: settings.description ?? "",
     copyrightText: settings.storedCopyright ?? "",
-    address: settings.address ?? "",
     phone: settings.phone ?? "",
     email: settings.email ?? "",
+  };
+}
+
+function locationForm(settings: FooterSettings): ShopLocationValues {
+  return {
+    address: settings.address ?? "",
+    latitude: settings.latitude ?? "",
+    longitude: settings.longitude ?? "",
+    showMap: settings.showMap,
+    mapZoom: String(settings.mapZoom),
+    mapsPlaceUrl: settings.mapsPlaceUrl ?? "",
   };
 }
 
@@ -267,6 +293,7 @@ export default function AdminFooterPage() {
   const [settings, setSettings] = useState<FooterSettings | null>(null);
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [settingsValues, setSettingsValues] = useState(EMPTY_SETTINGS);
+  const [locationValues, setLocationValues] = useState(EMPTY_LOCATION);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [sectionValues, setSectionValues] = useState(EMPTY_SECTION);
   const [editingSection, setEditingSection] = useState<FooterSection | null>(null);
@@ -298,6 +325,7 @@ export default function AdminFooterPage() {
     if (settingsResult.ok && settingsResult.data) {
       setSettings(settingsResult.data.settings);
       setSettingsValues(settingsForm(settingsResult.data.settings));
+      setLocationValues(locationForm(settingsResult.data.settings));
     }
     if (pageResult.ok) setPages(pageResult.data?.pages ?? []);
     const failure = [sectionResult, settingsResult, pageResult].find(
@@ -324,7 +352,6 @@ export default function AdminFooterPage() {
         brandTitle: settingsValues.brandTitle.trim(),
         description: settingsValues.description.trim(),
         copyrightText: settingsValues.copyrightText.trim(),
-        address: settingsValues.address.trim(),
         phone: settingsValues.phone.trim(),
         email: settingsValues.email.trim(),
       }
@@ -349,6 +376,37 @@ export default function AdminFooterPage() {
     setLogoFile(null);
     if (logoInput.current) logoInput.current.value = "";
     notify("تنظیمات فوتر ذخیره شد ✅");
+    await load();
+  }
+
+  const updateLocation = useCallback(
+    (patch: Partial<ShopLocationValues>) =>
+      setLocationValues((current) => ({ ...current, ...patch })),
+    []
+  );
+
+  async function saveLocation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    // رشته‌ی خالی یعنی «پاک کن»؛ بک‌اند نیم‌مختصات را رد می‌کند
+    const result = await api.patch<{ settings: FooterSettings }>(
+      "/api/admin/footer/settings",
+      {
+        address: locationValues.address.trim(),
+        latitude: locationValues.latitude.trim(),
+        longitude: locationValues.longitude.trim(),
+        showMap: locationValues.showMap,
+        mapZoom: Number(locationValues.mapZoom) || 15,
+        mapsPlaceUrl: locationValues.mapsPlaceUrl.trim(),
+      }
+    );
+    setBusy(false);
+    if (!result.ok) {
+      notify(result.error ?? "ذخیره موقعیت فروشگاه انجام نشد");
+      return;
+    }
+    notify("موقعیت فروشگاه ذخیره شد ✅");
     await load();
   }
 
@@ -632,20 +690,6 @@ export default function AdminFooterPage() {
               className={INPUT_CLASS}
             />
           </label>
-          <label className="md:col-span-2">
-            <span className="mb-1.5 block text-xs text-slate-600">نشانی</span>
-            <input
-              value={settingsValues.address}
-              onChange={(event) =>
-                setSettingsValues((current) => ({
-                  ...current,
-                  address: event.target.value,
-                }))
-              }
-              maxLength={300}
-              className={INPUT_CLASS}
-            />
-          </label>
           <label>
             <span className="mb-1.5 block text-xs text-slate-600">تلفن</span>
             <input
@@ -715,6 +759,40 @@ export default function AdminFooterPage() {
             >
               {busy ? "در حال ذخیره..." : "ذخیره تنظیمات"}
             </button>
+          </div>
+        </form>
+      </section>
+
+      {/* ─── موقعیت فروشگاه ─── */}
+      <section className="rounded-2xl border border-slate-100 bg-white p-5">
+        <h2 className="mb-1 font-bold text-slate-700">موقعیت فروشگاه</h2>
+        <p className="mb-4 text-[11px] leading-6 text-slate-400">
+          نقطه‌ی انتخاب‌شده روی نقشه، نشانی و دکمه‌ی مسیریابی فروشگاه را در
+          فوتر می‌سازد. مقصد گوگل مپس همیشه از همین مختصات ساخته می‌شود.
+        </p>
+        <form onSubmit={saveLocation} className="space-y-4">
+          <ShopLocationPicker
+            values={locationValues}
+            onChange={updateLocation}
+            disabled={busy || loading}
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              disabled={busy}
+              className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {busy ? "در حال ذخیره..." : "ذخیره موقعیت"}
+            </button>
+            {settings?.directionsUrl && (
+              <a
+                href={settings.directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-brand-700 hover:underline"
+              >
+                بررسی موقعیت ذخیره‌شده در گوگل مپس ↗
+              </a>
+            )}
           </div>
         </form>
       </section>

@@ -5,8 +5,16 @@ from __future__ import annotations
 from datetime import date
 
 from .models import FooterItem, FooterSection, FooterSettings
+from .maps import format_coordinate
 from .selectors import section_items
-from .services import resolved_brand_title, resolved_copyright
+from .services import (
+    resolved_brand_title,
+    resolved_copyright,
+    shop_coordinates,
+    shop_directions_url,
+    shop_map_is_visible,
+    shop_maps_url,
+)
 from .validation import is_external_url, phone_href
 
 
@@ -74,6 +82,21 @@ def admin_section_dto(section: FooterSection) -> dict:
     }
 
 
+def public_location_dto(settings_row: FooterSettings) -> dict | None:
+    """موقعیت فروشگاه برای فوتر، یا None وقتی نباید نمایش داده شود"""
+    if not shop_map_is_visible(settings_row):
+        return None
+    latitude, longitude = shop_coordinates(settings_row)
+    return {
+        "address": settings_row.address or None,
+        "latitude": format_coordinate(latitude),
+        "longitude": format_coordinate(longitude),
+        "zoom": settings_row.map_zoom,
+        "mapsUrl": shop_maps_url(settings_row),
+        "directionsUrl": shop_directions_url(settings_row),
+    }
+
+
 def settings_dto(settings_row: FooterSettings, *, year: int | None = None) -> dict:
     return {
         "brandTitle": resolved_brand_title(settings_row) or None,
@@ -88,6 +111,7 @@ def settings_dto(settings_row: FooterSettings, *, year: int | None = None) -> di
         "phoneUrl": phone_href(settings_row.phone) or None,
         "email": settings_row.email or None,
         "emailUrl": f"mailto:{settings_row.email}" if settings_row.email else None,
+        "location": public_location_dto(settings_row),
     }
 
 
@@ -97,5 +121,21 @@ def admin_settings_dto(settings_row: FooterSettings) -> dict:
         # مقدار ذخیره‌شده، بدون جایگزینی {year} و بدون پُرکردن از تنظیمات سئو
         "storedBrandTitle": settings_row.brand_title or None,
         "storedCopyright": settings_row.copyright_text or None,
+        # مختصات خام برای نقشه‌ی انتخابگر — بدون وابستگی به showMap
+        "latitude": (
+            format_coordinate(settings_row.latitude)
+            if settings_row.latitude is not None
+            else None
+        ),
+        "longitude": (
+            format_coordinate(settings_row.longitude)
+            if settings_row.longitude is not None
+            else None
+        ),
+        "showMap": settings_row.show_map,
+        "mapZoom": settings_row.map_zoom,
+        "mapsPlaceUrl": settings_row.maps_place_url or None,
+        "mapsUrl": shop_maps_url(settings_row) or None,
+        "directionsUrl": shop_directions_url(settings_row) or None,
         "updatedAt": settings_row.updated_at,
     }

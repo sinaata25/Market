@@ -1,6 +1,8 @@
 import shutil
 import tempfile
+from decimal import Decimal
 from io import BytesIO
+from unittest.mock import patch
 
 from PIL import Image
 from django.contrib.auth import get_user_model
@@ -15,7 +17,11 @@ from seo.models import SeoSettings
 from staticpages.models import StaticPage
 from staticpages.definitions import default_content, default_section_visibility
 
-from .dto import item_dto, settings_dto
+from django.core.cache import cache
+
+from .dto import item_dto, public_location_dto, settings_dto
+from .geocoding import GeocodingUnavailable
+from .maps import is_google_maps_url, maps_directions_url, maps_search_url
 from .models import FooterItem, FooterSection, FooterSettings
 from .services import (
     FooterValidationError,
@@ -679,3 +685,350 @@ class FooterAdminApiTests(TempMediaRootMixin, FooterResetMixin, TestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertTrue(response.json()["data"]["item"]["image"])
+
+
+# ───────────────────────────── موقعیت فروشگاه ───────────────────────────────
+
+TEHRAN = {"latitude": Decimal("35.715298"), "longitude": Decimal("51.404343")}
+
+
+class ShopLocationModelTests(FooterResetMixin, TestCase):
+    def test_valid_coordinates_are_stored(self):
+        settings_row = update_settings(**TEHRAN)
+        settings_row.refresh_from_db()
+        self.assertEqual(settings_row.latitude, Decimal("35.715298"))
+        self.assertEqual(settings_row.longitude, Decimal("51.404343"))
+
+    def test_latitude_outside_its_range_is_rejected(self):
+        for value in (Decimal("90.000001"), Decimal("-90.000001")):
+            with self.subTest(latitude=value), self.assertRaises(ValidationError):
+                FooterSettings(
+                    pk=1, latitude=value, longitude=Decimal("51")
+                ).save()
+
+    def test_longitude_outside_its_range_is_rejected(self):
+        for value in (Decimal("180.000001"), Decimal("-180.000001")):
+            with self.subTest(longitude=value), self.assertRaises(ValidationError):
+                FooterSettings(
+                    pk=1, latitude=Decimal("35"), longitude=value
+                ).save()
+
+    def test_the_range_boundaries_themselves_are_accepted(self):
+        FooterSettings(pk=1, latitude=Decimal("-90"), longitude=Decimal("180")).save()
+
+    def test_half_a_coordinate_pair_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            FooterSettings(pk=1, latitude=Decimal("35.7")).save()
+        with self.assertRaises(ValidationError):
+            FooterSettings(pk=1, longitude=Decimal("51.4")).save()
+
+    def test_clearing_both_coordinates_is_allowed(self):
+        update_settings(**TEHRAN)
+        settings_row = update_settings(latitude=None, longitude=None)
+        self.assertIsNone(settings_row.latitude)
+        self.assertIsNone(settings_row.longitude)
+
+    def test_zoom_outside_its_range_is_rejected(self):
+        for value in (0, 22):
+            with self.subTest(zoom=value), self.assertRaises(ValidationError):
+                FooterSettings(pk=1, map_zoom=value).save()
+
+    def test_a_non_google_maps_link_is_rejected(self):
+        for url in (
+            "javascript:alert(1)",
+            "/maps",
+            "https://evil.example/maps",
+            "https://google.com/search?q=x",
+        ):
+            with self.subTest(url=url), self.assertRaises(ValidationError):
+                FooterSettings(pk=1, maps_place_url=url).save()
+
+    def test_google_maps_links_are_accepted(self):
+        for url in (
+            "https://www.google.com/maps/place/Shop",
+            "https://maps.app.goo.gl/abc123",
+            "https://google.de/maps?q=1,2",
+        ):
+            with self.subTest(url=url):
+                self.assertTrue(is_google_maps_url(url))
+                self.assertEqual(
+                    update_settings(maps_place_url=url).maps_place_url, url
+                )
+
+    def test_the_shop_address_reuses_the_single_footer_address_field(self):
+        """نشانی فروشگاه فیلد جداگانه ندارد — همان address تنظیمات فوتر است"""
+        field_names = {field.name for field in FooterSettings._meta.get_fields()}
+        self.assertIn("address", field_names)
+        self.assertNotIn("shop_address", field_names)
+
+
+class ShopLocationUrlTests(TestCase):
+    def test_the_maps_destination_is_built_from_the_saved_coordinates(self):
+        url = maps_search_url(Decimal("35.715298"), Decimal("51.404343"))
+        self.assertIn("query=35.715298%2C51.404343", url)
+        self.assertTrue(url.startswith("https://www.google.com/maps/search/"))
+
+    def test_the_directions_destination_is_built_from_the_saved_coordinates(self):
+        url = maps_directions_url(Decimal("35.715298"), Decimal("51.404343"))
+        self.assertIn("destination=35.715298%2C51.404343", url)
+        self.assertTrue(url.startswith("https://www.google.com/maps/dir/"))
+
+    def test_trailing_zeros_do_not_leak_into_the_destination(self):
+        self.assertIn(
+            "query=35.7%2C51", maps_search_url(Decimal("35.700000"), Decimal("51.000000"))
+        )
+
+    def test_a_whole_number_coordinate_never_becomes_scientific_notation(self):
+        self.assertIn("query=35%2C50", maps_search_url(Decimal("35"), Decimal("50")))
+
+
+class ShopLocationDtoTests(FooterResetMixin, TestCase):
+    def test_a_configured_location_is_exposed_with_both_destinations(self):
+        settings_row = update_settings(address="تهران، آزادی", **TEHRAN)
+        location = public_location_dto(settings_row)
+        self.assertEqual(location["address"], "تهران، آزادی")
+        self.assertEqual(location["latitude"], "35.715298")
+        self.assertEqual(location["zoom"], 15)
+        self.assertIn("35.715298%2C51.404343", location["mapsUrl"])
+        self.assertIn("35.715298%2C51.404343", location["directionsUrl"])
+
+    def test_no_coordinates_means_no_location_block(self):
+        self.assertIsNone(public_location_dto(update_settings(address="تهران")))
+
+    def test_turning_the_map_off_hides_the_location_block(self):
+        settings_row = update_settings(show_map=False, **TEHRAN)
+        self.assertIsNone(public_location_dto(settings_row))
+
+    def test_an_admin_place_link_replaces_only_the_view_destination(self):
+        settings_row = update_settings(
+            maps_place_url="https://maps.app.goo.gl/abc123", **TEHRAN
+        )
+        location = public_location_dto(settings_row)
+        self.assertEqual(location["mapsUrl"], "https://maps.app.goo.gl/abc123")
+        # مسیریابی هرگز به لینک دستی تکیه نمی‌کند
+        self.assertIn("35.715298%2C51.404343", location["directionsUrl"])
+
+
+class ShopLocationPublicApiTests(FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+
+    def _location(self):
+        return self.client.get("/api/footer").json()["data"]["settings"]["location"]
+
+    def test_the_public_footer_carries_the_shop_location(self):
+        update_settings(address="تهران، آزادی", **TEHRAN)
+        location = self._location()
+        self.assertEqual(location["latitude"], "35.715298")
+        self.assertEqual(location["longitude"], "51.404343")
+
+    def test_the_public_footer_omits_the_location_when_the_map_is_off(self):
+        update_settings(show_map=False, **TEHRAN)
+        self.assertIsNone(self._location())
+
+    def test_the_public_footer_omits_the_location_when_coordinates_are_missing(self):
+        update_settings(address="تهران، آزادی")
+        self.assertIsNone(self._location())
+
+    def test_the_address_still_shows_in_the_footer_when_the_map_is_off(self):
+        update_settings(address="تهران، آزادی", show_map=False)
+        settings_payload = self.client.get("/api/footer").json()["data"]["settings"]
+        self.assertEqual(settings_payload["address"], "تهران، آزادی")
+        self.assertIsNone(settings_payload["location"])
+
+    def test_the_location_never_exposes_management_only_fields(self):
+        update_settings(**TEHRAN)
+        location = self._location()
+        for field in ("showMap", "mapsPlaceUrl", "updatedAt"):
+            self.assertNotIn(field, location)
+
+
+class ShopLocationAdminApiTests(FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+        self.client.force_authenticate(
+            get_user_model().objects.create_user(phone="09121234567", is_staff=True)
+        )
+
+    def _patch(self, payload):
+        return self.client.patch(
+            "/api/admin/footer/settings", payload, format="json"
+        )
+
+    def test_saving_a_location_picked_on_the_map(self):
+        response = self._patch(
+            {
+                "latitude": "35.715298",
+                "longitude": "51.404343",
+                "address": "تهران، خیابان آزادی",
+                "mapZoom": 17,
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        settings_payload = response.json()["data"]["settings"]
+        self.assertEqual(settings_payload["latitude"], "35.715298")
+        self.assertEqual(settings_payload["mapZoom"], 17)
+        self.assertIn("35.715298%2C51.404343", settings_payload["directionsUrl"])
+
+    def test_updating_an_existing_location(self):
+        self._patch({"latitude": "35.7", "longitude": "51.4"})
+        response = self._patch({"latitude": "36.2", "longitude": "50.1"})
+        self.assertEqual(response.status_code, 200)
+        settings_row = FooterSettings.load()
+        self.assertEqual(settings_row.latitude, Decimal("36.200000"))
+        self.assertEqual(settings_row.longitude, Decimal("50.100000"))
+
+    def test_an_out_of_range_latitude_is_reported_on_its_field(self):
+        response = self._patch({"latitude": "120", "longitude": "51.4"})
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("latitude", response.json()["data"]["fieldErrors"])
+
+    def test_an_out_of_range_longitude_is_reported_on_its_field(self):
+        response = self._patch({"latitude": "35.7", "longitude": "-200"})
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("longitude", response.json()["data"]["fieldErrors"])
+
+    def test_a_lone_latitude_is_rejected(self):
+        response = self._patch({"latitude": "35.7"})
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("longitude", response.json()["data"]["fieldErrors"])
+
+    def test_blank_coordinates_clear_the_saved_location(self):
+        self._patch({"latitude": "35.7", "longitude": "51.4"})
+        response = self._patch({"latitude": "", "longitude": ""})
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["data"]["settings"]["latitude"])
+
+    def test_a_non_numeric_coordinate_is_rejected_before_it_reaches_the_model(self):
+        self.assertEqual(self._patch({"latitude": "abc", "longitude": "1"}).status_code, 400)
+
+    def test_toggling_the_footer_map_off_and_on(self):
+        self._patch({"latitude": "35.7", "longitude": "51.4"})
+        self.assertFalse(
+            self._patch({"showMap": False}).json()["data"]["settings"]["showMap"]
+        )
+        self.assertTrue(
+            self._patch({"showMap": True}).json()["data"]["settings"]["showMap"]
+        )
+
+    def test_an_out_of_range_zoom_is_rejected(self):
+        self.assertEqual(self._patch({"mapZoom": 40}).status_code, 400)
+
+    def test_a_non_google_place_link_is_rejected(self):
+        response = self._patch({"mapsPlaceUrl": "https://evil.example/maps"})
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("mapsPlaceUrl", response.json()["data"]["fieldErrors"])
+
+
+class ShopLocationPermissionTests(FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+
+    def _urls(self):
+        return [
+            ("patch", "/api/admin/footer/settings"),
+            ("get", "/api/admin/footer/geocode/search?q=tehran"),
+            ("get", "/api/admin/footer/geocode/reverse?lat=35.7&lng=51.4"),
+        ]
+
+    def test_anonymous_visitors_cannot_read_or_write_shop_location_tools(self):
+        client = APIClient()
+        for method, url in self._urls():
+            with self.subTest(url=url):
+                self.assertEqual(getattr(client, method)(url).status_code, 403)
+
+    def test_a_customer_cannot_reach_the_geocoding_proxy(self):
+        client = APIClient()
+        client.force_authenticate(
+            get_user_model().objects.create_user(phone="09120000000")
+        )
+        for method, url in self._urls():
+            with self.subTest(url=url):
+                self.assertEqual(getattr(client, method)(url).status_code, 403)
+
+    def test_a_customer_cannot_move_the_shop_by_crafting_a_payload(self):
+        client = APIClient()
+        client.force_authenticate(
+            get_user_model().objects.create_user(phone="09120000001")
+        )
+        client.patch(
+            "/api/admin/footer/settings",
+            {"latitude": "1", "longitude": "1"},
+            format="json",
+        )
+        self.assertIsNone(FooterSettings.load().latitude)
+
+
+class GeocodingProxyTests(FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.client = APIClient()
+        self.client.force_authenticate(
+            get_user_model().objects.create_user(phone="09121234567", is_staff=True)
+        )
+
+    def test_searching_an_address_returns_usable_coordinates(self):
+        payload = [
+            {"display_name": "تهران، آزادی", "lat": "35.7152981", "lon": "51.4043433"},
+            {"display_name": "بدون مختصات", "lat": "not-a-number", "lon": "51.4"},
+        ]
+        with patch("footer.geocoding._request", return_value=payload):
+            response = self.client.get("/api/admin/footer/geocode/search?q=آزادی")
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["data"]["results"]
+        # ردیف بی‌مختصات بی‌سروصدا کنار گذاشته می‌شود، نه اینکه پاسخ را بشکند
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["latitude"], "35.715298")
+
+    def test_an_empty_search_term_is_rejected(self):
+        self.assertEqual(
+            self.client.get("/api/admin/footer/geocode/search?q=  ").status_code, 422
+        )
+
+    def test_reverse_lookup_returns_a_human_readable_address(self):
+        with patch("footer.geocoding._request", return_value={"display_name": "تهران"}):
+            response = self.client.get(
+                "/api/admin/footer/geocode/reverse?lat=35.7&lng=51.4"
+            )
+        self.assertEqual(response.json()["data"]["address"], "تهران")
+
+    def test_reverse_lookup_rejects_coordinates_outside_the_world(self):
+        for query in ("lat=120&lng=51", "lat=35&lng=200", "lat=x&lng=1", "lat=35"):
+            with self.subTest(query=query):
+                self.assertEqual(
+                    self.client.get(
+                        f"/api/admin/footer/geocode/reverse?{query}"
+                    ).status_code,
+                    422,
+                )
+
+    def test_a_provider_outage_is_a_controlled_failure_not_a_500(self):
+        with patch("footer.geocoding._request", side_effect=GeocodingUnavailable):
+            search_response = self.client.get(
+                "/api/admin/footer/geocode/search?q=tehran"
+            )
+            reverse_response = self.client.get(
+                "/api/admin/footer/geocode/reverse?lat=35.7&lng=51.4"
+            )
+        self.assertEqual(search_response.status_code, 503)
+        self.assertEqual(reverse_response.status_code, 503)
+        self.assertFalse(search_response.json()["ok"])
+
+
+class ShopLocationCacheTests(FooterResetMixin, TestCase):
+    """فوتر روی هر صفحه کش می‌شود؛ تغییر موقعیت باید کش را باطل کند"""
+
+    def test_saving_a_location_schedules_a_footer_cache_revalidation(self):
+        with patch("footer.services.schedule_footer_revalidation") as scheduled:
+            update_settings(**TEHRAN)
+        self.assertTrue(scheduled.called)
+
+    def test_toggling_the_map_schedules_a_footer_cache_revalidation(self):
+        update_settings(**TEHRAN)
+        with patch("footer.services.schedule_footer_revalidation") as scheduled:
+            update_settings(show_map=False)
+        self.assertTrue(scheduled.called)

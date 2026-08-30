@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from staticpages.definitions import SUPPORTED_PAGE_KEYS
 
+from .maps import ZOOM_RANGE
 from .models import FooterItem, FooterSection
 
 # نام فیلد ورودی (camelCase) → نام فیلد مدل
@@ -12,7 +13,19 @@ _FIELD_RENAMES = {
     "staticPageKey": "static_page_key",
     "copyrightText": "copyright_text",
     "brandTitle": "brand_title",
+    "showMap": "show_map",
+    "mapZoom": "map_zoom",
+    "mapsPlaceUrl": "maps_place_url",
 }
+
+
+class BlankableDecimalField(serializers.DecimalField):
+    """رشته‌ی خالی از فرم مدیریت یعنی «پاک کن»، نه «صفر»"""
+
+    def validate_empty_values(self, data):
+        if data == "":
+            return True, None
+        return super().validate_empty_values(data)
 
 
 class RenamingSerializer(serializers.Serializer):
@@ -36,6 +49,20 @@ class FooterSettingsSerializer(RenamingSerializer):
     address = serializers.CharField(max_length=300, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=40, required=False, allow_blank=True)
     email = serializers.CharField(max_length=120, required=False, allow_blank=True)
+    # محدوده‌ی مقادیر در مدل هم بررسی می‌شود؛ اینجا فقط شکل عدد کنترل می‌گردد
+    latitude = BlankableDecimalField(
+        max_digits=9, decimal_places=6, required=False, allow_null=True
+    )
+    longitude = BlankableDecimalField(
+        max_digits=10, decimal_places=6, required=False, allow_null=True
+    )
+    showMap = serializers.BooleanField(required=False)
+    mapZoom = serializers.IntegerField(
+        required=False, min_value=ZOOM_RANGE[0], max_value=ZOOM_RANGE[1]
+    )
+    mapsPlaceUrl = serializers.CharField(
+        max_length=500, required=False, allow_blank=True
+    )
 
 
 class FooterSectionCreateSerializer(RenamingSerializer):

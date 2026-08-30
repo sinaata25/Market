@@ -1,12 +1,17 @@
+from decimal import Decimal, InvalidOperation
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from accounts.permissions import ShopAdminRequiredMixin
 from common.responses import fail, first_error_message, ok
 
 from .dto import admin_item_dto, admin_section_dto, admin_settings_dto
+from .geocoding import GeocodingUnavailable, reverse, search
+from .maps import LATITUDE_RANGE, LONGITUDE_RANGE, format_coordinate
 from .files import schedule_footer_image_delete
 from .images import image_upload_error
 from .models import FooterItem, FooterSection, FooterSettings
@@ -284,3 +289,76 @@ class AdminFooterItemImageView(ShopAdminRequiredMixin, APIView):
         )
         schedule_footer_revalidation(using=item._state.db or "default")
         return ok({"item": admin_item_dto(item)})
+
+
+class GeocodingThrottle(UserRateThrottle):
+    """سرویس نشانی مهمان ماست؛ سیاست استفاده‌اش نرخ پایین می‌خواهد"""
+
+    scope = "footer_geocode"
+
+
+class AdminFooterGeocodeSearchView(ShopAdminRequiredMixin, APIView):
+    """جست‌وجوی نشانی برای انتخابگر نقشه — فقط مدیران داشبورد"""
+
+    throttle_classes = [GeocodingThrottle]
+
+    @extend_schema(
+        parameters=[OpenApiParameter("q", str, description="عبارت جست‌وجو")],
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def get(self, request):
+        query = (request.query_params.get("q") or "").strip()
+        if not query:
+            return fail("عبارت جست‌وجو خالی است", 422)
+        try:
+            results = search(query)
+        except GeocodingUnavailable:
+            return fail("سرویس جست‌وجوی نشانی در دسترس نیست", 503)
+        return ok(
+            {
+                "results": [
+                    {
+                        "label": result.label,
+                        "latitude": format_coordinate(result.latitude),
+                        "longitude": format_coordinate(result.longitude),
+                    }
+                    for result in results
+                ]
+            }
+        )
+
+
+class AdminFooterGeocodeReverseView(ShopAdminRequiredMixin, APIView):
+    """نشانی خوانای یک نقطه‌ی روی نقشه — مدیر همچنان می‌تواند ویرایشش کند"""
+
+    throttle_classes = [GeocodingThrottle]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("lat", str, description="عرض جغرافیایی"),
+            OpenApiParameter("lng", str, description="طول جغرافیایی"),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def get(self, request):
+        latitude = _bounded_decimal(request.query_params.get("lat"), *LATITUDE_RANGE)
+        longitude = _bounded_decimal(request.query_params.get("lng"), *LONGITUDE_RANGE)
+        if latitude is None or longitude is None:
+            return fail("مختصات معتبر نیست", 422)
+        try:
+            address = reverse(latitude, longitude)
+        except GeocodingUnavailable:
+            return fail("سرویس نشانی در دسترس نیست", 503)
+        return ok({"address": address or None})
+
+
+def _bounded_decimal(raw, low: Decimal, high: Decimal) -> Decimal | None:
+    if raw is None:
+        return None
+    try:
+        value = Decimal(str(raw))
+    except (InvalidOperation, ValueError):
+        return None
+    if not value.is_finite() or not low <= value <= high:
+        return None
+    return value

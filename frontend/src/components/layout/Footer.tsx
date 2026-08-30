@@ -1,5 +1,7 @@
 import Link from "next/link";
+import FooterShopLocation from "@/components/layout/FooterShopLocation";
 import { getFooter } from "@/lib/footer";
+import { shopLocationToRender } from "@/lib/footer-map";
 import type { FooterItem, FooterSection, FooterSettings } from "@/lib/footer";
 import {
   footerColumnGridClass,
@@ -199,6 +201,7 @@ export default async function Footer() {
 
   const { settings, sections } = footer;
   const { strips, columns } = partitionFooterSections(sections);
+  const location = shopLocationToRender(settings.location);
 
   return (
     <footer className="mt-12 border-t border-slate-200 bg-white">
@@ -215,6 +218,8 @@ export default async function Footer() {
             <ColumnSection key={section.id} section={section} />
           ))}
         </div>
+
+        {location && <FooterShopLocation location={location} />}
 
         {settings.copyright && (
           <div className="border-t border-slate-100 pt-6 text-center text-xs text-slate-400">

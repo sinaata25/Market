@@ -3,6 +3,13 @@ from django.db import models
 
 from staticpages.definitions import PAGE_KEY_CHOICES, SUPPORTED_PAGE_KEYS
 
+from .maps import (
+    DEFAULT_ZOOM,
+    LATITUDE_RANGE,
+    LONGITUDE_RANGE,
+    ZOOM_RANGE,
+    is_google_maps_url,
+)
 from .validation import (
     contains_control_characters,
     contains_html,
@@ -97,6 +104,26 @@ class FooterSettings(models.Model):
     address = models.CharField("نشانی", max_length=300, blank=True)
     phone = models.CharField("تلفن", max_length=40, blank=True)
     email = models.EmailField("ایمیل", max_length=120, blank=True)
+
+    # موقعیت فروشگاه — نشانی متنی همان فیلد address بالاست تا دو منبع حقیقت
+    # برای یک چیز ساخته نشود؛ اینجا فقط مختصات و تنظیمات نمایش نقشه است.
+    latitude = models.DecimalField(
+        "عرض جغرافیایی", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    longitude = models.DecimalField(
+        "طول جغرافیایی", max_digits=10, decimal_places=6, null=True, blank=True
+    )
+    show_map = models.BooleanField("نمایش نقشه در فوتر", default=True)
+    map_zoom = models.PositiveSmallIntegerField(
+        "بزرگ‌نمایی نقشه", default=DEFAULT_ZOOM
+    )
+    maps_place_url = models.CharField(
+        "پیوند صفحه‌ی گوگل مپس (اختیاری)",
+        max_length=500,
+        blank=True,
+        help_text="جای‌گزین پیوند «مشاهده روی نقشه»؛ مسیریابی همیشه از مختصات ساخته می‌شود",
+    )
+
     updated_at = models.DateTimeField("به‌روزرسانی", auto_now=True)
 
     class Meta:
@@ -120,8 +147,39 @@ class FooterSettings(models.Model):
             errors["phone"] = "شماره تماس معتبر نیست"
         if self.email and not is_valid_email(self.email):
             errors["email"] = "ایمیل معتبر نیست"
+        errors.update(self._location_errors())
         if errors:
             raise ValidationError(errors)
+
+    def _location_errors(self) -> dict[str, str]:
+        errors: dict[str, str] = {}
+
+        # نیم‌مختصات روی نقشه معنا ندارد و سوزن را جای اشتباه می‌گذارد
+        if (self.latitude is None) != (self.longitude is None):
+            missing = "latitude" if self.latitude is None else "longitude"
+            errors[missing] = "عرض و طول جغرافیایی باید هر دو تنظیم شوند یا هیچ‌کدام"
+
+        if self.latitude is not None and not (
+            LATITUDE_RANGE[0] <= self.latitude <= LATITUDE_RANGE[1]
+        ):
+            errors["latitude"] = "عرض جغرافیایی باید بین ۹۰- و ۹۰ باشد"
+        if self.longitude is not None and not (
+            LONGITUDE_RANGE[0] <= self.longitude <= LONGITUDE_RANGE[1]
+        ):
+            errors["longitude"] = "طول جغرافیایی باید بین ۱۸۰- و ۱۸۰ باشد"
+
+        # map_zoom تهی نمی‌پذیرد، اما full_clean متد clean را حتی وقتی
+        # clean_fields خطا داده هم صدا می‌زند؛ مقایسه با None نباید بترکد
+        if self.map_zoom is not None and not (
+            ZOOM_RANGE[0] <= self.map_zoom <= ZOOM_RANGE[1]
+        ):
+            errors["mapZoom"] = (
+                f"بزرگ‌نمایی نقشه باید بین {ZOOM_RANGE[0]} تا {ZOOM_RANGE[1]} باشد"
+            )
+
+        if self.maps_place_url and not is_google_maps_url(self.maps_place_url):
+            errors["mapsPlaceUrl"] = "پیوند باید یک نشانی معتبر گوگل مپس باشد"
+        return errors
 
     def save(self, *args, **kwargs):
         self.full_clean()
