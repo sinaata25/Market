@@ -1,15 +1,11 @@
 import "server-only";
 
+import { footerFetchOptions } from "@/lib/footer-cache";
+
 // لایه‌ی خواندن فوتر سمت سرور Next — کل فوتر در یک درخواست از جنگو می‌آید
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
-/**
- * فوتر روی تقریباً همه‌ی صفحه‌هاست، پس پاسخ آن کش می‌شود. بک‌اند بعد از هر
- * تغییر مدیر همین تگ را از مسیر /internal/revalidate باطل می‌کند؛ انقضای
- * زمانی هم به‌عنوان تور ایمنی باقی می‌ماند.
- */
-export const FOOTER_CACHE_TAG = "footer";
-const FOOTER_CACHE_SECONDS = 300;
+export { FOOTER_CACHE_TAG } from "@/lib/footer-cache";
 
 export type FooterItemType =
   | "link"
@@ -88,10 +84,10 @@ function isFooterData(value: unknown): value is FooterData {
 /** کل فوتر، یا null اگر بک‌اند در دسترس نباشد — فوتر نباید صفحه را بشکند */
 export async function getFooter(): Promise<FooterData | null> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/footer`, {
-      cache: "force-cache",
-      next: { revalidate: FOOTER_CACHE_SECONDS, tags: [FOOTER_CACHE_TAG] },
-    });
+    const response = await fetch(
+      `${BACKEND_URL}/api/footer`,
+      footerFetchOptions(process.env.NODE_ENV)
+    );
     const json = await response.json().catch(() => null);
     if (!response.ok || !json?.ok || !isFooterData(json.data)) return null;
     return json.data;

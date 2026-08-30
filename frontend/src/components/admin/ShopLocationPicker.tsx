@@ -117,8 +117,7 @@ export default function ShopLocationPicker({
     [onChange]
   );
 
-  async function runSearch(event: React.FormEvent) {
-    event.preventDefault();
+  async function runSearch() {
     const term = query.trim();
     if (!term || searching) return;
     setSearching(true);
@@ -155,22 +154,31 @@ export default function ShopLocationPicker({
 
   return (
     <div className="space-y-4">
-      <form onSubmit={runSearch} className="flex flex-wrap gap-2">
+      {/* عمداً <form> نیست: این انتخابگر داخل فرم «ذخیره موقعیت» رندر
+          می‌شود و فرم تودرتو در HTML مجاز نیست. */}
+      <div className="flex flex-wrap gap-2">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            // بدون این، Enter فرمِ بیرونی را ثبت و موقعیت را ذخیره می‌کند
+            event.preventDefault();
+            void runSearch();
+          }}
           disabled={disabled}
           placeholder="جست‌وجوی نشانی یا نام مکان..."
           className={`${INPUT_CLASS} min-w-0 flex-1 basis-56`}
         />
         <button
-          type="submit"
+          type="button"
+          onClick={() => void runSearch()}
           disabled={disabled || searching || !query.trim()}
           className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600 transition hover:border-brand-400 disabled:opacity-50"
         >
           {searching ? "در حال جست‌وجو..." : "جست‌وجو"}
         </button>
-      </form>
+      </div>
 
       {results.length > 0 && (
         <ul className="max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200">

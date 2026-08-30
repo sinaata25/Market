@@ -34,10 +34,27 @@ def _post_revalidation(url: str, secret: str) -> None:
         logger.warning("footer cache revalidation request failed", exc_info=True)
 
 
+_warned_about_configuration = False
+
+
+def _warn_once_if_unconfigured() -> None:
+    """بی‌سروصدا کهنه‌ماندن فوتر بدترین حالت است — دست‌کم یک‌بار هشدار بده"""
+    global _warned_about_configuration
+    if settings.DEBUG or _warned_about_configuration:
+        return
+    _warned_about_configuration = True
+    logger.warning(
+        "footer changed but FRONTEND_REVALIDATE_URL/SECRET are unset; the "
+        "storefront footer will keep serving cached data for up to its "
+        "revalidate window after each admin change"
+    )
+
+
 def schedule_footer_revalidation(*, using: str = "default") -> None:
     url = getattr(settings, "FRONTEND_REVALIDATE_URL", "")
     secret = getattr(settings, "FRONTEND_REVALIDATE_SECRET", "")
     if not url or not secret:
+        _warn_once_if_unconfigured()
         return
 
     def dispatch():

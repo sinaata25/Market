@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { revalidateTag } from "next/cache";
-import { FOOTER_CACHE_TAG } from "@/lib/footer";
+import { FOOTER_CACHE_TAG } from "@/lib/footer-cache";
 
 /**
  * باطل‌کردن کش داده‌های سرور به‌درخواست بک‌اند.
@@ -29,6 +29,10 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "unknown tag" }, { status: 422 });
   }
 
-  revalidateTag(tag, "max");
+  // { expire: 0 } یعنی «read-your-own-writes»: درخواست بعدی منتظر داده‌ی
+  // تازه می‌ماند. با profile "max" اولین بارگذاری پس از ذخیره هنوز نسخه‌ی
+  // کهنه را می‌دید و مدیر مجبور بود دوباره صفحه را باز کند.
+  // (updateTag همین کار را می‌کند اما فقط در Server Action مجاز است.)
+  revalidateTag(tag, { expire: 0 });
   return Response.json({ ok: true, data: { revalidated: tag } });
 }
