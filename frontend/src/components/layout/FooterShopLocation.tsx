@@ -1,3 +1,4 @@
+import FooterIcon from "@/components/layout/FooterIcon";
 import type { FooterLocation } from "@/lib/footer";
 import { MAP_ASPECT_RATIO, googleMapsEmbedUrl } from "@/lib/footer-map";
 
@@ -33,7 +34,7 @@ export default function FooterShopLocation({
         </h3>
         {location.address && (
           <p className="flex items-start gap-1.5 text-sm leading-7 text-slate-500">
-            <span aria-hidden="true">📍</span>
+            <FooterIcon image={location.icon} className="mt-1 h-4 w-4" />
             <span className="min-w-0">{location.address}</span>
           </p>
         )}

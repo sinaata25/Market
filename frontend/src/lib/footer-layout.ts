@@ -73,3 +73,25 @@ export function partitionFooterSections<T extends PartitionedSection>(
     columns: sections.filter((section) => section.variant !== "strip"),
   };
 }
+
+export type FooterIconSource =
+  | { kind: "image"; value: string }
+  | { kind: "emoji"; value: string }
+  | { kind: "none" };
+
+/**
+ * چه چیزی به‌جای آیکن رندر شود.
+ *
+ * فایل آیکنِ انتخاب‌شده در داشبورد همیشه مقدم است؛ ایموجی فقط میراث
+ * پیکربندی‌های قدیمی و راه سریع مدیر است، نه حالت پیش‌فرض.
+ */
+export function footerIconSource(
+  image: string | null | undefined,
+  emoji?: string | null
+): FooterIconSource {
+  const file = image?.trim();
+  if (file) return { kind: "image", value: file };
+  const fallback = emoji?.trim();
+  if (fallback) return { kind: "emoji", value: fallback };
+  return { kind: "none" };
+}

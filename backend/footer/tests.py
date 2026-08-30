@@ -19,14 +19,16 @@ from staticpages.definitions import default_content, default_section_visibility
 
 from django.core.cache import cache
 
-from .dto import item_dto, public_location_dto, settings_dto
+from .dto import admin_icon_dto, item_dto, public_location_dto, settings_dto
 from .geocoding import GeocodingUnavailable
 from .maps import is_google_maps_url, maps_directions_url, maps_search_url
-from .models import FooterItem, FooterSection, FooterSettings
+from .models import FooterIcon, FooterItem, FooterSection, FooterSettings
 from .services import (
     FooterValidationError,
+    create_icon,
     create_item,
     create_section,
+    delete_icon,
     delete_item,
     delete_section,
     move_item,
@@ -41,6 +43,20 @@ def make_image_file(name="logo.png", size=(10, 10)) -> SimpleUploadedFile:
     buffer = BytesIO()
     Image.new("RGB", size, "green").save(buffer, format="PNG")
     return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+
+SAFE_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<circle cx="12" cy="12" r="8" fill="#467235"/></svg>'
+)
+
+
+def make_icon_file(name="icon.svg", data: bytes = SAFE_SVG) -> SimpleUploadedFile:
+    return SimpleUploadedFile(name, data, content_type="image/svg+xml")
+
+
+def make_icon(name="ارسال") -> FooterIcon:
+    return create_icon(name=name, image=make_icon_file())
 
 
 class TempMediaRootMixin:
@@ -1032,3 +1048,324 @@ class ShopLocationCacheTests(FooterResetMixin, TestCase):
         with patch("footer.services.schedule_footer_revalidation") as scheduled:
             update_settings(show_map=False)
         self.assertTrue(scheduled.called)
+
+
+# ───────────────────────────── کتابخانه‌ی آیکن‌ها ────────────────────────────
+
+
+class FooterIconModelTests(TempMediaRootMixin, FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        FooterIcon.objects.all().delete()
+
+    def test_an_icon_needs_a_file(self):
+        with self.assertRaises(ValidationError):
+            FooterIcon(name="بدون فایل").save()
+
+    def test_icon_names_are_unique(self):
+        make_icon("ارسال")
+        with self.assertRaises(FooterValidationError):
+            make_icon("ارسال")
+
+    def test_html_in_an_icon_name_is_rejected(self):
+        with self.assertRaises(FooterValidationError):
+            create_icon(name="<b>ارسال</b>", image=make_icon_file())
+
+    def test_an_unsafe_svg_is_rejected(self):
+        unsafe = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+            b'<script>alert(1)</script></svg>'
+        )
+        with self.assertRaises(FooterValidationError):
+            create_icon(name="خطرناک", image=make_icon_file("bad.svg", unsafe))
+
+    def test_a_non_icon_file_type_is_rejected(self):
+        with self.assertRaises(FooterValidationError):
+            create_icon(
+                name="جیپگ",
+                image=SimpleUploadedFile("x.jpg", b"nope", "image/jpeg"),
+            )
+
+    def test_a_png_icon_is_accepted(self):
+        icon = create_icon(name="پی‌ان‌جی", image=make_image_file("icon.png"))
+        self.assertTrue(icon.image)
+
+    def test_deleting_an_icon_leaves_its_items_without_one_not_broken(self):
+        icon = make_icon()
+        section = make_section()
+        item = make_link(section, icon_image=icon)
+        delete_icon(icon)
+        item.refresh_from_db()
+        self.assertIsNone(item.icon_image_id)
+        self.assertTrue(FooterItem.objects.filter(pk=item.pk).exists())
+
+    def test_deleting_an_icon_clears_it_from_the_settings_rows(self):
+        icon = make_icon()
+        update_settings(address_icon=icon, phone_icon=icon)
+        delete_icon(icon)
+        settings_row = FooterSettings.load()
+        self.assertIsNone(settings_row.address_icon_id)
+        self.assertIsNone(settings_row.phone_icon_id)
+
+    def test_an_icon_is_rejected_on_an_item_type_that_has_no_icon(self):
+        icon = make_icon()
+        section = make_section()
+        with self.assertRaises(ValidationError):
+            FooterItem(
+                section=section,
+                item_type="image",
+                image=make_image_file(),
+                icon_image=icon,
+            ).save()
+
+    def test_switching_item_type_drops_an_icon_the_new_type_cannot_use(self):
+        icon = make_icon()
+        section = make_section()
+        item = make_link(section, icon_image=icon)
+        update_item(item, item_type="image", image=make_image_file())
+        item.refresh_from_db()
+        self.assertIsNone(item.icon_image_id)
+
+    def test_the_usage_count_reports_how_many_items_use_the_icon(self):
+        icon = make_icon()
+        section = make_section()
+        make_link(section, label="یک", icon_image=icon)
+        make_link(section, label="دو", icon_image=icon)
+        self.assertEqual(admin_icon_dto(icon)["usageCount"], 2)
+
+
+class FooterIconPublicApiTests(TempMediaRootMixin, FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        FooterIcon.objects.all().delete()
+        self.client = APIClient()
+
+    def test_an_item_exposes_its_icon_file_to_the_storefront(self):
+        icon = make_icon()
+        section = make_section()
+        make_link(section, icon_image=icon)
+        item = self.client.get("/api/footer").json()["data"]["sections"][0]["items"][0]
+        self.assertTrue(item["iconImage"].endswith(".svg"))
+
+    def test_the_emoji_remains_only_as_a_fallback(self):
+        section = make_section()
+        make_link(section, icon="🚚")
+        item = self.client.get("/api/footer").json()["data"]["sections"][0]["items"][0]
+        self.assertIsNone(item["iconImage"])
+        self.assertEqual(item["icon"], "🚚")
+
+    def test_the_contact_row_icons_come_from_settings_not_the_component(self):
+        icon = make_icon()
+        update_settings(
+            address="تهران",
+            phone="021-12345678",
+            email="a@b.com",
+            address_icon=icon,
+            phone_icon=icon,
+            email_icon=icon,
+        )
+        settings_payload = self.client.get("/api/footer").json()["data"]["settings"]
+        for key in ("addressIcon", "phoneIcon", "emailIcon"):
+            self.assertTrue(settings_payload[key].endswith(".svg"))
+
+    def test_the_map_row_reuses_the_address_icon(self):
+        icon = make_icon()
+        update_settings(
+            address_icon=icon,
+            latitude=Decimal("35.7"),
+            longitude=Decimal("51.4"),
+        )
+        location = self.client.get("/api/footer").json()["data"]["settings"]["location"]
+        self.assertTrue(location["icon"].endswith(".svg"))
+
+    def test_missing_icons_are_null_rather_than_breaking_the_footer(self):
+        update_settings(address="تهران", phone="021-12345678")
+        settings_payload = self.client.get("/api/footer").json()["data"]["settings"]
+        self.assertIsNone(settings_payload["addressIcon"])
+        self.assertIsNone(settings_payload["phoneIcon"])
+
+    def test_icons_do_not_add_a_query_per_item(self):
+        icon = make_icon()
+        FooterSettings.load()
+        section = make_section()
+        make_link(section, icon_image=icon)
+        with CaptureQueriesContext(connection) as small:
+            self.client.get("/api/footer")
+        for index in range(5):
+            make_link(section, label=f"پیوند {index}", icon_image=icon)
+        with CaptureQueriesContext(connection) as large:
+            self.client.get("/api/footer")
+        self.assertEqual(len(large), len(small))
+
+
+class FooterIconAdminApiTests(TempMediaRootMixin, FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        FooterIcon.objects.all().delete()
+        self.client = APIClient()
+        self.client.force_authenticate(
+            get_user_model().objects.create_user(phone="09121234567", is_staff=True)
+        )
+
+    def test_creating_an_icon_with_its_file(self):
+        response = self.client.post(
+            "/api/admin/footer/icons",
+            {"name": "ارسال", "file": make_icon_file()},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        icon = response.json()["data"]["icon"]
+        self.assertEqual(icon["name"], "ارسال")
+        self.assertTrue(icon["image"])
+        self.assertEqual(icon["usageCount"], 0)
+
+    def test_creating_an_icon_without_a_file_is_rejected(self):
+        response = self.client.post(
+            "/api/admin/footer/icons", {"name": "بدون فایل"}, format="multipart"
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_creating_an_icon_with_an_unsafe_svg_is_rejected(self):
+        unsafe = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">'
+            b"</svg>"
+        )
+        response = self.client.post(
+            "/api/admin/footer/icons",
+            {"name": "خطرناک", "file": make_icon_file("bad.svg", unsafe)},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(FooterIcon.objects.exists())
+
+    def test_renaming_an_icon(self):
+        icon = make_icon()
+        response = self.client.patch(
+            f"/api/admin/footer/icons/{icon.id}", {"name": "نام تازه"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        icon.refresh_from_db()
+        self.assertEqual(icon.name, "نام تازه")
+
+    def test_replacing_an_icon_file_updates_every_place_that_uses_it(self):
+        icon = make_icon()
+        section = make_section()
+        item = make_link(section, icon_image=icon)
+        original = icon.image.name
+
+        response = self.client.post(
+            f"/api/admin/footer/icons/{icon.id}/image",
+            {"file": make_icon_file("replacement.svg")},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        item.refresh_from_db()
+        self.assertNotEqual(item.icon_image.image.name, original)
+
+    def test_deleting_an_icon(self):
+        icon = make_icon()
+        self.assertEqual(
+            self.client.delete(f"/api/admin/footer/icons/{icon.id}").status_code, 200
+        )
+        self.assertFalse(FooterIcon.objects.exists())
+
+    def test_a_missing_icon_is_a_404(self):
+        self.assertEqual(
+            self.client.patch(
+                "/api/admin/footer/icons/9999", {"name": "x"}, format="json"
+            ).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.delete("/api/admin/footer/icons/9999").status_code, 404
+        )
+
+    def test_assigning_an_icon_to_an_item(self):
+        icon = make_icon()
+        section = make_section()
+        response = self.client.post(
+            f"/api/admin/footer/sections/{section.id}/items",
+            {"itemType": "link", "label": "پرسش‌ها", "url": "/support", "iconId": icon.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["data"]["item"]["iconId"], icon.id)
+
+    def test_clearing_an_items_icon(self):
+        icon = make_icon()
+        section = make_section()
+        item = make_link(section, icon_image=icon)
+        response = self.client.patch(
+            f"/api/admin/footer/items/{item.id}", {"iconId": None}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        item.refresh_from_db()
+        self.assertIsNone(item.icon_image_id)
+
+    def test_an_unknown_icon_id_is_rejected(self):
+        section = make_section()
+        response = self.client.post(
+            f"/api/admin/footer/sections/{section.id}/items",
+            {"itemType": "link", "label": "x", "url": "/x", "iconId": 9999},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_assigning_the_contact_icons_from_settings(self):
+        icon = make_icon()
+        response = self.client.patch(
+            "/api/admin/footer/settings",
+            {
+                "addressIconId": icon.id,
+                "phoneIconId": icon.id,
+                "emailIconId": icon.id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        settings_payload = response.json()["data"]["settings"]
+        self.assertEqual(settings_payload["addressIconId"], icon.id)
+        self.assertEqual(settings_payload["phoneIconId"], icon.id)
+
+    def test_an_unknown_settings_icon_id_is_rejected(self):
+        self.assertEqual(
+            self.client.patch(
+                "/api/admin/footer/settings", {"phoneIconId": 9999}, format="json"
+            ).status_code,
+            400,
+        )
+
+
+class FooterIconPermissionTests(TempMediaRootMixin, FooterResetMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        FooterIcon.objects.all().delete()
+        self.icon = make_icon()
+
+    def _urls(self):
+        return [
+            ("get", "/api/admin/footer/icons"),
+            ("post", "/api/admin/footer/icons"),
+            ("patch", f"/api/admin/footer/icons/{self.icon.id}"),
+            ("delete", f"/api/admin/footer/icons/{self.icon.id}"),
+            ("post", f"/api/admin/footer/icons/{self.icon.id}/image"),
+        ]
+
+    def test_anonymous_visitors_cannot_touch_the_icon_library(self):
+        client = APIClient()
+        for method, url in self._urls():
+            with self.subTest(url=f"{method} {url}"):
+                self.assertEqual(getattr(client, method)(url).status_code, 403)
+
+    def test_a_customer_cannot_touch_the_icon_library(self):
+        client = APIClient()
+        client.force_authenticate(
+            get_user_model().objects.create_user(phone="09120000000")
+        )
+        for method, url in self._urls():
+            with self.subTest(url=f"{method} {url}"):
+                self.assertEqual(getattr(client, method)(url).status_code, 403)
+
+    def test_a_rejected_delete_leaves_the_icon_in_place(self):
+        APIClient().delete(f"/api/admin/footer/icons/{self.icon.id}")
+        self.assertTrue(FooterIcon.objects.filter(pk=self.icon.pk).exists())

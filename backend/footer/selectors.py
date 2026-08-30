@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Count, Prefetch, QuerySet
 
-from .models import FooterItem, FooterSection
+from .models import FooterIcon, FooterItem, FooterSection
 
 
 def items_queryset(*, active_only: bool) -> QuerySet[FooterItem]:
-    qs = FooterItem.objects.order_by("position", "id")
+    qs = FooterItem.objects.select_related("icon_image").order_by("position", "id")
     return qs.filter(is_active=True) if active_only else qs
 
 
@@ -27,4 +27,9 @@ def section_items(section: FooterSection) -> list[FooterItem]:
     prefetched = getattr(section, "ordered_items", None)
     if prefetched is not None:
         return list(prefetched)
-    return list(section.items.order_by("position", "id"))
+    return list(section.items.select_related("icon_image").order_by("position", "id"))
+
+
+def icons_queryset() -> QuerySet[FooterIcon]:
+    """آیکن‌ها به‌همراه تعداد آیتم‌هایی که از آن‌ها استفاده می‌کنند"""
+    return FooterIcon.objects.annotate(item_count=Count("items")).order_by("name", "id")

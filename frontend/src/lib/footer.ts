@@ -24,6 +24,9 @@ export type FooterItem = {
   text: string | null;
   url: string | null;
   image: string | null;
+  /** آیکن تصویری انتخاب‌شده از کتابخانه؛ بر ایموجی اولویت دارد */
+  iconImage: string | null;
+  /** ایموجی جایگزین، فقط وقتی آیکن تصویری انتخاب نشده باشد */
   icon: string | null;
   openInNewTab: boolean;
   isExternal: boolean;
@@ -43,6 +46,7 @@ export type FooterSection = {
 
 export type FooterLocation = {
   address: string | null;
+  icon: string | null;
   latitude: string;
   longitude: string;
   zoom: number;
@@ -58,10 +62,13 @@ export type FooterSettings = {
   description: string | null;
   copyright: string | null;
   address: string | null;
+  addressIcon: string | null;
   phone: string | null;
   phoneUrl: string | null;
+  phoneIcon: string | null;
   email: string | null;
   emailUrl: string | null;
+  emailIcon: string | null;
   /** null یعنی مدیر نقشه را خاموش کرده یا مختصاتی ذخیره نشده است */
   location: FooterLocation | null;
 };

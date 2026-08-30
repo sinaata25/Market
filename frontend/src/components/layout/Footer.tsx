@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FooterIcon from "@/components/layout/FooterIcon";
 import FooterShopLocation from "@/components/layout/FooterShopLocation";
 import { getFooter } from "@/lib/footer";
 import { shopLocationToRender } from "@/lib/footer-map";
@@ -62,8 +63,9 @@ function ItemBody({ item }: { item: FooterItem }) {
       ? item.label
       : (item.text ?? item.label);
 
+  const hasIcon = Boolean(item.iconImage || item.icon);
   // پیوند ساده‌ی بی‌آیکن دقیقاً همان متن قبلی فوتر است — بدون قاب اضافه
-  if (!item.icon && item.type !== "phone" && item.type !== "email") {
+  if (!hasIcon && item.type !== "phone" && item.type !== "email") {
     return <>{value}</>;
   }
 
@@ -71,7 +73,11 @@ function ItemBody({ item }: { item: FooterItem }) {
   const ltr = item.type === "phone" || item.type === "email";
   return (
     <span className="inline-flex items-start gap-1.5">
-      {item.icon && <span aria-hidden="true">{item.icon}</span>}
+      <FooterIcon
+        image={item.iconImage}
+        emoji={item.icon}
+        className="mt-0.5 h-4 w-4"
+      />
       <span
         dir={ltr ? "ltr" : undefined}
         className={ltr ? "min-w-0 font-num" : "min-w-0 whitespace-pre-line"}
@@ -111,7 +117,11 @@ function StripSection({ section }: { section: FooterSection }) {
     <div className="grid grid-cols-2 gap-4 border-b border-slate-100 pb-8 text-center sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
       {section.items.map((item) => (
         <div key={item.id} className="flex min-w-0 flex-col items-center gap-2">
-          {item.icon && <span className="text-3xl">{item.icon}</span>}
+          {item.iconImage ? (
+            <FooterIcon image={item.iconImage} className="h-10 w-10" />
+          ) : (
+            item.icon && <span className="text-3xl">{item.icon}</span>
+          )}
           <span className="text-sm text-slate-600">
             <ItemLink item={item} className={LINK_CLASS}>
               {item.text ?? item.label}
@@ -125,22 +135,27 @@ function StripSection({ section }: { section: FooterSection }) {
 
 function BrandColumn({ settings }: { settings: FooterSettings }) {
   const contactRows = [
-    settings.address && { key: "address", icon: "📍", text: settings.address, href: null },
+    settings.address && {
+      key: "address",
+      icon: settings.addressIcon,
+      text: settings.address,
+      href: null,
+    },
     settings.phone && {
       key: "phone",
-      icon: "☎️",
+      icon: settings.phoneIcon,
       text: settings.phone,
       href: settings.phoneUrl,
     },
     settings.email && {
       key: "email",
-      icon: "✉️",
+      icon: settings.emailIcon,
       text: settings.email,
       href: settings.emailUrl,
     },
   ].filter(Boolean) as {
     key: string;
-    icon: string;
+    icon: string | null;
     text: string;
     href: string | null;
   }[];
@@ -171,7 +186,7 @@ function BrandColumn({ settings }: { settings: FooterSettings }) {
         <ul className="mt-4 space-y-2 text-sm text-slate-500">
           {contactRows.map((row) => (
             <li key={row.key} className="flex items-start gap-1.5">
-              <span aria-hidden="true">{row.icon}</span>
+              <FooterIcon image={row.icon} className="mt-0.5 h-4 w-4" />
               {row.href ? (
                 <a
                   href={row.href}

@@ -1,6 +1,8 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
+# آیکن‌های فوتر همان قواعد ایمنی آیکن دسته‌بندی را دارند (PNG یا SVG پاک‌سازی‌شده)
+from catalog.validators import validate_category_icon
 from staticpages.definitions import PAGE_KEY_CHOICES, SUPPORTED_PAGE_KEYS
 
 from .maps import (
@@ -22,13 +24,20 @@ from .validation import (
 # افزودن نوع تازه یعنی یک ردیف اینجا و یک شاخه در فوتر فروشگاه، نه یک
 # مدل جدید.
 _TYPE_ALLOWED_FIELDS: dict[str, set[str]] = {
-    "link": {"label", "url", "icon", "open_in_new_tab", "static_page_key"},
-    "text": {"label", "text", "icon"},
+    "link": {
+        "label",
+        "url",
+        "icon",
+        "icon_image",
+        "open_in_new_tab",
+        "static_page_key",
+    },
+    "text": {"label", "text", "icon", "icon_image"},
     "image": {"label", "url", "image", "open_in_new_tab"},
-    "phone": {"label", "text", "icon"},
-    "email": {"label", "text", "icon"},
-    "address": {"label", "text", "icon"},
-    "social": {"label", "url", "icon", "open_in_new_tab"},
+    "phone": {"label", "text", "icon", "icon_image"},
+    "email": {"label", "text", "icon", "icon_image"},
+    "address": {"label", "text", "icon", "icon_image"},
+    "social": {"label", "url", "icon", "icon_image", "open_in_new_tab"},
 }
 
 # بدون این فیلدها آن نوع آیتم اصلاً چیزی برای نمایش ندارد
@@ -49,6 +58,7 @@ _FIELD_ERROR_KEYS: dict[str, str] = {
     "text": "text",
     "image": "image",
     "icon": "icon",
+    "icon_image": "iconId",
     "open_in_new_tab": "openInNewTab",
     "static_page_key": "staticPageKey",
 }
@@ -80,6 +90,43 @@ def _plain_text_error(value: str) -> str | None:
     return None
 
 
+class FooterIcon(models.Model):
+    """آیکن قابل استفاده‌ی مجدد در فوتر
+
+    یک‌بار آپلود می‌شود و هر جای فوتر (مزیت‌ها، پیوندها، اطلاعات تماس) به
+    آن ارجاع می‌دهد؛ همان الگوی «بنر» در صفحه‌ی اصلی. تعویض فایل یک آیکن،
+    همه‌ی جاهایی که از آن استفاده می‌کنند را با هم به‌روز می‌کند.
+    """
+
+    name = models.CharField("نام", max_length=80, unique=True)
+    image = models.FileField(
+        "فایل آیکن",
+        upload_to="footer/icons/",
+        validators=[validate_category_icon],
+        help_text="فایل PNG یا SVG ایمن، حداکثر ۵ مگابایت",
+    )
+    created_at = models.DateTimeField("ایجاد", auto_now_add=True)
+    updated_at = models.DateTimeField("به‌روزرسانی", auto_now=True)
+
+    class Meta:
+        verbose_name = "آیکن فوتر"
+        verbose_name_plural = "آیکن‌های فوتر"
+        ordering = ["name", "id"]
+
+    def clean(self):
+        super().clean()
+        message = _plain_text_error(self.name)
+        if message:
+            raise ValidationError({"name": message})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class FooterSettings(models.Model):
     """تنظیمات سراسری فوتر — تک‌ردیفی (singleton)
 
@@ -104,6 +151,32 @@ class FooterSettings(models.Model):
     address = models.CharField("نشانی", max_length=300, blank=True)
     phone = models.CharField("تلفن", max_length=40, blank=True)
     email = models.EmailField("ایمیل", max_length=120, blank=True)
+
+    # آیکن ردیف‌های اطلاعات تماس در فوتر؛ آیکن نشانی روی نقشه هم به کار می‌رود
+    address_icon = models.ForeignKey(
+        FooterIcon,
+        verbose_name="آیکن نشانی",
+        on_delete=models.SET_NULL,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+    phone_icon = models.ForeignKey(
+        FooterIcon,
+        verbose_name="آیکن تلفن",
+        on_delete=models.SET_NULL,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+    email_icon = models.ForeignKey(
+        FooterIcon,
+        verbose_name="آیکن ایمیل",
+        on_delete=models.SET_NULL,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
 
     # موقعیت فروشگاه — نشانی متنی همان فیلد address بالاست تا دو منبع حقیقت
     # برای یک چیز ساخته نشود؛ اینجا فقط مختصات و تنظیمات نمایش نقشه است.
@@ -188,16 +261,23 @@ class FooterSettings(models.Model):
     def __str__(self) -> str:
         return "تنظیمات فوتر"
 
+    # سه آیکن اطلاعات تماس همیشه با خود ردیف خوانده می‌شوند، وگرنه هر کدام
+    # یک کوئری اضافه به هر رندر فوتر اضافه می‌کنند
+    ICON_RELATIONS = ("address_icon", "phone_icon", "email_icon")
+
     @classmethod
     def load(cls) -> "FooterSettings":
         """ردیف تنظیمات را می‌سازد اگر نباشد — فقط برای مسیرهای مدیریت"""
-        settings_row, _ = cls.objects.get_or_create(pk=1)
-        return settings_row
+        cls.objects.get_or_create(pk=1)
+        return cls.current()
 
     @classmethod
     def current(cls) -> "FooterSettings":
         """خواندنی محض: فوتر روی هر صفحه است و نباید در GET بنویسد"""
-        return cls.objects.filter(pk=1).first() or cls(pk=1)
+        stored = (
+            cls.objects.select_related(*cls.ICON_RELATIONS).filter(pk=1).first()
+        )
+        return stored or cls(pk=1)
 
 
 class FooterSection(models.Model):
@@ -272,8 +352,19 @@ class FooterItem(models.Model):
     url = models.CharField("نشانی مقصد", max_length=300, blank=True)
     text = models.TextField("متن", max_length=600, blank=True)
     image = models.ImageField("تصویر", upload_to="footer/items/", blank=True)
+    icon_image = models.ForeignKey(
+        FooterIcon,
+        verbose_name="آیکن",
+        on_delete=models.SET_NULL,
+        related_name="items",
+        null=True,
+        blank=True,
+    )
     icon = models.CharField(
-        "آیکن", max_length=32, blank=True, help_text="یک ایموجی یا نویسه‌ی کوتاه"
+        "ایموجی جایگزین",
+        max_length=32,
+        blank=True,
+        help_text="وقتی آیکن تصویری انتخاب نشده باشد به کار می‌رود",
     )
     open_in_new_tab = models.BooleanField("باز شدن در تب جدید", default=False)
     static_page_key = models.CharField(
@@ -311,6 +402,7 @@ class FooterItem(models.Model):
             "text": self.text,
             "image": self.image,
             "icon": self.icon,
+            "icon_image": self.icon_image_id,
             "open_in_new_tab": self.open_in_new_tab,
             "static_page_key": self.static_page_key,
         }

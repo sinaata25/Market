@@ -7,11 +7,12 @@ def schedule_footer_image_delete(name: str, storage, *, using: str) -> None:
         return
 
     def delete_if_unreferenced():
-        from .models import FooterItem, FooterSettings
+        from .models import FooterIcon, FooterItem, FooterSettings
 
         referenced = (
             FooterSettings.objects.using(using).filter(logo=name).exists()
             or FooterItem.objects.using(using).filter(image=name).exists()
+            or FooterIcon.objects.using(using).filter(image=name).exists()
         )
         if not referenced:
             storage.delete(name)

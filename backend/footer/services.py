@@ -8,7 +8,13 @@ from seo.models import SeoSettings
 
 from .files import schedule_footer_image_delete
 from .maps import maps_directions_url, maps_search_url
-from .models import FooterItem, FooterSection, FooterSettings, allowed_fields
+from .models import (
+    FooterIcon,
+    FooterItem,
+    FooterSection,
+    FooterSettings,
+    allowed_fields,
+)
 from .revalidation import schedule_footer_revalidation
 
 
@@ -146,6 +152,8 @@ def _clear_disallowed_fields(item: FooterItem) -> None:
         item.image = ""
     if "icon" not in allowed:
         item.icon = ""
+    if "icon_image" not in allowed:
+        item.icon_image = None
     if "open_in_new_tab" not in allowed:
         item.open_in_new_tab = False
     if "static_page_key" not in allowed:
@@ -247,3 +255,32 @@ def shop_directions_url(settings_row: FooterSettings) -> str:
     """«مسیریابی» — همیشه از مختصات، تا سوزن دقیقاً روی فروشگاه بیفتد"""
     coordinates = shop_coordinates(settings_row)
     return maps_directions_url(*coordinates) if coordinates else ""
+
+
+# --------------------------------------------------------------- icons
+
+
+@transaction.atomic
+def create_icon(**fields) -> FooterIcon:
+    icon = FooterIcon(**fields)
+    _save(icon)
+    return icon
+
+
+@transaction.atomic
+def update_icon(icon: FooterIcon, **fields) -> FooterIcon:
+    for field_name, value in fields.items():
+        setattr(icon, field_name, value)
+    _save(icon)
+    return icon
+
+
+@transaction.atomic
+def delete_icon(icon: FooterIcon) -> None:
+    """آیکن حذف می‌شود و هر جا استفاده شده بی‌آیکن می‌ماند، نه شکسته"""
+    using = icon._state.db or "default"
+    stored_image = icon.image.name if icon.image else ""
+    storage = icon.image.storage if icon.image else None
+    icon.delete()
+    schedule_footer_image_delete(stored_image, storage, using=using)
+    schedule_footer_revalidation(using=using)

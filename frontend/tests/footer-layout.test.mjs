@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   footerColumnGridClass,
+  footerIconSource,
   footerLinkAttributes,
   partitionFooterSections,
 } from "../src/lib/footer-layout.ts";
@@ -79,4 +80,23 @@ test("a section variant the frontend does not know yet still renders as a column
     columns.map((section) => section.id),
     [1]
   );
+});
+
+test("an uploaded icon file always wins over the emoji fallback", () => {
+  assert.deepEqual(footerIconSource("/media/footer/icons/delivery.svg", "🚚"), {
+    kind: "image",
+    value: "/media/footer/icons/delivery.svg",
+  });
+});
+
+test("the emoji is used only when no icon file is selected", () => {
+  assert.deepEqual(footerIconSource(null, "🚚"), { kind: "emoji", value: "🚚" });
+  assert.deepEqual(footerIconSource("", "🚚"), { kind: "emoji", value: "🚚" });
+  assert.deepEqual(footerIconSource("   ", "🚚"), { kind: "emoji", value: "🚚" });
+});
+
+test("with neither an icon nor an emoji, nothing is rendered", () => {
+  assert.deepEqual(footerIconSource(null, null), { kind: "none" });
+  assert.deepEqual(footerIconSource(undefined), { kind: "none" });
+  assert.deepEqual(footerIconSource("", "  "), { kind: "none" });
 });

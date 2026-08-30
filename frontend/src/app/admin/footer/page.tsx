@@ -16,6 +16,13 @@ type ItemType =
   | "address"
   | "social";
 
+type FooterIcon = {
+  id: number;
+  name: string;
+  image: string | null;
+  usageCount: number;
+};
+
 type FooterItem = {
   id: number;
   sectionId: number;
@@ -26,6 +33,8 @@ type FooterItem = {
   rawUrl: string | null;
   image: string | null;
   icon: string | null;
+  iconImage: string | null;
+  iconId: number | null;
   openInNewTab: boolean;
   isExternal: boolean;
   staticPageKey: string | null;
@@ -53,6 +62,11 @@ type FooterSettings = {
   email: string | null;
   storedBrandTitle: string | null;
   storedCopyright: string | null;
+  phoneIcon: string | null;
+  emailIcon: string | null;
+  addressIconId: number | null;
+  phoneIconId: number | null;
+  emailIconId: number | null;
   latitude: string | null;
   longitude: string | null;
   showMap: boolean;
@@ -76,6 +90,7 @@ type ItemForm = {
   label: string;
   url: string;
   text: string;
+  iconId: string;
   icon: string;
   openInNewTab: boolean;
   staticPageKey: string;
@@ -88,6 +103,8 @@ type SettingsForm = {
   copyrightText: string;
   phone: string;
   email: string;
+  phoneIconId: string;
+  emailIconId: string;
 };
 
 const VARIANTS: { value: SectionVariant; label: string; hint: string }[] = [
@@ -117,31 +134,31 @@ const ITEM_TYPES: {
   {
     value: "link",
     label: "پیوند",
-    fields: ["label", "url", "icon", "openInNewTab", "staticPageKey"],
+    fields: ["label", "url", "iconId", "icon", "openInNewTab", "staticPageKey"],
   },
   {
     value: "social",
     label: "شبکه اجتماعی",
-    fields: ["label", "url", "icon", "openInNewTab"],
+    fields: ["label", "url", "iconId", "icon", "openInNewTab"],
   },
-  { value: "text", label: "متن", fields: ["label", "text", "icon"] },
+  { value: "text", label: "متن", fields: ["label", "text", "iconId", "icon"] },
   {
     value: "address",
     label: "نشانی",
-    fields: ["label", "text", "icon"],
+    fields: ["label", "text", "iconId", "icon"],
     textLabel: "نشانی",
   },
   {
     value: "phone",
     label: "شماره تماس",
-    fields: ["label", "text", "icon"],
+    fields: ["label", "text", "iconId", "icon"],
     textLabel: "شماره تماس",
     textDir: "ltr",
   },
   {
     value: "email",
     label: "ایمیل",
-    fields: ["label", "text", "icon"],
+    fields: ["label", "text", "iconId", "icon"],
     textLabel: "ایمیل",
     textDir: "ltr",
   },
@@ -172,6 +189,7 @@ const EMPTY_ITEM: ItemForm = {
   label: "",
   url: "",
   text: "",
+  iconId: "",
   icon: "",
   openInNewTab: false,
   staticPageKey: "",
@@ -184,9 +202,14 @@ const EMPTY_SETTINGS: SettingsForm = {
   copyrightText: "",
   phone: "",
   email: "",
+  phoneIconId: "",
+  emailIconId: "",
 };
 
+const EMPTY_ICON_FORM = { name: "", file: null as File | null };
+
 const EMPTY_LOCATION: ShopLocationValues = {
+  addressIconId: "",
   address: "",
   latitude: "",
   longitude: "",
@@ -214,6 +237,7 @@ function itemForm(item: FooterItem): ItemForm {
     label: item.label ?? "",
     url: item.rawUrl ?? "",
     text: item.text ?? "",
+    iconId: item.iconId ? String(item.iconId) : "",
     icon: item.icon ?? "",
     openInNewTab: item.openInNewTab,
     staticPageKey: item.staticPageKey ?? "",
@@ -228,11 +252,14 @@ function settingsForm(settings: FooterSettings): SettingsForm {
     copyrightText: settings.storedCopyright ?? "",
     phone: settings.phone ?? "",
     email: settings.email ?? "",
+    phoneIconId: settings.phoneIconId ? String(settings.phoneIconId) : "",
+    emailIconId: settings.emailIconId ? String(settings.emailIconId) : "",
   };
 }
 
 function locationForm(settings: FooterSettings): ShopLocationValues {
   return {
+    addressIconId: settings.addressIconId ? String(settings.addressIconId) : "",
     address: settings.address ?? "",
     latitude: settings.latitude ?? "",
     longitude: settings.longitude ?? "",
@@ -280,6 +307,55 @@ function ImagePreview({
   );
 }
 
+function IconSelect({
+  icons,
+  value,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  icons: FooterIcon[];
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  const selected = icons.find((icon) => String(icon.id) === value);
+  return (
+    <div className="min-w-0">
+      <span className="mb-1.5 block text-xs text-slate-600">{label}</span>
+      <div className="flex items-center gap-2">
+        <select
+          disabled={disabled}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={INPUT_CLASS}
+        >
+          <option value="">بدون آیکن</option>
+          {icons.map((icon) => (
+            <option key={icon.id} value={icon.id}>
+              {icon.name}
+            </option>
+          ))}
+        </select>
+        {selected?.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={selected.image}
+            alt=""
+            className="h-8 w-8 shrink-0 object-contain"
+          />
+        )}
+      </div>
+      {!icons.length && (
+        <span className="mt-1 block text-[11px] text-slate-400">
+          هنوز آیکنی در کتابخانه نیست؛ از بخش «آیکن‌ها» اضافه کنید.
+        </span>
+      )}
+    </div>
+  );
+}
+
 function itemSummary(item: FooterItem): string {
   const parts = [ITEM_TYPE_LABELS[item.type] ?? item.type];
   if (item.rawUrl) parts.push(item.rawUrl);
@@ -292,6 +368,9 @@ export default function AdminFooterPage() {
   const [sections, setSections] = useState<FooterSection[]>([]);
   const [settings, setSettings] = useState<FooterSettings | null>(null);
   const [pages, setPages] = useState<PageSummary[]>([]);
+  const [icons, setIcons] = useState<FooterIcon[]>([]);
+  const [iconValues, setIconValues] = useState(EMPTY_ICON_FORM);
+  const [editingIcon, setEditingIcon] = useState<FooterIcon | null>(null);
   const [settingsValues, setSettingsValues] = useState(EMPTY_SETTINGS);
   const [locationValues, setLocationValues] = useState(EMPTY_LOCATION);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -306,6 +385,8 @@ export default function AdminFooterPage() {
   const [message, setMessage] = useState("");
 
   const logoInput = useRef<HTMLInputElement>(null);
+  const iconInput = useRef<HTMLInputElement>(null);
+  const iconEditor = useRef<HTMLElement>(null);
   const itemImageInput = useRef<HTMLInputElement>(null);
   const sectionEditor = useRef<HTMLElement>(null);
   const itemEditor = useRef<HTMLElement>(null);
@@ -316,11 +397,14 @@ export default function AdminFooterPage() {
   }, []);
 
   const load = useCallback(async () => {
-    const [sectionResult, settingsResult, pageResult] = await Promise.all([
-      api.get<{ sections: FooterSection[] }>("/api/admin/footer/sections"),
-      api.get<{ settings: FooterSettings }>("/api/admin/footer/settings"),
-      api.get<{ pages: PageSummary[] }>("/api/admin/content/pages"),
-    ]);
+    const [sectionResult, settingsResult, pageResult, iconResult] =
+      await Promise.all([
+        api.get<{ sections: FooterSection[] }>("/api/admin/footer/sections"),
+        api.get<{ settings: FooterSettings }>("/api/admin/footer/settings"),
+        api.get<{ pages: PageSummary[] }>("/api/admin/content/pages"),
+        api.get<{ icons: FooterIcon[] }>("/api/admin/footer/icons"),
+      ]);
+    if (iconResult.ok) setIcons(iconResult.data?.icons ?? []);
     if (sectionResult.ok) setSections(sectionResult.data?.sections ?? []);
     if (settingsResult.ok && settingsResult.data) {
       setSettings(settingsResult.data.settings);
@@ -328,7 +412,7 @@ export default function AdminFooterPage() {
       setLocationValues(locationForm(settingsResult.data.settings));
     }
     if (pageResult.ok) setPages(pageResult.data?.pages ?? []);
-    const failure = [sectionResult, settingsResult, pageResult].find(
+    const failure = [sectionResult, settingsResult, pageResult, iconResult].find(
       (result) => !result.ok
     );
     if (failure) notify(failure.error ?? "دریافت اطلاعات فوتر انجام نشد");
@@ -354,6 +438,12 @@ export default function AdminFooterPage() {
         copyrightText: settingsValues.copyrightText.trim(),
         phone: settingsValues.phone.trim(),
         email: settingsValues.email.trim(),
+        phoneIconId: settingsValues.phoneIconId
+          ? Number(settingsValues.phoneIconId)
+          : null,
+        emailIconId: settingsValues.emailIconId
+          ? Number(settingsValues.emailIconId)
+          : null,
       }
     );
     if (!result.ok) {
@@ -394,6 +484,9 @@ export default function AdminFooterPage() {
       "/api/admin/footer/settings",
       {
         address: locationValues.address.trim(),
+        addressIconId: locationValues.addressIconId
+          ? Number(locationValues.addressIconId)
+          : null,
         latitude: locationValues.latitude.trim(),
         longitude: locationValues.longitude.trim(),
         showMap: locationValues.showMap,
@@ -408,6 +501,89 @@ export default function AdminFooterPage() {
     }
     notify("موقعیت فروشگاه ذخیره شد ✅");
     await load();
+  }
+
+  function resetIcon() {
+    setEditingIcon(null);
+    setIconValues(EMPTY_ICON_FORM);
+    if (iconInput.current) iconInput.current.value = "";
+  }
+
+  function editIcon(icon: FooterIcon) {
+    setEditingIcon(icon);
+    setIconValues({ name: icon.name, file: null });
+    if (iconInput.current) iconInput.current.value = "";
+    iconEditor.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function saveIcon(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const name = iconValues.name.trim();
+    if (!name) {
+      notify("برای آیکن یک نام بگذارید");
+      return;
+    }
+    if (!editingIcon && !iconValues.file) {
+      notify("فایل آیکن را انتخاب کنید");
+      return;
+    }
+
+    setBusy(true);
+    if (editingIcon) {
+      const renamed = await api.patch(
+        `/api/admin/footer/icons/${editingIcon.id}`,
+        { name }
+      );
+      if (!renamed.ok) {
+        setBusy(false);
+        notify(renamed.error ?? "ذخیره آیکن انجام نشد");
+        return;
+      }
+      if (iconValues.file) {
+        const form = new FormData();
+        form.append("file", iconValues.file);
+        const upload = await api.upload(
+          `/api/admin/footer/icons/${editingIcon.id}/image`,
+          form
+        );
+        if (!upload.ok) {
+          setBusy(false);
+          notify(`نام ذخیره شد، اما فایل جایگزین نشد: ${upload.error ?? ""}`);
+          await load();
+          return;
+        }
+      }
+    } else {
+      const form = new FormData();
+      form.append("name", name);
+      form.append("file", iconValues.file as File);
+      const created = await api.upload("/api/admin/footer/icons", form);
+      if (!created.ok) {
+        setBusy(false);
+        notify(created.error ?? "ساخت آیکن انجام نشد");
+        return;
+      }
+    }
+    setBusy(false);
+    notify(editingIcon ? "آیکن ویرایش شد ✅" : "آیکن افزوده شد ✅");
+    resetIcon();
+    await load();
+  }
+
+  async function removeIcon(icon: FooterIcon) {
+    const usage = icon.usageCount
+      ? ` این آیکن در ${icon.usageCount.toLocaleString("fa-IR")} محتوا استفاده شده و آن‌ها بی‌آیکن می‌شوند.`
+      : "";
+    if (!window.confirm(`آیکن «${icon.name}» حذف شود؟${usage}`)) return;
+    setBusy(true);
+    const result = await api.delete(`/api/admin/footer/icons/${icon.id}`);
+    setBusy(false);
+    if (!result.ok) notify(result.error ?? "حذف آیکن انجام نشد");
+    else {
+      if (editingIcon?.id === icon.id) resetIcon();
+      await load();
+    }
   }
 
   async function removeLogo() {
@@ -537,6 +713,10 @@ export default function AdminFooterPage() {
       url: allowed.has("url") ? itemValues.url.trim() : "",
       text: allowed.has("text") ? itemValues.text.trim() : "",
       icon: allowed.has("icon") ? itemValues.icon.trim() : "",
+      iconId:
+        allowed.has("iconId") && itemValues.iconId
+          ? Number(itemValues.iconId)
+          : null,
       openInNewTab: allowed.has("openInNewTab") ? itemValues.openInNewTab : false,
       staticPageKey: allowed.has("staticPageKey") ? itemValues.staticPageKey : "",
     };
@@ -720,6 +900,22 @@ export default function AdminFooterPage() {
               className={INPUT_CLASS}
             />
           </label>
+          <IconSelect
+            icons={icons}
+            value={settingsValues.phoneIconId}
+            onChange={(value) =>
+              setSettingsValues((current) => ({ ...current, phoneIconId: value }))
+            }
+            label="آیکن تلفن"
+          />
+          <IconSelect
+            icons={icons}
+            value={settingsValues.emailIconId}
+            onChange={(value) =>
+              setSettingsValues((current) => ({ ...current, emailIconId: value }))
+            }
+            label="آیکن ایمیل"
+          />
           <div className="min-w-0 space-y-1.5">
             <label className="block">
               <span className="block text-xs text-slate-600">
@@ -763,6 +959,140 @@ export default function AdminFooterPage() {
         </form>
       </section>
 
+      {/* ─── کتابخانه‌ی آیکن‌ها ─── */}
+      <section
+        ref={iconEditor}
+        className="scroll-mt-[calc(var(--header-h)+1rem)] rounded-2xl border border-slate-100 bg-white p-5"
+      >
+        <h2 className="mb-1 font-bold text-slate-700">آیکن‌ها</h2>
+        <p className="mb-4 text-[11px] leading-6 text-slate-400">
+          آیکن‌های فوتر از همین کتابخانه انتخاب می‌شوند. تعویض فایل یک آیکن،
+          همه‌ی جاهایی که از آن استفاده می‌کنند را با هم به‌روز می‌کند.
+        </p>
+
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {icons.map((icon) => (
+            <article
+              key={icon.id}
+              className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 p-3"
+            >
+              {icon.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={icon.image}
+                  alt=""
+                  className="h-10 w-10 shrink-0 object-contain"
+                />
+              ) : (
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs text-slate-400">
+                  ؟
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-slate-700">
+                  {icon.name}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-400">
+                  {icon.usageCount.toLocaleString("fa-IR")} استفاده
+                </p>
+                <div className="mt-1.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => editIcon(icon)}
+                    className="text-[11px] text-brand-700"
+                  >
+                    ویرایش
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => removeIcon(icon)}
+                    className="text-[11px] text-red-600 disabled:opacity-50"
+                  >
+                    حذف
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+          {!icons.length && !loading && (
+            <p className="text-sm text-slate-400">هنوز آیکنی ساخته نشده است.</p>
+          )}
+        </div>
+
+        <form
+          onSubmit={saveIcon}
+          className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 md:grid-cols-2"
+        >
+          <div className="md:col-span-2 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-600">
+              {editingIcon ? `ویرایش آیکن «${editingIcon.name}»` : "افزودن آیکن"}
+            </h3>
+            {editingIcon && (
+              <button
+                type="button"
+                onClick={resetIcon}
+                className="text-xs text-slate-400"
+              >
+                انصراف
+              </button>
+            )}
+          </div>
+          <label>
+            <span className="mb-1.5 block text-xs text-slate-600">نام آیکن</span>
+            <input
+              value={iconValues.name}
+              onChange={(event) =>
+                setIconValues((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              maxLength={80}
+              placeholder="مثلاً ارسال رایگان"
+              className={INPUT_CLASS}
+            />
+          </label>
+          <div className="min-w-0 space-y-1.5">
+            <label className="block">
+              <span className="block text-xs text-slate-600">
+                فایل آیکن — PNG یا SVG، حداکثر ۵ مگابایت
+              </span>
+              <span className="mt-0.5 mb-1.5 block text-[11px] text-slate-400">
+                {editingIcon
+                  ? "خالی بگذارید تا فایل فعلی بماند"
+                  : "SVG پیشنهاد می‌شود؛ در هر اندازه‌ای واضح می‌ماند"}
+              </span>
+              <input
+                ref={iconInput}
+                type="file"
+                accept="image/png,image/svg+xml"
+                onChange={(event) =>
+                  setIconValues((current) => ({
+                    ...current,
+                    file: event.target.files?.[0] ?? null,
+                  }))
+                }
+                className={INPUT_CLASS}
+              />
+            </label>
+            <ImagePreview
+              file={iconValues.file}
+              savedUrl={editingIcon?.image ?? null}
+              className="h-16 w-full"
+            />
+          </div>
+          <div className="min-w-0 md:col-span-2">
+            <button
+              disabled={busy}
+              className="rounded-xl bg-secondary-900 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {busy ? "در حال ذخیره..." : editingIcon ? "ذخیره آیکن" : "افزودن آیکن"}
+            </button>
+          </div>
+        </form>
+      </section>
+
       {/* ─── موقعیت فروشگاه ─── */}
       <section className="rounded-2xl border border-slate-100 bg-white p-5">
         <h2 className="mb-1 font-bold text-slate-700">موقعیت فروشگاه</h2>
@@ -773,6 +1103,7 @@ export default function AdminFooterPage() {
         <form onSubmit={saveLocation} className="space-y-4">
           <ShopLocationPicker
             values={locationValues}
+            icons={icons}
             onChange={updateLocation}
             disabled={busy || loading}
           />
@@ -1163,10 +1494,21 @@ export default function AdminFooterPage() {
               />
             </label>
           )}
+          {itemDefinitionFields.has("iconId") && (
+            <IconSelect
+              icons={icons}
+              value={itemValues.iconId}
+              onChange={(value) =>
+                setItemValues((current) => ({ ...current, iconId: value }))
+              }
+              label="آیکن"
+              disabled={itemSectionId === null}
+            />
+          )}
           {itemDefinitionFields.has("icon") && (
             <label>
               <span className="mb-1.5 block text-xs text-slate-600">
-                آیکن (یک ایموجی، اختیاری)
+                ایموجی جایگزین (اختیاری)
               </span>
               <input
                 disabled={itemSectionId === null}
@@ -1178,6 +1520,9 @@ export default function AdminFooterPage() {
                 className={INPUT_CLASS}
                 placeholder="🚚"
               />
+              <span className="mt-1 block text-[11px] text-slate-400">
+                فقط وقتی به کار می‌رود که آیکنی انتخاب نشده باشد.
+              </span>
             </label>
           )}
           {itemDefinitionFields.has("staticPageKey") && (

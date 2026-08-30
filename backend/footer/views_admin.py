@@ -7,17 +7,24 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from accounts.permissions import ShopAdminRequiredMixin
+from catalog.validators import validate_category_icon
 from common.responses import fail, first_error_message, ok
 
-from .dto import admin_item_dto, admin_section_dto, admin_settings_dto
+from .dto import (
+    admin_icon_dto,
+    admin_item_dto,
+    admin_section_dto,
+    admin_settings_dto,
+)
 from .geocoding import GeocodingUnavailable, reverse, search
 from .maps import LATITUDE_RANGE, LONGITUDE_RANGE, format_coordinate
 from .files import schedule_footer_image_delete
 from .images import image_upload_error
-from .models import FooterItem, FooterSection, FooterSettings
+from .models import FooterIcon, FooterItem, FooterSection, FooterSettings
 from .revalidation import schedule_footer_revalidation
-from .selectors import sections_queryset
+from .selectors import icons_queryset, sections_queryset
 from .serializers import (
+    FooterIconWriteSerializer,
     FooterItemCreateSerializer,
     FooterItemUpdateSerializer,
     FooterSectionCreateSerializer,
@@ -27,12 +34,15 @@ from .serializers import (
 )
 from .services import (
     FooterValidationError,
+    create_icon,
     create_item,
     create_section,
+    delete_icon,
     delete_item,
     delete_section,
     move_item,
     move_section,
+    update_icon,
     update_item,
     update_section,
     update_settings,
@@ -111,6 +121,96 @@ class AdminFooterLogoView(ShopAdminRequiredMixin, APIView):
         )
         schedule_footer_revalidation(using=settings_row._state.db or "default")
         return ok({"settings": admin_settings_dto(settings_row)})
+
+
+def _icon_file_error(file) -> str | None:
+    """همان قواعد آیکن دسته‌بندی: PNG یا SVG ایمن، حداکثر ۵ مگابایت"""
+    if file is None:
+        return "فایل آیکن ارسال نشده است"
+    try:
+        validate_category_icon(file)
+    except DjangoValidationError as exc:
+        messages = getattr(exc, "messages", None)
+        return messages[0] if messages else "فایل آیکن معتبر نیست"
+    return None
+
+
+class AdminFooterIconListView(ShopAdminRequiredMixin, APIView):
+    """کتابخانه‌ی آیکن‌های فوتر — ساخت با multipart (name + file)"""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        return ok({"icons": [admin_icon_dto(icon) for icon in icons_queryset()]})
+
+    @extend_schema(
+        request=FooterIconWriteSerializer, responses={201: OpenApiTypes.OBJECT}
+    )
+    def post(self, request):
+        serializer = FooterIconWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        file = request.FILES.get("file")
+        error = _icon_file_error(file)
+        if error:
+            return fail(error, 422)
+        try:
+            icon = create_icon(name=serializer.validated_data["name"], image=file)
+        except FooterValidationError as exc:
+            return _validation_failure(exc)
+        return ok({"icon": admin_icon_dto(icon)}, status=201)
+
+
+class AdminFooterIconDetailView(ShopAdminRequiredMixin, APIView):
+    def _get(self, pk: int) -> FooterIcon | None:
+        return FooterIcon.objects.filter(pk=pk).first()
+
+    @extend_schema(
+        request=FooterIconWriteSerializer, responses={200: OpenApiTypes.OBJECT}
+    )
+    def patch(self, request, pk: int):
+        icon = self._get(pk)
+        if icon is None:
+            return fail("آیکن یافت نشد", 404)
+        serializer = FooterIconWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            icon = update_icon(icon, **serializer.validated_data)
+        except FooterValidationError as exc:
+            return _validation_failure(exc)
+        return ok({"icon": admin_icon_dto(icon)})
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def delete(self, request, pk: int):
+        icon = self._get(pk)
+        if icon is None:
+            return fail("آیکن یافت نشد", 404)
+        # جاهایی که از آن استفاده می‌کردند بی‌آیکن می‌شوند، نه خراب
+        delete_icon(icon)
+        return ok({"deleted": True})
+
+
+class AdminFooterIconImageView(ShopAdminRequiredMixin, APIView):
+    """تعویض فایل یک آیکن — همه‌ی جاهایی که از آن استفاده می‌کنند با هم عوض می‌شوند"""
+
+    def post(self, request, pk: int):
+        icon = FooterIcon.objects.filter(pk=pk).first()
+        if icon is None:
+            return fail("آیکن یافت نشد", 404)
+        file = request.FILES.get("file")
+        error = _icon_file_error(file)
+        if error:
+            return fail(error, 422)
+
+        old_name = icon.image.name if icon.image else ""
+        old_storage = icon.image.storage if icon.image else None
+        try:
+            icon = update_icon(icon, image=file)
+        except FooterValidationError as exc:
+            return _validation_failure(exc)
+        if old_name and old_name != icon.image.name:
+            schedule_footer_image_delete(
+                old_name, old_storage, using=icon._state.db or "default"
+            )
+        return ok({"icon": admin_icon_dto(icon)}, status=201)
 
 
 class AdminFooterSectionListView(ShopAdminRequiredMixin, APIView):

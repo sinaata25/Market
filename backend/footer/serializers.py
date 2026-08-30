@@ -3,7 +3,7 @@ from rest_framework import serializers
 from staticpages.definitions import SUPPORTED_PAGE_KEYS
 
 from .maps import ZOOM_RANGE
-from .models import FooterItem, FooterSection
+from .models import FooterIcon, FooterItem, FooterSection
 
 # نام فیلد ورودی (camelCase) → نام فیلد مدل
 _FIELD_RENAMES = {
@@ -16,7 +16,38 @@ _FIELD_RENAMES = {
     "showMap": "show_map",
     "mapZoom": "map_zoom",
     "mapsPlaceUrl": "maps_place_url",
+    "iconId": "icon_image",
+    "addressIconId": "address_icon",
+    "phoneIconId": "phone_icon",
+    "emailIconId": "email_icon",
 }
+
+# نام ورودی (camelCase) → نام فیلد مدل، برای ارجاع‌های آیکن
+_ICON_FIELDS = {
+    "iconId": "icon_image",
+    "addressIconId": "address_icon",
+    "phoneIconId": "phone_icon",
+    "emailIconId": "email_icon",
+}
+
+
+class IconReferenceMixin:
+    """شناسه‌ی آیکن را به شیء آیکن تبدیل می‌کند؛ null یعنی «بدون آیکن»"""
+
+    def validate(self, data):
+        data = super().validate(data)
+        for input_name, field_name in _ICON_FIELDS.items():
+            if field_name not in data:
+                continue
+            icon_id = data[field_name]
+            if icon_id is None:
+                data[field_name] = None
+                continue
+            icon = FooterIcon.objects.filter(pk=icon_id).first()
+            if icon is None:
+                raise serializers.ValidationError({input_name: "آیکن یافت نشد"})
+            data[field_name] = icon
+        return data
 
 
 class BlankableDecimalField(serializers.DecimalField):
@@ -36,7 +67,7 @@ class RenamingSerializer(serializers.Serializer):
         return {_FIELD_RENAMES.get(key, key): item for key, item in value.items()}
 
 
-class FooterSettingsSerializer(RenamingSerializer):
+class FooterSettingsSerializer(IconReferenceMixin, RenamingSerializer):
     brandTitle = serializers.CharField(
         max_length=120, required=False, allow_blank=True
     )
@@ -63,6 +94,9 @@ class FooterSettingsSerializer(RenamingSerializer):
     mapsPlaceUrl = serializers.CharField(
         max_length=500, required=False, allow_blank=True
     )
+    addressIconId = serializers.IntegerField(required=False, allow_null=True)
+    phoneIconId = serializers.IntegerField(required=False, allow_null=True)
+    emailIconId = serializers.IntegerField(required=False, allow_null=True)
 
 
 class FooterSectionCreateSerializer(RenamingSerializer):
@@ -91,7 +125,7 @@ class FooterSectionUpdateSerializer(FooterSectionCreateSerializer):
         return fields
 
 
-class FooterItemCreateSerializer(RenamingSerializer):
+class FooterItemCreateSerializer(IconReferenceMixin, RenamingSerializer):
     itemType = serializers.ChoiceField(choices=FooterItem.ItemType.choices)
     label = serializers.CharField(
         max_length=120, required=False, allow_blank=True, default=""
@@ -105,6 +139,7 @@ class FooterItemCreateSerializer(RenamingSerializer):
     icon = serializers.CharField(
         max_length=32, required=False, allow_blank=True, default=""
     )
+    iconId = serializers.IntegerField(required=False, allow_null=True)
     openInNewTab = serializers.BooleanField(required=False, default=False)
     staticPageKey = serializers.ChoiceField(
         choices=SUPPORTED_PAGE_KEYS, required=False, allow_blank=True, default=""
@@ -125,3 +160,7 @@ class FooterItemUpdateSerializer(FooterItemCreateSerializer):
 
 class MoveSerializer(serializers.Serializer):
     direction = serializers.ChoiceField(choices=["up", "down"])
+
+
+class FooterIconWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=80)

@@ -20,7 +20,14 @@ const LocationMap = dynamic(() => import("./LocationMap"), {
   ),
 });
 
+export type FooterIconOption = {
+  id: number;
+  name: string;
+  image: string | null;
+};
+
 export type ShopLocationValues = {
+  addressIconId: string;
   address: string;
   latitude: string;
   longitude: string;
@@ -54,10 +61,12 @@ function formatCoordinate(value: number): string {
 
 export default function ShopLocationPicker({
   values,
+  icons,
   onChange,
   disabled = false,
 }: {
   values: ShopLocationValues;
+  icons: FooterIconOption[];
   onChange: (patch: Partial<ShopLocationValues>) => void;
   disabled?: boolean;
 }) {
@@ -72,6 +81,9 @@ export default function ShopLocationPicker({
   const longitude = parseCoordinate(values.longitude, 180);
   const zoom = Number(values.mapZoom) || 15;
   const hasCoordinates = latitude !== null && longitude !== null;
+  const selectedAddressIcon = icons.find(
+    (icon) => String(icon.id) === values.addressIconId
+  );
 
   const lookUpAddress = useCallback(
     async (nextLatitude: number, nextLongitude: number) => {
@@ -249,6 +261,36 @@ export default function ShopLocationPicker({
             className={INPUT_CLASS}
           />
         </label>
+        <div className="md:col-span-2">
+          <span className="mb-1.5 block text-xs text-slate-600">
+            آیکن نشانی (کنار نشانی در فوتر و بالای نقشه)
+          </span>
+          <div className="flex items-center gap-2">
+            <select
+              disabled={disabled}
+              value={values.addressIconId}
+              onChange={(event) =>
+                onChange({ addressIconId: event.target.value })
+              }
+              className={INPUT_CLASS}
+            >
+              <option value="">بدون آیکن</option>
+              {icons.map((icon) => (
+                <option key={icon.id} value={icon.id}>
+                  {icon.name}
+                </option>
+              ))}
+            </select>
+            {selectedAddressIcon?.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={selectedAddressIcon.image}
+                alt=""
+                className="h-8 w-8 shrink-0 object-contain"
+              />
+            )}
+          </div>
+        </div>
         <label>
           <span className="mb-1.5 block text-xs text-slate-600">
             بزرگ‌نمایی نقشه (۱ تا ۲۱)
