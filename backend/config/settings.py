@@ -130,6 +130,7 @@ INSTALLED_APPS = [
     "blog",
     "staticpages",
     "homepage",
+    "footer",
 ]
 
 MIDDLEWARE = [
@@ -317,6 +318,12 @@ INVOICE_FONT_BOLD_PATH = Path(
     )
 )
 INVOICE_STORE_NAME = os.getenv("INVOICE_STORE_NAME", "گروه صنعتی توانا").strip()
+
+# فوتر روی تقریباً همه‌ی صفحه‌های فروشگاه است و Next آن را کش می‌کند. با
+# تنظیم این دو مقدار، بک‌اند بعد از هر تغییر مدیر کش همان تگ را باطل می‌کند.
+# خالی گذاشتنشان (پیش‌فرض توسعه) یعنی کش فقط با انقضای زمانی خودش تازه شود.
+FRONTEND_REVALIDATE_URL = os.getenv("FRONTEND_REVALIDATE_URL", "").strip()
+FRONTEND_REVALIDATE_SECRET = os.getenv("FRONTEND_REVALIDATE_SECRET", "").strip()
 
 # ─── تنظیمات فروشگاه ─────────────────────────────────────────
 

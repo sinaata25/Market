@@ -19,6 +19,8 @@ from staticpages.urls import admin_urlpatterns as staticpages_admin_urls
 from staticpages.urls import public_urlpatterns as staticpages_public_urls
 from homepage.urls import admin_urlpatterns as homepage_admin_urls
 from homepage.urls import public_urlpatterns as homepage_public_urls
+from footer.urls import admin_urlpatterns as footer_admin_urls
+from footer.urls import public_urlpatterns as footer_public_urls
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -44,6 +46,7 @@ urlpatterns = [
         include((staticpages_admin_urls, "staticpages-admin")),
     ),
     path("api/admin/home/", include((homepage_admin_urls, "homepage-admin"))),
+    path("api/admin/footer/", include((footer_admin_urls, "footer-admin"))),
     path("api/blog/", include((blog_public_urls, "blog-public"))),
     path("api/seo/", include((seo_public_urls, "seo-public"))),
     path(
@@ -51,6 +54,7 @@ urlpatterns = [
         include((staticpages_public_urls, "staticpages-public")),
     ),
     path("api/home/", include((homepage_public_urls, "homepage-public"))),
+    path("api/footer", include((footer_public_urls, "footer-public"))),
     # فایل‌های سئو در ریشه (از طریق rewrite فرانت هم در دسترس‌اند)
     path("robots.txt", seo_public.robots_txt),
     path("sitemap.xml", seo_public.sitemap_xml),
