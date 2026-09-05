@@ -23,19 +23,24 @@ export default function FooterShopLocation({
   return (
     <section
       aria-labelledby="footer-shop-location"
-      className="grid gap-5 border-t border-slate-100 py-8 md:grid-cols-2 md:items-center"
+      className="grid gap-6 border-t border-slate-100 py-8 md:grid-cols-2 md:items-start"
     >
       <div className="min-w-0">
         <h3
           id="footer-shop-location"
-          className="mb-3 font-bold text-slate-700"
+          className="font-bold leading-6 text-slate-700"
         >
           موقعیت فروشگاه
         </h3>
         {location.address && (
-          <p className="flex items-start gap-1.5 text-sm leading-7 text-slate-500">
-            <FooterIcon image={location.icon} className="mt-1 h-4 w-4" />
-            <span className="min-w-0">{location.address}</span>
+          <p className="mt-3 flex min-w-0 items-start gap-2 text-sm leading-6 text-slate-500">
+            <FooterIcon image={location.icon} className="size-6 p-0.5 text-base" />
+            <bdi
+              dir="auto"
+              className="min-w-0 whitespace-pre-line [overflow-wrap:anywhere]"
+            >
+              {location.address}
+            </bdi>
           </p>
         )}
         <div className="mt-4 flex flex-wrap gap-2">

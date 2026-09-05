@@ -27,25 +27,55 @@ function ItemLink({
 }) {
   const attributes = footerLinkAttributes(item);
   // محتوای بی‌مقصد (متن، نشانی، تصویر بدون لینک) نباید حالت hover پیوند بگیرد
-  if (!attributes) return <span>{children}</span>;
+  if (!attributes) return <span className={className}>{children}</span>;
 
   const { href, external, ...rest } = attributes;
+  const linkedClassName = `${className} ${LINK_CLASS}`;
   if (external) {
     return (
-      <a href={href} className={className} {...rest}>
+      <a href={href} className={linkedClassName} {...rest}>
         {children}
       </a>
     );
   }
   return (
-    <Link href={href} className={className} {...rest}>
+    <Link href={href} className={linkedClassName} {...rest}>
       {children}
     </Link>
   );
 }
 
-/** محتوای درونی یک آیتم — آیکن اختیاری به‌علاوه‌ی متن یا تصویرش */
-function ItemBody({ item }: { item: FooterItem }) {
+function itemValue(item: FooterItem, hasVisual: boolean): string | null {
+  const value =
+    item.type === "link" || item.type === "social"
+      ? item.label
+      : (item.text ?? item.label);
+
+  // شبکه‌ی اجتماعی می‌تواند طبق قرارداد بک‌اند فقط URL داشته باشد. اگر آیکنی
+  // هم ندارد، خود مقصد را نشان می‌دهیم تا یک پیوند نامرئی ساخته نشود.
+  return value ?? (!hasVisual ? item.url : null);
+}
+
+function itemIsLtr(item: FooterItem): boolean {
+  return item.type === "phone" || item.type === "email";
+}
+
+function itemHasVisual(item: FooterItem): boolean {
+  return Boolean(
+    (item.type === "image" && item.image) || item.iconImage || item.icon
+  );
+}
+
+/** محتوای درونی یک آیتم — برای ستون افقی و برای نوار مزیت عمودی است. */
+function ItemBody({
+  item,
+  variant = "column",
+  reserveVisualSpace = false,
+}: {
+  item: FooterItem;
+  variant?: "column" | "strip";
+  reserveVisualSpace?: boolean;
+}) {
   if (item.type === "image" && item.image) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -58,78 +88,115 @@ function ItemBody({ item }: { item: FooterItem }) {
     );
   }
 
-  const value =
-    item.type === "link" || item.type === "social"
-      ? item.label
-      : (item.text ?? item.label);
-
   const hasIcon = Boolean(item.iconImage || item.icon);
-  // پیوند ساده‌ی بی‌آیکن دقیقاً همان متن قبلی فوتر است — بدون قاب اضافه
-  if (!hasIcon && item.type !== "phone" && item.type !== "email") {
-    return <>{value}</>;
+  const value = itemValue(item, hasIcon);
+  const ltr = itemIsLtr(item);
+  const text = value && (
+    <bdi
+      dir={ltr ? "ltr" : "auto"}
+      className={`min-w-0 whitespace-pre-line leading-6 [overflow-wrap:anywhere] ${
+        ltr ? "font-num" : ""
+      }`}
+    >
+      {value}
+    </bdi>
+  );
+
+  if (variant === "strip") {
+    return (
+      <span className="flex min-w-0 flex-col items-center gap-2 text-center">
+        {(hasIcon || reserveVisualSpace) && (
+          <span
+            className="flex size-10 items-center justify-center"
+            aria-hidden={!hasIcon}
+          >
+            <FooterIcon
+              image={item.iconImage}
+              emoji={item.icon}
+              className="size-10 text-3xl"
+            />
+          </span>
+        )}
+        {text}
+      </span>
+    );
   }
 
-  // شماره و ایمیل باید چپ‌به‌راست خوانده شوند، حتی داخل صفحه‌ی راست‌به‌چپ
-  const ltr = item.type === "phone" || item.type === "email";
+  // پیوند ساده‌ی بی‌آیکن همان متن فوتر می‌ماند و جای خالی آیکن نمی‌گیرد.
+  if (!hasIcon) return text;
+
   return (
-    <span className="inline-flex items-start gap-1.5">
+    <span className="flex min-w-0 items-start gap-2">
       <FooterIcon
         image={item.iconImage}
         emoji={item.icon}
-        className="mt-0.5 h-4 w-4"
+        className="size-6 p-0.5 text-base"
       />
-      <span
-        dir={ltr ? "ltr" : undefined}
-        className={ltr ? "min-w-0 font-num" : "min-w-0 whitespace-pre-line"}
-      >
-        {value}
-      </span>
+      {text}
     </span>
   );
 }
 
 function ColumnSection({ section }: { section: FooterSection }) {
   return (
-    <div className="min-w-0">
+    <section className="min-w-0">
       {section.title && (
-        <h3 className="mb-3 font-bold text-slate-700">{section.title}</h3>
+        <h3 className="mb-3 font-bold leading-6 text-slate-700">
+          {section.title}
+        </h3>
       )}
       {section.description && (
-        <p className="mb-3 text-sm leading-7 text-slate-500">
+        <p className="mb-3 whitespace-pre-line text-sm leading-7 text-slate-500">
           {section.description}
         </p>
       )}
-      <ul className="space-y-2 text-sm text-slate-500">
+      <ul className="space-y-2 text-sm leading-6 text-slate-500">
         {section.items.map((item) => (
           <li key={item.id} className="min-w-0">
-            <ItemLink item={item} className={LINK_CLASS}>
+            <ItemLink item={item} className="inline-block max-w-full align-top">
               <ItemBody item={item} />
             </ItemLink>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }
 
 function StripSection({ section }: { section: FooterSection }) {
+  const reserveVisualSpace = section.items.some(itemHasVisual);
+
   return (
-    <div className="grid grid-cols-2 gap-4 border-b border-slate-100 pb-8 text-center sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
-      {section.items.map((item) => (
-        <div key={item.id} className="flex min-w-0 flex-col items-center gap-2">
-          {item.iconImage ? (
-            <FooterIcon image={item.iconImage} className="h-10 w-10" />
-          ) : (
-            item.icon && <span className="text-3xl">{item.icon}</span>
+    <section className="border-b border-slate-100 py-8 first:pt-0">
+      {(section.title || section.description) && (
+        <header className="mb-5 min-w-0">
+          {section.title && (
+            <h3 className="font-bold leading-6 text-slate-700">{section.title}</h3>
           )}
-          <span className="text-sm text-slate-600">
-            <ItemLink item={item} className={LINK_CLASS}>
-              {item.text ?? item.label}
+          {section.description && (
+            <p className="mt-2 whitespace-pre-line text-sm leading-7 text-slate-500">
+              {section.description}
+            </p>
+          )}
+        </header>
+      )}
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(8rem,100%),1fr))] gap-4 text-sm text-slate-600 sm:grid-cols-[repeat(auto-fit,minmax(min(9rem,100%),1fr))]">
+        {section.items.map((item) => (
+          <li key={item.id} className="min-w-0">
+            <ItemLink
+              item={item}
+              className="flex h-full min-w-0 items-start justify-center"
+            >
+              <ItemBody
+                item={item}
+                variant="strip"
+                reserveVisualSpace={reserveVisualSpace}
+              />
             </ItemLink>
-          </span>
-        </div>
-      ))}
-    </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -161,7 +228,7 @@ function BrandColumn({ settings }: { settings: FooterSettings }) {
   }[];
 
   return (
-    <div className="col-span-2 min-w-0 md:col-span-1">
+    <section className="col-span-full min-w-0 lg:col-span-1">
       <div className="mb-3 flex items-center gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -172,7 +239,7 @@ function BrandColumn({ settings }: { settings: FooterSettings }) {
           className="h-10 w-10 object-contain"
         />
         {settings.brandTitle && (
-          <span className="text-lg font-bold text-brand-700">
+          <span className="min-w-0 text-lg font-bold leading-7 text-brand-700 [overflow-wrap:anywhere]">
             {settings.brandTitle}
           </span>
         )}
@@ -183,26 +250,32 @@ function BrandColumn({ settings }: { settings: FooterSettings }) {
         </p>
       )}
       {contactRows.length > 0 && (
-        <ul className="mt-4 space-y-2 text-sm text-slate-500">
+        <ul className="mt-4 space-y-2 text-sm leading-6 text-slate-500">
           {contactRows.map((row) => (
-            <li key={row.key} className="flex items-start gap-1.5">
-              <FooterIcon image={row.icon} className="mt-0.5 h-4 w-4" />
+            <li key={row.key} className="flex min-w-0 items-start gap-2">
+              <FooterIcon image={row.icon} className="size-6 p-0.5 text-base" />
               {row.href ? (
-                <a
-                  href={row.href}
-                  dir="ltr"
-                  className={`min-w-0 font-num ${LINK_CLASS}`}
-                >
-                  {row.text}
+                <a href={row.href} className={`min-w-0 ${LINK_CLASS}`}>
+                  <bdi
+                    dir="ltr"
+                    className="font-num whitespace-pre-line [overflow-wrap:anywhere]"
+                  >
+                    {row.text}
+                  </bdi>
                 </a>
               ) : (
-                <span className="min-w-0">{row.text}</span>
+                <bdi
+                  dir="auto"
+                  className="min-w-0 whitespace-pre-line [overflow-wrap:anywhere]"
+                >
+                  {row.text}
+                </bdi>
               )}
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -226,7 +299,7 @@ export default async function Footer() {
         ))}
 
         <div
-          className={`grid grid-cols-2 gap-8 py-8 ${footerColumnGridClass(columns.length)}`}
+          className={`grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-x-8 gap-y-10 py-8 sm:grid-cols-2 ${footerColumnGridClass(columns.length)}`}
         >
           <BrandColumn settings={settings} />
           {columns.map((section) => (
@@ -237,7 +310,7 @@ export default async function Footer() {
         {location && <FooterShopLocation location={location} />}
 
         {settings.copyright && (
-          <div className="border-t border-slate-100 pt-6 text-center text-xs text-slate-400">
+          <div className="border-t border-slate-100 pt-6 text-center text-xs text-slate-400 whitespace-pre-line [overflow-wrap:anywhere]">
             {settings.copyright}
           </div>
         )}

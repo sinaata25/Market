@@ -17,17 +17,20 @@ const link = (overrides = {}) => ({
 
 test("the current three-column footer keeps its four-column desktop grid", () => {
   // ستون معرفی برند + سه بخش مدیر — همان چیدمانی که فوتر امروز دارد
-  assert.equal(footerColumnGridClass(3), "md:grid-cols-4");
+  assert.equal(footerColumnGridClass(3), "lg:grid-cols-4");
 });
 
-test("adding a section widens the grid instead of squashing the columns", () => {
-  assert.equal(footerColumnGridClass(4), "md:grid-cols-5");
+test("adding sections wraps after four desktop columns instead of squashing them", () => {
+  assert.equal(footerColumnGridClass(4), "lg:grid-cols-4");
+  assert.equal(footerColumnGridClass(8), "lg:grid-cols-4");
 });
 
-test("an unusually long footer falls back to the widest grid, never undefined", () => {
-  assert.equal(footerColumnGridClass(99), "md:grid-cols-6");
-  assert.equal(footerColumnGridClass(0), "md:grid-cols-1");
-  assert.equal(footerColumnGridClass(-1), "md:grid-cols-1");
+test("small and unusual section counts always produce a valid desktop grid", () => {
+  assert.equal(footerColumnGridClass(0), "lg:grid-cols-1");
+  assert.equal(footerColumnGridClass(1), "lg:grid-cols-2");
+  assert.equal(footerColumnGridClass(2), "lg:grid-cols-3");
+  assert.equal(footerColumnGridClass(99), "lg:grid-cols-4");
+  assert.equal(footerColumnGridClass(-1), "lg:grid-cols-1");
 });
 
 test("an item with no destination gets no link attributes", () => {

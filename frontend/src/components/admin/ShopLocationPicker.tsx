@@ -265,14 +265,14 @@ export default function ShopLocationPicker({
           <span className="mb-1.5 block text-xs text-slate-600">
             آیکن نشانی (کنار نشانی در فوتر و بالای نقشه)
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <select
               disabled={disabled}
               value={values.addressIconId}
               onChange={(event) =>
                 onChange({ addressIconId: event.target.value })
               }
-              className={INPUT_CLASS}
+              className={`${INPUT_CLASS} min-w-0 flex-1`}
             >
               <option value="">بدون آیکن</option>
               {icons.map((icon) => (

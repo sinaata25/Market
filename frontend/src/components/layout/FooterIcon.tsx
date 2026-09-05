@@ -18,24 +18,27 @@ export default function FooterIcon({
 }) {
   const source = footerIconSource(image, emoji);
 
+  if (source.kind === "none") return null;
+
+  const slotClassName = `${className} inline-flex shrink-0 items-center justify-center overflow-hidden leading-none`;
+
   if (source.kind === "image") {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={source.value}
-        alt=""
-        aria-hidden="true"
-        loading="lazy"
-        className={`${className} shrink-0 object-contain`}
-      />
-    );
-  }
-  if (source.kind === "emoji") {
-    return (
-      <span aria-hidden="true" className="shrink-0">
-        {source.value}
+      <span aria-hidden="true" className={slotClassName}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={source.value}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-contain"
+        />
       </span>
     );
   }
-  return null;
+
+  return (
+    <span aria-hidden="true" className={slotClassName}>
+      {source.value}
+    </span>
+  );
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import ShopLocationPicker from "@/components/admin/ShopLocationPicker";
+import FooterIcon from "@/components/layout/FooterIcon";
 import type { ShopLocationValues } from "@/components/admin/ShopLocationPicker";
 import { api } from "@/lib/client-api";
 
@@ -324,12 +326,12 @@ function IconSelect({
   return (
     <div className="min-w-0">
       <span className="mb-1.5 block text-xs text-slate-600">{label}</span>
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <select
           disabled={disabled}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className={INPUT_CLASS}
+          className={`${INPUT_CLASS} min-w-0 flex-1`}
         >
           <option value="">بدون آیکن</option>
           {icons.map((icon) => (
@@ -365,6 +367,7 @@ function itemSummary(item: FooterItem): string {
 }
 
 export default function AdminFooterPage() {
+  const router = useRouter();
   const [sections, setSections] = useState<FooterSection[]>([]);
   const [settings, setSettings] = useState<FooterSettings | null>(null);
   const [pages, setPages] = useState<PageSummary[]>([]);
@@ -424,6 +427,13 @@ export default function AdminFooterPage() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  async function reloadAfterMutation() {
+    await load();
+    // Footer در RootLayout یک Server Component است؛ refresh باعث می‌شود تغییر
+    // موفق مدیر در همین نشست هم دیده شود، بدون از دست رفتن state فرم مدیریت.
+    router.refresh();
+  }
+
   // ─────────────────────────────── تنظیمات سراسری
 
   async function saveSettings(event: React.FormEvent<HTMLFormElement>) {
@@ -458,7 +468,7 @@ export default function AdminFooterPage() {
       if (!upload.ok) {
         setBusy(false);
         notify(`تنظیمات ذخیره شد، اما لوگو بارگذاری نشد: ${upload.error ?? ""}`);
-        await load();
+        await reloadAfterMutation();
         return;
       }
     }
@@ -466,7 +476,7 @@ export default function AdminFooterPage() {
     setLogoFile(null);
     if (logoInput.current) logoInput.current.value = "";
     notify("تنظیمات فوتر ذخیره شد ✅");
-    await load();
+    await reloadAfterMutation();
   }
 
   const updateLocation = useCallback(
@@ -500,7 +510,7 @@ export default function AdminFooterPage() {
       return;
     }
     notify("موقعیت فروشگاه ذخیره شد ✅");
-    await load();
+    await reloadAfterMutation();
   }
 
   function resetIcon() {
@@ -550,7 +560,7 @@ export default function AdminFooterPage() {
         if (!upload.ok) {
           setBusy(false);
           notify(`نام ذخیره شد، اما فایل جایگزین نشد: ${upload.error ?? ""}`);
-          await load();
+          await reloadAfterMutation();
           return;
         }
       }
@@ -568,7 +578,7 @@ export default function AdminFooterPage() {
     setBusy(false);
     notify(editingIcon ? "آیکن ویرایش شد ✅" : "آیکن افزوده شد ✅");
     resetIcon();
-    await load();
+    await reloadAfterMutation();
   }
 
   async function removeIcon(icon: FooterIcon) {
@@ -582,7 +592,7 @@ export default function AdminFooterPage() {
     if (!result.ok) notify(result.error ?? "حذف آیکن انجام نشد");
     else {
       if (editingIcon?.id === icon.id) resetIcon();
-      await load();
+      await reloadAfterMutation();
     }
   }
 
@@ -594,7 +604,7 @@ export default function AdminFooterPage() {
     if (!result.ok) notify(result.error ?? "حذف لوگو انجام نشد");
     else {
       notify("لوگو حذف شد ✅");
-      await load();
+      await reloadAfterMutation();
     }
   }
 
@@ -631,7 +641,7 @@ export default function AdminFooterPage() {
     }
     notify(editingSection ? "بخش ویرایش شد ✅" : "بخش افزوده شد ✅");
     resetSection();
-    await load();
+    await reloadAfterMutation();
   }
 
   async function toggleSection(section: FooterSection) {
@@ -642,7 +652,7 @@ export default function AdminFooterPage() {
     });
     setBusy(false);
     if (!result.ok) notify(result.error ?? "تغییر وضعیت انجام نشد");
-    else await load();
+    else await reloadAfterMutation();
   }
 
   async function moveSection(section: FooterSection, direction: "up" | "down") {
@@ -654,7 +664,10 @@ export default function AdminFooterPage() {
     );
     setBusy(false);
     if (!result.ok) notify(result.error ?? "تغییر ترتیب انجام نشد");
-    else setSections(result.data?.sections ?? []);
+    else {
+      setSections(result.data?.sections ?? []);
+      router.refresh();
+    }
   }
 
   async function removeSection(section: FooterSection) {
@@ -670,7 +683,7 @@ export default function AdminFooterPage() {
     else {
       if (editingSection?.id === section.id) resetSection();
       if (itemSectionId === section.id) resetItem();
-      await load();
+      await reloadAfterMutation();
     }
   }
 
@@ -750,14 +763,14 @@ export default function AdminFooterPage() {
       if (!upload.ok) {
         setBusy(false);
         notify(`محتوا ذخیره شد، اما تصویر بارگذاری نشد: ${upload.error ?? ""}`);
-        await load();
+        await reloadAfterMutation();
         return;
       }
     }
     setBusy(false);
     notify(editingItem ? "محتوا ویرایش شد ✅" : "محتوا افزوده شد ✅");
     resetItem();
-    await load();
+    await reloadAfterMutation();
   }
 
   async function toggleItem(item: FooterItem) {
@@ -768,7 +781,7 @@ export default function AdminFooterPage() {
     });
     setBusy(false);
     if (!result.ok) notify(result.error ?? "تغییر وضعیت انجام نشد");
-    else await load();
+    else await reloadAfterMutation();
   }
 
   async function moveItem(item: FooterItem, direction: "up" | "down") {
@@ -779,7 +792,7 @@ export default function AdminFooterPage() {
     });
     setBusy(false);
     if (!result.ok) notify(result.error ?? "تغییر ترتیب انجام نشد");
-    else await load();
+    else await reloadAfterMutation();
   }
 
   async function removeItem(item: FooterItem) {
@@ -791,7 +804,7 @@ export default function AdminFooterPage() {
     if (!result.ok) notify(result.error ?? "حذف محتوا انجام نشد");
     else {
       if (editingItem?.id === item.id) resetItem();
-      await load();
+      await reloadAfterMutation();
     }
   }
 
@@ -1220,9 +1233,15 @@ export default function AdminFooterPage() {
                       className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50/70 px-3 py-2"
                     >
                       <div className="min-w-0 flex-1 basis-40">
-                        <p className="truncate text-xs font-medium text-slate-700">
-                          {item.icon && <span className="ml-1">{item.icon}</span>}
-                          {item.label ?? item.text ?? "—"}
+                        <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-700">
+                          <FooterIcon
+                            image={item.iconImage}
+                            emoji={item.icon}
+                            className="size-5 text-sm"
+                          />
+                          <span className="min-w-0 truncate">
+                            {item.label ?? item.text ?? "—"}
+                          </span>
                         </p>
                         <p
                           dir="auto"

@@ -21,15 +21,15 @@ export type FooterLinkAttributes = {
  * آن‌ها را در سورس ببیند.
  */
 const COLUMN_GRID_CLASSES: Record<number, string> = {
-  0: "md:grid-cols-1",
-  1: "md:grid-cols-2",
-  2: "md:grid-cols-3",
-  3: "md:grid-cols-4",
-  4: "md:grid-cols-5",
-  5: "md:grid-cols-6",
+  0: "lg:grid-cols-1",
+  1: "lg:grid-cols-2",
+  2: "lg:grid-cols-3",
 };
 
-const WIDEST_COLUMN_GRID = COLUMN_GRID_CLASSES[5];
+// چهار ستون، حداقل عرض عملیِ ستون‌ها را در لپ‌تاپ و دسکتاپ حفظ می‌کند؛
+// بخش‌های بیشتر به ردیف بعد می‌روند و دیگر در تبلت به ۵ یا ۶ ستون فشرده
+// نمی‌شوند.
+const WIDEST_COLUMN_GRID = "lg:grid-cols-4";
 
 /** کلاس شبکه‌ی ستون‌های فوتر برای این تعداد بخش ستونی */
 export function footerColumnGridClass(columnSectionCount: number): string {
