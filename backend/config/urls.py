@@ -21,6 +21,8 @@ from homepage.urls import admin_urlpatterns as homepage_admin_urls
 from homepage.urls import public_urlpatterns as homepage_public_urls
 from footer.urls import admin_urlpatterns as footer_admin_urls
 from footer.urls import public_urlpatterns as footer_public_urls
+from contacts.urls import admin_urlpatterns as contacts_admin_urls
+from contacts.urls import public_urlpatterns as contacts_public_urls
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -55,6 +57,8 @@ urlpatterns = [
     ),
     path("api/home/", include((homepage_public_urls, "homepage-public"))),
     path("api/footer", include((footer_public_urls, "footer-public"))),
+    path("api/site-settings/", include((contacts_public_urls, "contacts-public"))),
+    path("api/admin/", include((contacts_admin_urls, "contacts-admin"))),
     # فایل‌های سئو در ریشه (از طریق rewrite فرانت هم در دسترس‌اند)
     path("robots.txt", seo_public.robots_txt),
     path("sitemap.xml", seo_public.sitemap_xml),

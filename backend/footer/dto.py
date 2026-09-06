@@ -30,6 +30,8 @@ def admin_icon_dto(icon: FooterIcon) -> dict:
     data = icon_dto(icon)
     count = getattr(icon, "item_count", None)
     data["usageCount"] = icon.items.count() if count is None else count
+    contact_count = getattr(icon, "contact_count", None)
+    data["usageCount"] += icon.contact_buttons.count() if contact_count is None else contact_count
     return data
 
 

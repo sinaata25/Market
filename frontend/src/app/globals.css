@@ -132,6 +132,65 @@ label {
 }
 
 /* نوار مقایسه فقط هنگام نمایش خودش از انتهای صفحه فضا می‌گیرد. */
+.floating-contact-stack {
+  --contact-bottom: calc(max(0.75rem, env(safe-area-inset-bottom, 0px)) + var(--compare-tray-h, 0px));
+  position: fixed;
+  bottom: var(--contact-bottom);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  max-height: max(4rem, calc(100dvh - var(--header-h, 12rem) - var(--contact-bottom) - 1rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.floating-contact-stack[data-floating-contacts="bottom-right"] {
+  right: max(0.25rem, env(safe-area-inset-right, 0px));
+}
+
+.floating-contact-stack[data-floating-contacts="bottom-left"] {
+  left: max(0.25rem, env(safe-area-inset-left, 0px));
+}
+
+.floating-contact-button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  color: white;
+  background: var(--color-brand-600);
+  box-shadow: 0 3px 10px rgb(15 23 42 / 18%);
+  transition: background-color 150ms, transform 150ms;
+}
+
+.floating-contact-button:hover {
+  background: var(--color-brand-700);
+  transform: translateY(-2px);
+}
+
+.floating-contact-button:focus-visible {
+  outline: 3px solid var(--color-brand-700);
+  outline-offset: 3px;
+}
+
+@media (min-width: 640px) {
+  .floating-contact-stack { --contact-bottom: calc(max(1rem, env(safe-area-inset-bottom, 0px)) + var(--compare-tray-h, 0px)); }
+  .floating-contact-stack[data-floating-contacts="bottom-right"] { right: max(1rem, env(safe-area-inset-right, 0px)); }
+  .floating-contact-stack[data-floating-contacts="bottom-left"] { left: max(1rem, env(safe-area-inset-left, 0px)); }
+  .floating-contact-button { width: 3.25rem; height: 3.25rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-contact-button { transition: none; }
+  .floating-contact-button:hover { transform: none; }
+}
+
 body:has([data-compare-tray]) .site-main {
   padding-bottom: 9rem;
 }

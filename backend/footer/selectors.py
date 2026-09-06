@@ -32,4 +32,7 @@ def section_items(section: FooterSection) -> list[FooterItem]:
 
 def icons_queryset() -> QuerySet[FooterIcon]:
     """آیکن‌ها به‌همراه تعداد آیتم‌هایی که از آن‌ها استفاده می‌کنند"""
-    return FooterIcon.objects.annotate(item_count=Count("items")).order_by("name", "id")
+    return FooterIcon.objects.annotate(
+        item_count=Count("items", distinct=True),
+        contact_count=Count("contact_buttons", distinct=True),
+    ).order_by("name", "id")

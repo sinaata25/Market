@@ -1,17 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { formatPrice } from "@/lib/products";
 import { MAX_COMPARE_ITEMS, useCompare } from "@/lib/compare";
 
 // نوار شناور مقایسه — هنگام مرور فروشگاه، محصولات انتخاب‌شده را نشان می‌دهد
 export default function CompareTray() {
   const { items, count, canCompare, remove, clear } = useCompare();
+  const tray = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tray.current) return;
+    const element = tray.current;
+    const root = document.documentElement;
+    const measure = () => root.style.setProperty("--compare-tray-h", `${element.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--compare-tray-h");
+    };
+  }, [count]);
 
   if (count === 0) return null;
 
   return (
-    <div data-compare-tray className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur">
+    <div ref={tray} data-compare-tray className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="site-container flex flex-col gap-2 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:py-3">
         <div className="responsive-scroll flex w-full items-center gap-2 sm:min-w-0 sm:flex-1">
           {items.map((item) => (

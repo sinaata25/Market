@@ -43,6 +43,7 @@ const SHOP_NAV: NavItem[] = [
   { href: "/admin/blog", icon: "📝", label: "وبلاگ" },
   { href: "/admin/homepage", icon: "🏠", label: "صفحه اصلی" },
   { href: "/admin/footer", icon: "🧱", label: "فوتر" },
+  { href: "/admin/floating-contact-buttons", icon: "☎", label: "دکمه‌های تماس شناور" },
   { href: "/admin/content", icon: "📄", label: "محتوای صفحات" },
 ];
 

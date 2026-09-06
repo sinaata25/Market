@@ -5,6 +5,8 @@ import Header from "@/components/layout/Header";
 import HeaderHeightProbe from "@/components/layout/HeaderHeightProbe";
 import Footer from "@/components/layout/Footer";
 import CompareTray from "@/components/product/CompareTray";
+import { Suspense } from "react";
+import FloatingContactButtons from "@/components/layout/FloatingContactButtons";
 
 // فونت فارسی وزیرمتن — به‌صورت محلی host می‌شود (بدون وابستگی به اینترنت)
 const vazirmatn = localFont({
@@ -37,6 +39,9 @@ export default function RootLayout({
         <main className="site-main flex-1 pb-8">{children}</main>
         <Footer />
         <CompareTray />
+        <Suspense fallback={null}>
+          <FloatingContactButtons />
+        </Suspense>
       </body>
     </html>
   );

@@ -131,6 +131,7 @@ INSTALLED_APPS = [
     "staticpages",
     "homepage",
     "footer",
+    "contacts",
 ]
 
 MIDDLEWARE = [
