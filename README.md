@@ -1,82 +1,187 @@
-# 🌾 ابزار سبز — فروشگاه اینترنتی ابزارآلات کشاورزی
+# Green Tools Market
 
-فروشگاه فارسی (RTL) با فرانت **Next.js + Tailwind** و بک‌اند **Django + DRF**.
+Green Tools Market is a Persian, right-to-left e-commerce application for agricultural tools and supplies. It combines a Next.js storefront and management dashboard with a Django REST API.
 
+## Technology stack
+
+- **Frontend:** Next.js 16, React 19, TypeScript, and Tailwind CSS 4
+- **Backend:** Django 6 and Django REST Framework
+- **Development database:** SQLite
+- **Production database:** PostgreSQL
+- **Authentication:** Phone-number OTP with console and IPPanel SMS backends
+- **API documentation:** OpenAPI, Swagger UI, and ReDoc
+
+## Repository structure
+
+```text
+Market/
+├── backend/    # Django API, business logic, database, and media files
+├── frontend/   # Next.js storefront and management dashboard
+└── docs/       # Feature-specific documentation
 ```
-market/
-├── frontend/   # Next.js 16 — رابط کاربری (پورت 3000)
-└── backend/    # Django 6 + DRF — API و دیتابیس (پورت 8000)
-```
 
-درخواست‌های `/api/*` فرانت از طریق rewrite در `next.config.ts` به جنگو پروکسی می‌شوند.
+The frontend proxies `/api/*`, `/media/*`, `/robots.txt`, and `/sitemap.xml` requests to Django. This keeps session cookies and CSRF handling on the same browser origin during normal storefront use.
 
-## راه‌اندازی بک‌اند
+## Features
 
-```powershell
+- Product catalog, categories, brands, specifications, reviews, and comparisons
+- Guest and authenticated shopping carts
+- Checkout, order management, and printable invoices
+- Phone-number OTP authentication
+- Customer profiles, addresses, favorites, comments, and order history
+- Blog, static pages, homepage sections, SEO settings, and sitemap management
+- Configurable footer, contact details, location map, and floating contact buttons
+- Role-based storefront management dashboard
+
+## Prerequisites
+
+Install the following before starting:
+
+- Python 3.12 or newer
+- Node.js 20.9 or newer
+- npm
+
+PostgreSQL and Redis are required for production deployments but are optional for local development.
+
+## Local development
+
+### 1. Start the backend
+
+From the repository root:
+
+```bash
 cd backend
-py -3.13 -m venv venv              # فقط بار اول
-.\venv\Scripts\pip install -r requirements.txt
-copy .env.example .env             # و مقداردهی SECRET_KEY
-.\venv\Scripts\python manage.py migrate
-.\venv\Scripts\python manage.py seed_catalog
-.\venv\Scripts\python manage.py runserver 127.0.0.1:8000
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+python manage.py migrate
+python manage.py seed_catalog
+python manage.py runserver 127.0.0.1:8000
 ```
 
-پنل ادمین: `python manage.py createsuperuser` سپس http://127.0.0.1:8000/admin
+On Windows, activate the virtual environment with `.venv\Scripts\activate` and use `copy .env.example .env` instead of `cp`.
 
-## راه‌اندازی فرانت (ترمینال دوم)
+The default development configuration uses SQLite. Replace `SECRET_KEY` in `backend/.env` with a private random value before using the application outside local development.
 
-```powershell
+Optional backend commands:
+
+```bash
+# Create a Django superuser
+python manage.py createsuperuser
+
+# Add richer demo content; this downloads product images
+python manage.py seed_demo
+```
+
+### 2. Start the frontend
+
+Open another terminal at the repository root:
+
+```bash
 cd frontend
-npm install                        # فقط بار اول
-copy .env.example .env             # BACKEND_URL پیش‌فرض درست است
+npm ci
+cp .env.example .env
 npm run dev
 ```
 
-سایت: http://localhost:3000
+On Windows, use `copy .env.example .env` instead of `cp`.
 
-## ورود با OTP و IPPanel
+Open the following services:
 
-سیستم OTP به API الگوی IPPanel متصل است. راهنمای ساخت الگو، تنظیم `.env`،
-مهاجرت دیتابیس، معماری و چک‌لیست استقرار در [docs/otp-login.md](docs/otp-login.md) آمده است.
+- Storefront: <http://localhost:3000>
+- Store management dashboard: <http://localhost:3000/admin>
+- Django administration: <http://127.0.0.1:8000/admin/>
+- Swagger API documentation: <http://127.0.0.1:8000/api/docs/>
+- ReDoc API documentation: <http://127.0.0.1:8000/api/redoc/>
+- OpenAPI schema: <http://127.0.0.1:8000/api/schema/>
 
-## فوتر
+## Environment configuration
 
-ساختار و محتوای فوتر از `/admin/footer` مدیریت می‌شود و فروشگاه آن را از
-`GET /api/footer` می‌خواند.
+The example environment files document all supported settings:
 
-در حالت توسعه، فوتر کش نمی‌شود و هر تغییر مدیر با همان یک بار بارگذاری دیده
-می‌شود. در **استقرار تولید** این دو مقدار را در دو طرف تنظیم کنید تا تغییر
-مدیر بلافاصله در فروشگاه دیده شود:
+- `backend/.env.example`
+- `frontend/.env.example`
 
-```
+Important frontend settings include:
+
+- `BACKEND_URL`: Django server used by the Next.js proxy
+- `SITE_URL`: Public storefront URL used for canonical and Open Graph metadata
+- `FRONTEND_REVALIDATE_SECRET`: Shared secret for on-demand cache revalidation
+- `GOOGLE_MAPS_EMBED_API_KEY`: Optional key for the official Google Maps embed route
+
+Important backend settings include:
+
+- `SECRET_KEY`, `DJANGO_DEBUG`, `ALLOWED_HOSTS`, and `CSRF_TRUSTED_ORIGINS`
+- `DATABASE_URL`: PostgreSQL connection URL required in production
+- `REDIS_URL`: Redis connection URL required for production OTP throttling
+- `OTP_SMS_BACKEND`: Use `console` locally or `ippanel` in production
+- `IPPANEL_*`: IPPanel credentials, sender number, pattern codes, and timeouts
+- `FRONTEND_REVALIDATE_URL` and `FRONTEND_REVALIDATE_SECRET`: Frontend cache invalidation settings
+
+## OTP authentication
+
+Local development defaults to `OTP_SMS_BACKEND=console`. OTP codes are written to the Django server log and are never returned by the API.
+
+Production uses the IPPanel pattern API. See [OTP Login and IPPanel Setup](docs/otp-login.md) for configuration, architecture, database migration, security behavior, and deployment guidance.
+
+## Cache revalidation
+
+Footer content is cached by the storefront. To make dashboard changes visible immediately in production, configure the same secret on both applications:
+
+```dotenv
 # backend/.env
 FRONTEND_REVALIDATE_URL=https://example.com/internal/revalidate
-FRONTEND_REVALIDATE_SECRET=<یک رشته‌ی تصادفی بلند>
+FRONTEND_REVALIDATE_SECRET=replace-with-a-long-random-secret
 
 # frontend/.env
-FRONTEND_REVALIDATE_SECRET=<همان رشته>
+FRONTEND_REVALIDATE_SECRET=replace-with-the-same-secret
 ```
 
-بدون این دو، فروشگاه هنوز درست کار می‌کند اما فوتر تا یک دقیقه پس از هر
-تغییر، نسخه‌ی کش‌شده را نشان می‌دهد.
+Without these values, the footer still works but may remain cached for up to one minute after an update.
 
-## نکته‌ها
+## API conventions
 
-- در توسعه، `OTP_SMS_BACKEND=console` کد را فقط در لاگ جنگو می‌نویسد؛ کد هیچ‌گاه در API برنمی‌گردد.
-- دیتابیس توسعه SQLite است (`backend/db.sqlite3`)؛ استقرار با `DJANGO_DEBUG=false` فقط با `DATABASE_URL` از نوع PostgreSQL بالا می‌آید.
-- قرارداد پاسخ همه‌ی APIها: `{ok: true, data}` یا `{ok: false, error, errorCode?, data?}`.
+Successful API responses use this envelope:
 
-## وبلاگ
+```json
+{"ok": true, "data": {}}
+```
 
-صفحات عمومی وبلاگ در `/blog` و `/blog/{slug}` و مدیریت نوشته‌ها در
-`/admin/blog` قرار دارد. پس از دریافت تغییرات جدید، مهاجرت‌ها را اجرا کنید:
+Errors use this envelope:
 
-```powershell
+```json
+{"ok": false, "error": "A human-readable message", "errorCode": "optional_code", "data": {}}
+```
+
+See [Blog API](docs/blog-api.md) for the blog endpoint reference.
+
+## Quality checks
+
+Run the backend test suite:
+
+```bash
 cd backend
-.\venv\Scripts\python manage.py migrate
+source .venv/bin/activate
+python manage.py test
 ```
 
-برای canonical و Open Graph URL در فرانت، مقدار `SITE_URL` را در محیط استقرار
-برابر آدرس عمومی سایت قرار دهید. مستندات endpointها در
-[`docs/blog-api.md`](docs/blog-api.md) آمده است.
+Run frontend linting and create a production build:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+## Production notes
+
+When `DJANGO_DEBUG=false`, the backend enforces several production safeguards:
+
+- `SECRET_KEY` must be strong and unique.
+- `DATABASE_URL` must point to PostgreSQL.
+- `REDIS_URL` must be configured for shared, atomic OTP throttling.
+- `OTP_SMS_BACKEND` must be `ippanel` with valid provider settings.
+- HTTPS cookies, HSTS, and secure redirect settings are enabled by default.
+
+Set `SITE_URL` to the public storefront URL so canonical links and Open Graph metadata use the correct origin. Run database migrations during every deployment.
