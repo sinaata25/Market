@@ -16,6 +16,7 @@ from .dto import (
     admin_section_dto,
     admin_settings_dto,
 )
+from .badges import validate_badge_image
 from .geocoding import GeocodingUnavailable, reverse, search
 from .maps import LATITUDE_RANGE, LONGITUDE_RANGE, format_coordinate
 from .files import schedule_footer_image_delete
@@ -31,6 +32,7 @@ from .serializers import (
     FooterSectionUpdateSerializer,
     FooterSettingsSerializer,
     MoveSerializer,
+    FooterTrustBadgeWriteSerializer,
 )
 from .services import (
     FooterValidationError,
@@ -46,6 +48,7 @@ from .services import (
     update_item,
     update_section,
     update_settings,
+    save_trust_badge,
 )
 
 
@@ -350,7 +353,14 @@ class AdminFooterItemImageView(ShopAdminRequiredMixin, APIView):
         if item is None:
             return fail("محتوای فوتر یافت نشد", 404)
         file = request.FILES.get("file")
-        error = image_upload_error(file)
+        if item.item_type == FooterItem.ItemType.BADGE:
+            try:
+                validate_badge_image(file)
+                error = None
+            except DjangoValidationError as exc:
+                error = exc.messages[0]
+        else:
+            error = image_upload_error(file)
         if error:
             return fail(error, 422)
 
@@ -389,6 +399,28 @@ class AdminFooterItemImageView(ShopAdminRequiredMixin, APIView):
         )
         schedule_footer_revalidation(using=item._state.db or "default")
         return ok({"item": admin_item_dto(item)})
+
+
+class AdminFooterTrustBadgeWriteView(ShopAdminRequiredMixin, APIView):
+    """Create/update a badge and its image in one multipart request."""
+
+    @extend_schema(request=FooterTrustBadgeWriteSerializer, responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT})
+    def post(self, request, pk=None):
+        item = None
+        if pk is not None:
+            item = FooterItem.objects.filter(pk=pk, item_type=FooterItem.ItemType.BADGE).first()
+            if item is None:
+                return fail("نماد یافت نشد", 404)
+        serializer = FooterTrustBadgeWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return fail(first_error_message(serializer.errors), 422, data={"fieldErrors": serializer.errors})
+        try:
+            item = save_trust_badge(item=item, **serializer.validated_data)
+        except FooterValidationError as exc:
+            return _validation_failure(exc)
+        except DjangoValidationError as exc:
+            return fail(first_error_message(exc.messages), 422)
+        return ok({"item": admin_item_dto(item)}, status=201 if pk is None else 200)
 
 
 class GeocodingThrottle(UserRateThrottle):

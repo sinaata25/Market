@@ -66,11 +66,12 @@ export type PartitionedSection = { variant: string };
  */
 export function partitionFooterSections<T extends PartitionedSection>(
   sections: readonly T[]
-): { strips: T[]; columns: T[] } {
+): { strips: T[]; columns: T[]; badges: T[] } {
   return {
     strips: sections.filter((section) => section.variant === "strip"),
-    // هر چیزی که نوار نیست ستون است، تا نوع تازه‌ی بخش بی‌صدا ناپدید نشود
-    columns: sections.filter((section) => section.variant !== "strip"),
+    // نوع ناشناخته همچنان ستون می‌شود؛ نمادها ناحیه‌ی مخصوص خود را دارند.
+    columns: sections.filter((section) => section.variant !== "strip" && section.variant !== "badges"),
+    badges: sections.filter((section) => section.variant === "badges"),
   };
 }
 

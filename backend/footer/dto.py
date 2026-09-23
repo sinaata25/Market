@@ -60,6 +60,7 @@ def item_dto(item: FooterItem) -> dict:
         # از روی خود نشانی مشتق می‌شود تا برچسب و مقصد هرگز ناهمخوان نشوند
         "isExternal": bool(href) and is_external_url(href),
         "position": item.position,
+        **({"altText": item.alt_text or item.label} if item.item_type == FooterItem.ItemType.BADGE else {}),
     }
 
 
@@ -74,6 +75,7 @@ def admin_item_dto(item: FooterItem) -> dict:
         "staticPageKey": item.static_page_key or None,
         "createdAt": item.created_at,
         "updatedAt": item.updated_at,
+        **({"altText": item.alt_text or None} if item.item_type == FooterItem.ItemType.BADGE else {}),
     }
 
 

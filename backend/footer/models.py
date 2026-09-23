@@ -4,6 +4,7 @@ from django.db import models
 # آیکن‌های فوتر همان قواعد ایمنی آیکن دسته‌بندی را دارند (PNG یا SVG پاک‌سازی‌شده)
 from catalog.validators import validate_category_icon
 from staticpages.definitions import PAGE_KEY_CHOICES, SUPPORTED_PAGE_KEYS
+from .badges import validate_badge_image, validate_badge_url
 
 from .maps import (
     DEFAULT_ZOOM,
@@ -34,6 +35,7 @@ _TYPE_ALLOWED_FIELDS: dict[str, set[str]] = {
     },
     "text": {"label", "text", "icon", "icon_image"},
     "image": {"label", "url", "image", "open_in_new_tab"},
+    "badge": {"label", "url", "image", "alt_text", "open_in_new_tab"},
     "phone": {"label", "text", "icon", "icon_image"},
     "email": {"label", "text", "icon", "icon_image"},
     "address": {"label", "text", "icon", "icon_image"},
@@ -45,6 +47,7 @@ _TYPE_REQUIRED_FIELDS: dict[str, set[str]] = {
     "link": {"label", "url"},
     "text": {"text"},
     "image": {"image"},
+    "badge": {"label", "url", "image"},
     "phone": {"text"},
     "email": {"text"},
     "address": {"text"},
@@ -61,6 +64,7 @@ _FIELD_ERROR_KEYS: dict[str, str] = {
     "icon_image": "iconId",
     "open_in_new_tab": "openInNewTab",
     "static_page_key": "staticPageKey",
+    "alt_text": "altText",
 }
 
 _REQUIRED_FIELD_MESSAGES: dict[str, str] = {
@@ -286,6 +290,7 @@ class FooterSection(models.Model):
     class Variant(models.TextChoices):
         COLUMN = "column", "ستون (فهرست عمودی)"
         STRIP = "strip", "نوار مزیت‌ها (ردیف افقی بالای فوتر)"
+        BADGES = "badges", "نمادها و مجوزها"
 
     title = models.CharField("عنوان", max_length=120, blank=True)
     variant = models.CharField(
@@ -304,6 +309,12 @@ class FooterSection(models.Model):
         indexes = [
             models.Index(fields=["position", "id"], name="footer_section_order_idx")
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["variant"], condition=models.Q(variant="badges"),
+                name="footer_single_badges_section",
+            )
+        ]
 
     def clean(self):
         super().clean()
@@ -316,6 +327,14 @@ class FooterSection(models.Model):
         # عمداً عنوان ندارد.
         if self.variant == self.Variant.COLUMN and not self.title.strip():
             errors.setdefault("title", "عنوان بخش الزامی است")
+        if self.pk:
+            incompatible = (
+                self.items.exclude(item_type="badge")
+                if self.variant == self.Variant.BADGES
+                else self.items.filter(item_type="badge")
+            )
+            if incompatible.exists():
+                errors["variant"] = "نمادها باید در بخش مخصوص نمادها و مجوزها باقی بمانند"
         if errors:
             raise ValidationError(errors)
 
@@ -334,6 +353,7 @@ class FooterItem(models.Model):
         LINK = "link", "پیوند"
         TEXT = "text", "متن"
         IMAGE = "image", "تصویر"
+        BADGE = "badge", "نماد یا مجوز"
         PHONE = "phone", "شماره تماس"
         EMAIL = "email", "ایمیل"
         ADDRESS = "address", "نشانی"
@@ -352,6 +372,7 @@ class FooterItem(models.Model):
     url = models.CharField("نشانی مقصد", max_length=300, blank=True)
     text = models.TextField("متن", max_length=600, blank=True)
     image = models.ImageField("تصویر", upload_to="footer/items/", blank=True)
+    alt_text = models.CharField("متن جایگزین نماد", max_length=200, blank=True)
     icon_image = models.ForeignKey(
         FooterIcon,
         verbose_name="آیکن",
@@ -405,6 +426,7 @@ class FooterItem(models.Model):
             "icon_image": self.icon_image_id,
             "open_in_new_tab": self.open_in_new_tab,
             "static_page_key": self.static_page_key,
+            "alt_text": self.alt_text,
         }
 
         for field_name in _TYPE_REQUIRED_FIELDS.get(self.item_type, set()):
@@ -422,7 +444,7 @@ class FooterItem(models.Model):
                 "این فیلد برای این نوع محتوا قابل استفاده نیست",
             )
 
-        for field_name in ("label", "text", "icon"):
+        for field_name in ("label", "text", "icon", "alt_text"):
             message = _plain_text_error(values[field_name])
             if message:
                 errors.setdefault(_FIELD_ERROR_KEYS[field_name], message)
@@ -438,6 +460,20 @@ class FooterItem(models.Model):
 
         if self.static_page_key and self.static_page_key not in SUPPORTED_PAGE_KEYS:
             errors.setdefault("staticPageKey", "صفحه‌ی محتوایی پشتیبانی نمی‌شود")
+
+        try:
+            badge_section = self.section.variant == FooterSection.Variant.BADGES
+        except FooterSection.DoesNotExist:
+            badge_section = False  # FK validation reports the missing section.
+        if badge_section != (self.item_type == self.ItemType.BADGE):
+            errors["itemType"] = "بخش نمادها فقط محتوای نماد می‌پذیرد؛ نماد را در همین بخش بسازید"
+        if self.item_type == self.ItemType.BADGE:
+            for field_name, validator in (("url", validate_badge_url), ("image", validate_badge_image)):
+                if values[field_name]:
+                    try:
+                        validator(values[field_name])
+                    except ValidationError as exc:
+                        errors[field_name] = exc.messages[0]
 
         if errors:
             raise ValidationError(errors)

@@ -130,9 +130,9 @@ def move_section(section: FooterSection, direction: str) -> list[FooterSection]:
 
 @transaction.atomic
 def create_item(*, section: FooterSection, **fields) -> FooterItem:
+    fields.setdefault("position", _next_position(FooterItem.objects.filter(section=section)))
     item = FooterItem(
         section=section,
-        position=_next_position(FooterItem.objects.filter(section=section)),
         **fields,
     )
     _save(item)
@@ -158,6 +158,8 @@ def _clear_disallowed_fields(item: FooterItem) -> None:
         item.open_in_new_tab = False
     if "static_page_key" not in allowed:
         item.static_page_key = ""
+    if "alt_text" not in allowed:
+        item.alt_text = ""
 
 
 @transaction.atomic
@@ -170,11 +172,24 @@ def update_item(item: FooterItem, **fields) -> FooterItem:
         _clear_disallowed_fields(item)
     _save(item)
     # تعویض نوع آیتم تصویر را رها می‌کند؛ فایل بی‌مرجع نباید در media بماند
-    if stored_image and not item.image:
+    if stored_image and stored_image != item.image.name:
         schedule_footer_image_delete(
             stored_image, storage, using=item._state.db or "default"
         )
     return item
+
+
+@transaction.atomic
+def save_trust_badge(*, item: FooterItem | None = None, **fields) -> FooterItem:
+    """Reuse footer items and create the dedicated section only with its first badge."""
+    if item is not None:
+        item = FooterItem.objects.select_for_update().get(pk=item.pk)
+        return update_item(item, **fields)
+    section, _ = FooterSection.objects.get_or_create(
+        variant=FooterSection.Variant.BADGES,
+        defaults={"title": "نمادها و مجوزها", "position": _next_position(FooterSection.objects)},
+    )
+    return create_item(section=section, item_type=FooterItem.ItemType.BADGE, **fields)
 
 
 @transaction.atomic

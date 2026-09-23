@@ -7,6 +7,8 @@ public_urlpatterns = [
 ]
 
 admin_urlpatterns = [
+    path("trust-badges", views_admin.AdminFooterTrustBadgeWriteView.as_view()),
+    path("trust-badges/<int:pk>", views_admin.AdminFooterTrustBadgeWriteView.as_view()),
     path("settings", views_admin.AdminFooterSettingsView.as_view()),
     path("settings/logo", views_admin.AdminFooterLogoView.as_view()),
     path("geocode/search", views_admin.AdminFooterGeocodeSearchView.as_view()),

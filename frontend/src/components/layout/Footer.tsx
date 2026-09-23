@@ -1,6 +1,7 @@
 import Link from "next/link";
 import FooterIcon from "@/components/layout/FooterIcon";
 import FooterShopLocation from "@/components/layout/FooterShopLocation";
+import FooterTrustBadges from "@/components/layout/FooterTrustBadges";
 import { getFooter } from "@/lib/footer";
 import { shopLocationToRender } from "@/lib/footer-map";
 import type { FooterItem, FooterSection, FooterSettings } from "@/lib/footer";
@@ -288,7 +289,7 @@ export default async function Footer() {
   }
 
   const { settings, sections } = footer;
-  const { strips, columns } = partitionFooterSections(sections);
+  const { strips, columns, badges } = partitionFooterSections(sections);
   const location = shopLocationToRender(settings.location);
 
   return (
@@ -308,6 +309,8 @@ export default async function Footer() {
         </div>
 
         {location && <FooterShopLocation location={location} />}
+
+        {badges.map((section) => <FooterTrustBadges key={section.id} section={section} />)}
 
         {settings.copyright && (
           <div className="border-t border-slate-100 pt-6 text-center text-xs text-slate-400 whitespace-pre-line [overflow-wrap:anywhere]">

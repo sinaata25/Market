@@ -11,6 +11,7 @@ export type FooterItemType =
   | "link"
   | "text"
   | "image"
+  | "badge"
   | "phone"
   | "email"
   | "address"
@@ -24,6 +25,7 @@ export type FooterItem = {
   text: string | null;
   url: string | null;
   image: string | null;
+  altText?: string | null;
   /** آیکن تصویری انتخاب‌شده از کتابخانه؛ بر ایموجی اولویت دارد */
   iconImage: string | null;
   /** ایموجی جایگزین، فقط وقتی آیکن تصویری انتخاب نشده باشد */
@@ -33,7 +35,7 @@ export type FooterItem = {
   position: number;
 };
 
-export type FooterSectionVariant = "column" | "strip";
+export type FooterSectionVariant = "column" | "strip" | "badges";
 
 export type FooterSection = {
   id: number;

@@ -4,15 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ShopLocationPicker from "@/components/admin/ShopLocationPicker";
 import FooterIcon from "@/components/layout/FooterIcon";
+import FooterTrustBadgesEditor from "@/components/admin/FooterTrustBadgesEditor";
 import type { ShopLocationValues } from "@/components/admin/ShopLocationPicker";
 import { api } from "@/lib/client-api";
 
-type SectionVariant = "column" | "strip";
+type SectionVariant = "column" | "strip" | "badges";
 
 type ItemType =
   | "link"
   | "text"
   | "image"
+  | "badge"
   | "phone"
   | "email"
   | "address"
@@ -35,6 +37,7 @@ type FooterItem = {
   rawUrl: string | null;
   image: string | null;
   icon: string | null;
+  altText?: string | null;
   iconImage: string | null;
   iconId: number | null;
   openInNewTab: boolean;
@@ -812,6 +815,7 @@ export default function AdminFooterPage() {
   const activeItemDefinition = itemDefinition(itemValues.itemType);
   const editingSectionTitle =
     sections.find((section) => section.id === itemSectionId)?.title ?? "بدون عنوان";
+  const contentSections = sections.filter((section) => section.variant !== "badges");
 
   return (
     <div className="space-y-6">
@@ -830,6 +834,12 @@ export default function AdminFooterPage() {
       )}
 
       {/* ─── تنظیمات سراسری ─── */}
+      <FooterTrustBadgesEditor
+        section={sections.find((section) => section.variant === "badges")}
+        loading={loading}
+        onChanged={reloadAfterMutation}
+      />
+
       <section className="rounded-2xl border border-slate-100 bg-white p-5">
         <h2 className="mb-1 font-bold text-slate-700">تنظیمات سراسری</h2>
         <p className="mb-4 text-[11px] text-slate-400">
@@ -1150,13 +1160,13 @@ export default function AdminFooterPage() {
           <p className="p-6 text-center text-sm text-slate-400 sm:p-8">
             در حال دریافت...
           </p>
-        ) : sections.length === 0 ? (
+        ) : contentSections.length === 0 ? (
           <p className="p-6 text-center text-sm text-slate-400 sm:p-8">
             هنوز بخشی افزوده نشده است.
           </p>
         ) : (
           <div className="divide-y divide-slate-100">
-            {sections.map((section, index) => (
+            {contentSections.map((section, index) => (
               <div key={section.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500">
@@ -1193,7 +1203,7 @@ export default function AdminFooterPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={busy || index === sections.length - 1}
+                      disabled={busy || index === contentSections.length - 1}
                       onClick={() => moveSection(section, "down")}
                       title="انتقال به پایین"
                       className={`${SMALL_BUTTON} border-slate-200`}

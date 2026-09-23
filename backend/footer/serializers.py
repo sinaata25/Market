@@ -20,6 +20,7 @@ _FIELD_RENAMES = {
     "addressIconId": "address_icon",
     "phoneIconId": "phone_icon",
     "emailIconId": "email_icon",
+    "altText": "alt_text",
 }
 
 # نام ورودی (camelCase) → نام فیلد مدل، برای ارجاع‌های آیکن
@@ -164,3 +165,20 @@ class MoveSerializer(serializers.Serializer):
 
 class FooterIconWriteSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=80)
+
+
+class FooterTrustBadgeWriteSerializer(RenamingSerializer):
+    """Complete metadata plus an optional replacement file, saved atomically."""
+
+    label = serializers.CharField(max_length=120)
+    url = serializers.CharField(max_length=300)
+    altText = serializers.CharField(max_length=200, allow_blank=True, required=False, default="")
+    position = serializers.IntegerField(min_value=0, max_value=2147483647, required=False)
+    isActive = serializers.BooleanField(required=False, default=True)
+    openInNewTab = serializers.BooleanField(required=False, default=True)
+    file = serializers.FileField(source="image", required=False)
+
+    def validate(self, data):
+        if self.initial_data.get("embedCode") or self.initial_data.get("embed_code"):
+            raise serializers.ValidationError({"embedCode": "کد HTML پشتیبانی نمی‌شود؛ تصویر و نشانی نماد را وارد کنید"})
+        return data
